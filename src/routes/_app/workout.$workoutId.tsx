@@ -1,20 +1,41 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, CloseIcon, TrophyIcon } from "~/components/icons"
 import {
   Button,
   buttonClass,
   Card,
   ErrorNote,
+  Field,
   parseNumber,
   SectionTitle,
+  Segmented,
+  Sheet,
   Stat,
   Stepper,
+  TextInput,
   useAction,
   useNow,
 } from "~/components/ui"
+import { BAR_WEIGHTS, platesPerSide, warmupSets } from "~/domain/loading"
+import type { Unit } from "~/domain/schema"
 import { formatClock, formatCompact, formatDay, formatReps, formatWeight } from "~/format"
-import { deleteSet, discardWorkout, finishWorkout, getWorkout, logSet } from "~/functions/api"
+import {
+  deleteSet,
+  discardWorkout,
+  finishWorkout,
+  getExercises,
+  getWorkout,
+  logSet,
+  swapExercise,
+} from "~/functions/api"
+import {
+  cancelRestAlert,
+  primeRestAlert,
+  scheduleRestAlert,
+  setSoundEnabled,
+  soundEnabled,
+} from "~/restAlert"
 import type { Adjustment, WorkoutDetail, WorkoutExercise } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/workout/$workoutId")({
@@ -35,8 +56,12 @@ function WorkoutPage() {
 
 interface WorkoutViewProps {
   readonly detail: WorkoutDetail
-  readonly unit: string
+  readonly unit: Unit
 }
+
+/** How long the "rest over" message stays up. */
+const REST_OVER_MS = 6000
+const EFFORTS = [6, 7, 8, 9, 10] as const
 
 interface Rest {
   readonly endsAt: number
@@ -62,6 +87,46 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
   )
 
   const currentId = detail.exercises.find((exercise) => !isDone(exercise))?.exerciseId
+  const restOver = rest !== null && now !== null && restLeft <= 0 && now - rest.endsAt < REST_OVER_MS
+  const [sound, setSound] = useState(true)
+
+  useEffect(() => {
+    setSound(soundEnabled())
+
+    return cancelRestAlert
+  }, [])
+
+  // Phones that support it also buzz. iPhones do not allow this from a web page.
+  useEffect(() => {
+    if (restOver && "vibrate" in navigator) navigator.vibrate([200, 100, 200])
+  }, [restOver])
+
+  const startRest = (seconds: number) => {
+    if (seconds <= 0) {
+      cancelRestAlert()
+      setRest(null)
+
+      return
+    }
+
+    scheduleRestAlert(seconds)
+    setRest({ endsAt: Date.now() + seconds * 1000, total: seconds })
+  }
+
+  const extendRest = (current: Rest) => {
+    const endsAt = current.endsAt + 30_000
+
+    scheduleRestAlert((endsAt - Date.now()) / 1000)
+    setRest({ endsAt, total: current.total + 30 })
+  }
+
+  const toggleSound = (current: Rest) => {
+    setSoundEnabled(!sound)
+    setSound(!sound)
+
+    if (sound) cancelRestAlert()
+    else scheduleRestAlert((current.endsAt - Date.now()) / 1000)
+  }
 
   const finish = () =>
     act(async () => {
@@ -113,7 +178,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
 
       <ErrorNote message={error} />
 
-      <div className={`space-y-3 pt-1 ${restLeft > 0 ? "pb-32" : "pb-4"}`}>
+      <div className={`space-y-3 pt-1 ${restLeft > 0 || restOver ? "pb-36" : "pb-4"}`}>
         {detail.exercises.map((exercise, index) => (
           <ExerciseCard
             key={exercise.exerciseId}
@@ -122,7 +187,8 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
             current={exercise.exerciseId === currentId}
             unit={unit}
             workoutId={workoutId}
-            onLogged={(seconds) => setRest(seconds > 0 ? { endsAt: Date.now() + seconds * 1000, total: seconds } : null)}
+            takenIds={detail.exercises.map((item) => item.exerciseId)}
+            onLogged={startRest}
           />
         ))}
       </div>
@@ -136,7 +202,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
       {restLeft > 0 && rest !== null ? (
         <div className="bottom-safe fixed inset-x-0 z-30 px-4">
           <div className="mx-auto max-w-md animate-pop overflow-hidden rounded-3xl border border-white/10 bg-surface/95 shadow-2xl shadow-black/70 backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 px-4 pt-3">
               <div>
                 <p className="eyebrow text-xs text-accent">Rest</p>
                 <p className="display tabular text-5xl" role="timer">
@@ -144,10 +210,25 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => setRest({ endsAt: rest.endsAt + 30_000, total: rest.total + 30 })}>+30s</Button>
-                <Button onClick={() => setRest(null)}>Skip</Button>
+                <Button onClick={() => extendRest(rest)}>+30s</Button>
+                <Button
+                  onClick={() => {
+                    cancelRestAlert()
+                    setRest(null)
+                  }}
+                >
+                  Skip
+                </Button>
               </div>
             </div>
+            <button
+              type="button"
+              aria-pressed={sound}
+              className="min-h-11 px-4 text-sm font-semibold text-muted"
+              onClick={() => toggleSound(rest)}
+            >
+              Sound at the end: <span className={sound ? "text-accent" : "text-white"}>{sound ? "on" : "off"}</span>
+            </button>
             <div className="h-1 bg-raised" aria-hidden="true">
               <div
                 className="h-full bg-accent transition-[width] duration-1000 ease-linear"
@@ -155,6 +236,22 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
               />
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {restOver ? (
+        <div className="bottom-safe fixed inset-x-0 z-30 px-4" role="status">
+          <button
+            type="button"
+            className="mx-auto flex w-full max-w-md animate-pop items-center justify-between rounded-3xl bg-accent px-5 py-4 text-left text-accent-ink shadow-2xl shadow-black/70"
+            onClick={() => setRest(null)}
+          >
+            <span>
+              <span className="eyebrow block text-xs">Rest over</span>
+              <span className="display block text-4xl">Go</span>
+            </span>
+            <span className="text-sm font-semibold">Tap to dismiss</span>
+          </button>
         </div>
       ) : null}
     </>
@@ -165,18 +262,22 @@ interface ExerciseCardProps {
   readonly exercise: WorkoutExercise
   readonly position: number
   readonly current: boolean
-  readonly unit: string
+  readonly unit: Unit
   readonly workoutId: number
+  /** Every exercise already in this workout, so a swap does not offer them. */
+  readonly takenIds: ReadonlyArray<number>
   readonly onLogged: (restSeconds: number) => void
 }
 
-function ExerciseCard({ exercise, position, current, unit, workoutId, onLogged }: ExerciseCardProps) {
+function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, onLogged }: ExerciseCardProps) {
   const { act, pending, error } = useAction()
   const { target, sets, previous } = exercise
   const lastSet = sets.at(-1)
   const prescribed = target?.sets ?? 0
   const done = isDone(exercise)
   const [addingExtra, setAddingExtra] = useState(false)
+  const [effort, setEffort] = useState<number | null>(null)
+  const [sheet, setSheet] = useState<"swap" | "load" | null>(null)
 
   const [weight, setWeight] = useState(() =>
     formatWeight(lastSet?.weight ?? target?.targetWeight ?? previous[0]?.weight ?? 0),
@@ -192,11 +293,19 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, onLogged }
 
     if (parsedWeight === null || parsedReps === null) return
 
+    // Audio has to be woken inside the tap itself, before the request goes out.
+    primeRestAlert()
+
     void act(async () => {
       await logSet({
-        data: { workoutId, exerciseId: exercise.exerciseId, set: { weight: parsedWeight, reps: parsedReps } },
+        data: {
+          workoutId,
+          exerciseId: exercise.exerciseId,
+          set: { weight: parsedWeight, reps: parsedReps, rpe: effort },
+        },
       })
       setAddingExtra(false)
+      setEffort(null)
       onLogged(target?.restSeconds ?? 120)
     })
   }
@@ -216,6 +325,9 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, onLogged }
           {done ? <CheckIcon /> : position}
         </span>
         <div className="min-w-0 flex-1">
+          {exercise.swappedFrom === null ? null : (
+            <p className="eyebrow truncate text-xs text-accent">In for {exercise.swappedFrom}</p>
+          )}
           <h2 className="display truncate pt-0.5 text-2xl">{exercise.exerciseName}</h2>
           {target ? (
             <p className="tabular text-sm text-muted">
@@ -259,6 +371,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, onLogged }
                   <span className="px-1 text-base text-muted">{unit} ×</span>
                   {set.reps}
                 </span>
+                {set.rpe === null ? null : <span className="text-sm text-muted">RPE {formatWeight(set.rpe)}</span>}
               </span>
               <button
                 type="button"
@@ -286,13 +399,251 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, onLogged }
             <Stepper label={unit} value={weight} step={target?.increment || 2.5} decimal onChange={setWeight} />
             <Stepper label="Reps" value={reps} step={1} onChange={setReps} />
           </div>
+          <div role="group" aria-label="Effort, optional">
+            <p className="flex items-baseline justify-between pb-1.5 text-xs text-faint">
+              <span className="eyebrow text-xs">Effort · optional</span>
+              <span>10 = nothing left</span>
+            </p>
+            <div className="flex gap-1 rounded-2xl bg-ink p-1">
+              {EFFORTS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={effort === value}
+                  aria-label={`Effort ${value} out of 10`}
+                  className={`display tabular min-h-11 flex-1 rounded-xl text-xl transition-colors ${
+                    effort === value ? "bg-accent text-accent-ink" : "bg-raised text-muted"
+                  }`}
+                  onClick={() => setEffort(effort === value ? null : value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
           <Button variant={current || done ? "primary" : "secondary"} className="w-full" disabled={pending} onClick={log}>
             Log set {sets.length + 1}
             {prescribed > 0 && !done ? ` of ${prescribed}` : ""}
           </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1 px-2" onClick={() => setSheet("load")}>
+              Warm-up and plates
+            </Button>
+            {target && sets.length === 0 ? (
+              <Button variant="ghost" className="flex-1 px-2" onClick={() => setSheet("swap")}>
+                Swap exercise
+              </Button>
+            ) : null}
+          </div>
         </div>
       )}
+
+      {sheet === "load" ? (
+        <Sheet title={exercise.exerciseName} onClose={() => setSheet(null)}>
+          <LoadingGuide weight={parseNumber(weight) ?? 0} unit={unit} />
+        </Sheet>
+      ) : null}
+      {sheet === "swap" && target ? (
+        <Sheet title="Swap exercise" onClose={() => setSheet(null)}>
+          <SwapForm
+            workoutId={workoutId}
+            planExerciseId={target.id}
+            muscleGroup={target.muscleGroup}
+            current={exercise.exerciseName}
+            swappedFrom={exercise.swappedFrom}
+            takenIds={takenIds}
+            onDone={() => setSheet(null)}
+          />
+        </Sheet>
+      ) : null}
     </section>
+  )
+}
+
+const BAR_KEY = "gym.barWeight"
+
+const savedBar = (options: ReadonlyArray<number>) => {
+  try {
+    const saved = Number(window.localStorage.getItem(BAR_KEY))
+
+    return options.includes(saved) ? saved : null
+  } catch {
+    return null
+  }
+}
+
+/** Warm-up sets leading to a weight, and the plates to put on each side of the bar for it. */
+function LoadingGuide({ weight, unit }: { readonly weight: number; readonly unit: Unit }) {
+  const bars = BAR_WEIGHTS[unit]
+  const [bar, setBar] = useState(bars[0] ?? 0)
+
+  useEffect(() => {
+    const saved = savedBar(bars)
+
+    if (saved !== null) setBar(saved)
+  }, [bars])
+
+  const chooseBar = (label: string) => {
+    const next = Number(label)
+
+    setBar(next)
+
+    try {
+      window.localStorage.setItem(BAR_KEY, String(next))
+    } catch {
+      // Without storage the choice lasts until the page reloads.
+    }
+  }
+
+  const load = platesPerSide(weight, bar, unit)
+  const warmups = warmupSets(weight, bar, unit)
+
+  return (
+    <div className="space-y-5 pb-3">
+      <div>
+        <p className="pb-1.5 text-sm text-muted">Bar weight ({unit})</p>
+        <Segmented label="Bar weight" options={bars.map(String)} value={String(bar)} onChange={chooseBar} />
+      </div>
+
+      <div>
+        <p className="eyebrow pb-2 text-muted">
+          Each side for {formatWeight(weight)} {unit}
+        </p>
+        {load === null ? (
+          <p className="text-muted">That is lighter than the bar.</p>
+        ) : load.perSide.length === 0 ? (
+          <p className="text-muted">Just the bar.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {load.perSide.map((plate, index) => (
+              // The same plate size can appear twice, so the position is part of the key.
+              <li key={`${index}-${plate}`} className="display tabular rounded-xl bg-accent px-3 py-2 text-2xl text-accent-ink">
+                {formatWeight(plate)}
+              </li>
+            ))}
+          </ul>
+        )}
+        {load !== null && load.leftover > 0 ? (
+          <p className="pt-2 text-sm text-amber-300">
+            Standard plates leave {formatWeight(load.leftover)} {unit} short.
+          </p>
+        ) : null}
+      </div>
+
+      <div>
+        <p className="eyebrow pb-2 text-muted">Warm-up</p>
+        {warmups.length === 0 ? (
+          <p className="text-muted">No warm-up sets needed at this weight.</p>
+        ) : (
+          <ol className="space-y-1.5">
+            {warmups.map((set) => (
+              <li key={set.weight} className="flex items-center justify-between rounded-2xl bg-raised/70 px-4 py-2.5">
+                <span className="display tabular text-2xl">
+                  {formatWeight(set.weight)}
+                  <span className="px-1 text-base text-muted">{unit} ×</span>
+                  {set.reps}
+                </span>
+                <span className="tabular text-sm text-muted">
+                  {(platesPerSide(set.weight, bar, unit)?.perSide ?? []).map(formatWeight).join(" + ") || "bar only"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p className="pt-2 text-sm text-faint">Warm-up sets are a guide and are not logged.</p>
+      </div>
+    </div>
+  )
+}
+
+interface SwapFormProps {
+  readonly workoutId: number
+  readonly planExerciseId: number
+  readonly muscleGroup: string
+  readonly current: string
+  readonly swappedFrom: string | null
+  readonly takenIds: ReadonlyArray<number>
+  readonly onDone: () => void
+}
+
+/** Picks a stand-in for a planned exercise, for this workout only. */
+function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom, takenIds, onDone }: SwapFormProps) {
+  const { act, pending, error } = useAction()
+  const [name, setName] = useState("")
+  const [known, setKnown] = useState<ReadonlyArray<{ id: number; name: string; muscleGroup: string }>>([])
+
+  useEffect(() => {
+    let active = true
+
+    // Suggestions are a convenience. If they fail to load, typing a name still works.
+    getExercises().then(
+      (list) => {
+        if (active) setKnown(list)
+      },
+      () => undefined,
+    )
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const suggestions = known.filter(
+    (item) => muscleGroup !== "" && item.muscleGroup === muscleGroup && !takenIds.includes(item.id),
+  )
+
+  const swapTo = (exercise: string) =>
+    act(async () => {
+      await swapExercise({ data: { workoutId, planExerciseId, exercise } })
+      onDone()
+    })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    void swapTo(name)
+  }
+
+  return (
+    <div className="space-y-4 pb-3">
+      <p className="text-muted">
+        Replaces {current} for this workout only. Your plan stays the same, and the sets, reps and rest carry over.
+      </p>
+      <ErrorNote message={error} />
+
+      {suggestions.length > 0 ? (
+        <div>
+          <p className="eyebrow pb-2 text-muted">Other {muscleGroup.toLowerCase()} exercises</p>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map((item) => (
+              <Button key={item.id} disabled={pending} onClick={() => swapTo(item.name)}>
+                {item.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <form onSubmit={submit} className="space-y-3">
+        <Field label="Or type an exercise">
+          <TextInput
+            required
+            maxLength={80}
+            placeholder="Dumbbell Bench Press"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </Field>
+        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
+          Swap
+        </Button>
+      </form>
+
+      {swappedFrom === null ? null : (
+        <Button variant="ghost" className="w-full" disabled={pending} onClick={() => swapTo(swappedFrom)}>
+          Back to {swappedFrom}
+        </Button>
+      )}
+    </div>
   )
 }
 

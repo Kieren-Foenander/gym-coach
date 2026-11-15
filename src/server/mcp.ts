@@ -17,6 +17,8 @@ Start with get_overview: it returns their profile, the active plan (with the ids
 How the app works:
 - A plan has days; each day lists exercises with sets, a rep range, a target weight, a weight increment and a rest time.
 - The user logs sets in the app on their phone. All weights are in the unit given in the profile.
+- A set may carry an rpe: the user's effort rating from 6 to 10, where 10 means nothing left. Use it when judging whether a weight is right.
+- The user can swap an exercise for one workout when equipment is taken. Those sets appear in history under the stand-in exercise and do not change the plan.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.

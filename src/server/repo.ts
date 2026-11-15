@@ -110,6 +110,8 @@ export interface WorkoutExercise {
   readonly exerciseName: string
   readonly target: PlanExercise | null
   readonly sets: ReadonlyArray<WorkoutSet>
+  /** The planned exercise this one stands in for, when it was swapped in for this workout. */
+  readonly swappedFrom: string | null
   /** What was done for this exercise in the most recent earlier workout. */
   readonly previous: ReadonlyArray<{ readonly weight: number; readonly reps: number }>
 }
@@ -529,11 +531,26 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
           FROM plan_exercises pe JOIN exercises e ON e.id = pe.exercise_id
           WHERE pe.plan_day_id = ${workout.planDayId} ORDER BY pe.position, pe.id`).map(toPlanExercise)
 
+  const swaps = yield* sql<{ planExerciseId: number; exerciseId: number; exerciseName: string }>`
+    SELECT ws.plan_exercise_id, ws.exercise_id, e.name AS exercise_name
+    FROM workout_swaps ws JOIN exercises e ON e.id = ws.exercise_id WHERE ws.workout_id = ${workout.id}`
+
   // A finished workout shows what was done; one in progress shows the whole prescription.
-  const entries = new Map<number, { exerciseName: string; target: PlanExercise | null }>()
+  const entries = new Map<number, { exerciseName: string; target: PlanExercise | null; swappedFrom: string | null }>()
 
   if (workout.finishedAt === null) {
-    for (const target of targets) entries.set(target.exerciseId, { exerciseName: target.exerciseName, target })
+    for (const target of targets) {
+      const swap = swaps.find((item) => item.planExerciseId === target.id)
+
+      // A stand-in keeps the sets, reps and rest of the planned exercise, but its weight is its own.
+      if (swap) {
+        entries.set(swap.exerciseId, {
+          exerciseName: swap.exerciseName,
+          target: { ...target, targetWeight: null, notes: "" },
+          swappedFrom: target.exerciseName,
+        })
+      } else entries.set(target.exerciseId, { exerciseName: target.exerciseName, target, swappedFrom: null })
+    }
   }
 
   for (const set of sets) {
@@ -541,6 +558,7 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
       entries.set(set.exerciseId, {
         exerciseName: set.exerciseName,
         target: targets.find((target) => target.exerciseId === set.exerciseId) ?? null,
+        swappedFrom: null,
       })
     }
   }
@@ -552,6 +570,7 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
         exerciseId,
         exerciseName: entry.exerciseName,
         target: entry.target,
+        swappedFrom: entry.swappedFrom,
         sets: sets.flatMap((set): ReadonlyArray<WorkoutSet> =>
           set.exerciseId === exerciseId
             ? [
@@ -611,6 +630,68 @@ export const logSet = Effect.fn("logSet")(function* (
   return rows[0]!.id
 })
 
+/**
+ * Swaps a planned exercise for another one in this workout only, such as when
+ * the equipment is taken. Naming the planned exercise itself undoes the swap.
+ */
+export const swapExercise = Effect.fn("swapExercise")(function* (
+  workoutId: number,
+  planExerciseId: number,
+  exerciseName: string,
+) {
+  const sql = yield* sqlClient
+  const workout = yield* ownedWorkout(workoutId)
+
+  if (workout.finishedAt !== null) return yield* new Invalid({ reason: "This workout is already finished" })
+
+  const planned = yield* sql<{ id: number; exerciseId: number; muscleGroup: string }>`
+    SELECT pe.id, pe.exercise_id, e.muscle_group
+    FROM plan_exercises pe JOIN exercises e ON e.id = pe.exercise_id
+    WHERE pe.plan_day_id = ${workout.planDayId}`
+
+  const original = planned.find((item) => item.id === planExerciseId)
+
+  if (!original) return yield* new NotFound({ what: "That exercise in this workout" })
+
+  const current = yield* sql<{ exerciseId: number }>`
+    SELECT exercise_id FROM workout_swaps WHERE workout_id = ${workout.id} AND plan_exercise_id = ${original.id}`
+
+  const logged = yield* sql<{ id: number }>`
+    SELECT id FROM workout_sets
+    WHERE workout_id = ${workout.id} AND exercise_id = ${current[0]?.exerciseId ?? original.exerciseId} LIMIT 1`
+
+  if (logged[0]) return yield* new Invalid({ reason: "Remove the sets you logged for it before swapping" })
+
+  const user = yield* CurrentUser
+
+  // Looked up first so an existing exercise keeps its own muscle group.
+  const known = yield* sql<{ id: number }>`
+    SELECT id FROM exercises WHERE user_id = ${user.id} AND name = ${exerciseName}`
+
+  const replacementId = known[0]?.id ?? (yield* ensureExercise(exerciseName, original.muscleGroup))
+
+  if (replacementId === original.exerciseId) {
+    yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id} AND plan_exercise_id = ${original.id}`
+
+    return
+  }
+
+  if (planned.some((item) => item.exerciseId === replacementId)) {
+    return yield* new Invalid({ reason: `${exerciseName} is already in this workout` })
+  }
+
+  const taken = yield* sql<{ planExerciseId: number }>`
+    SELECT plan_exercise_id FROM workout_swaps
+    WHERE workout_id = ${workout.id} AND exercise_id = ${replacementId} AND plan_exercise_id != ${original.id}`
+
+  if (taken[0]) return yield* new Invalid({ reason: `${exerciseName} is already in this workout` })
+
+  yield* sql`
+    INSERT INTO workout_swaps (workout_id, plan_exercise_id, exercise_id)
+    VALUES (${workout.id}, ${original.id}, ${replacementId})
+    ON CONFLICT (workout_id, plan_exercise_id) DO UPDATE SET exercise_id = excluded.exercise_id`
+})
+
 const ownedSet = Effect.fn("ownedSet")(function* (setId: number) {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
@@ -643,6 +724,7 @@ export const discardWorkout = Effect.fn("discardWorkout")(function* (workoutId: 
   const sql = yield* sqlClient
   const workout = yield* ownedWorkout(workoutId)
   yield* sql`DELETE FROM workout_sets WHERE workout_id = ${workout.id}`
+  yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workouts WHERE id = ${workout.id}`
 })
 
@@ -670,7 +752,8 @@ export const finishWorkout = Effect.fn("finishWorkout")(function* (workoutId: nu
   for (const exercise of detail.exercises) {
     const target = exercise.target
 
-    if (!target || !target.autoProgress) continue
+    // A stand-in says nothing about the planned exercise, so its target is left alone.
+    if (!target || !target.autoProgress || exercise.swappedFrom !== null) continue
     const decision = evaluateProgression(target, exercise.sets, user.unit)
 
     if (decision.kind === "none") continue

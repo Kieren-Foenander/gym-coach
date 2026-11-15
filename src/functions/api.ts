@@ -138,6 +138,20 @@ export const logSet = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ workoutId: Id, exerciseId: Id, set: SetInput })))
   .handler(({ data }) => authed(Repo.logSet(data.workoutId, { ...data.set, exerciseId: data.exerciseId })))
 
+export const swapExercise = createServerFn({ method: "POST" })
+  .validator(
+    input(
+      Schema.Struct({
+        workoutId: Id,
+        planExerciseId: Id,
+        exercise: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+      }),
+    ),
+  )
+  .handler(({ data }) => authed(Repo.swapExercise(data.workoutId, data.planExerciseId, data.exercise)))
+
+export const getExercises = createServerFn({ method: "GET" }).handler(() => authed(Repo.listExercises()))
+
 export const updateSet = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ setId: Id, set: SetInput })))
   .handler(({ data }) => authed(Repo.updateSet(data.setId, data.set)))
