@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
+import { BodyLog } from "~/components/body"
 import { ChevronIcon } from "~/components/icons"
 import { Card, PageTitle, Segmented, Stat } from "~/components/ui"
 import { formatCompact, formatVolume } from "~/format"
@@ -14,9 +15,9 @@ const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" })
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" })
 
 function HistoryPage() {
-  const { workouts, exercises } = Route.useLoaderData()
+  const { workouts, exercises, measurements } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
-  const [view, setView] = useState<"workouts" | "exercises">("workouts")
+  const [view, setView] = useState<"workouts" | "exercises" | "body">("workouts")
   const performed = exercises.filter((exercise) => exercise.lastPerformedAt !== null)
   const totalVolume = workouts.reduce((total, workout) => total + workout.volume, 0)
   const totalSets = workouts.reduce((total, workout) => total + workout.setCount, 0)
@@ -33,7 +34,9 @@ function HistoryPage() {
         </div>
       ) : null}
 
-      <Segmented label="Show" options={["workouts", "exercises"] as const} value={view} onChange={setView} />
+      <Segmented label="Show" options={["workouts", "exercises", "body"] as const} value={view} onChange={setView} />
+
+      {view === "body" ? <BodyLog measurements={measurements} unit={user.unit} /> : null}
 
       {view === "workouts" ? (
         <div className="space-y-2 pt-4">
@@ -60,7 +63,9 @@ function HistoryPage() {
             </Link>
           ))}
         </div>
-      ) : (
+      ) : null}
+
+      {view === "exercises" ? (
         <div className="pt-4">
           {performed.length === 0 ? (
             <Empty>Exercises you log show up here.</Empty>
@@ -86,7 +91,7 @@ function HistoryPage() {
             </Card>
           )}
         </div>
-      )}
+      ) : null}
     </>
   )
 }

@@ -7,7 +7,10 @@ import {
 } from "~/domain/progression"
 import type {
   AdjustmentSource,
+  Direction,
   ExercisePrescription,
+  MeasurementInput,
+  MeasurementKind,
   PlanExercisePatch,
   PlanInput,
   ProfilePatch,
@@ -177,6 +180,17 @@ const ensureExercise = Effect.fn("ensureExercise")(function* (name: string, musc
   return rows[0]!.id
 })
 
+/** Finds an exercise by name, creating it if it is new. An existing exercise keeps its own muscle group. */
+const exerciseIdFor = Effect.fn("exerciseIdFor")(function* (name: string, muscleGroupIfNew: string) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  const known = yield* sql<{ id: number }>`
+    SELECT id FROM exercises WHERE user_id = ${user.id} AND name = ${name}`
+
+  return known[0]?.id ?? (yield* ensureExercise(name, muscleGroupIfNew))
+})
+
 export const listExercises = Effect.fn("listExercises")(function* () {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
@@ -320,6 +334,47 @@ export const addPlanDay = Effect.fn("addPlanDay")(function* (name: string) {
   return rows[0]!.id
 })
 
+/** Where an item lands after moving one place up or down a list. Null when it is already at that end. */
+const moved = (ids: ReadonlyArray<number>, id: number, direction: Direction): ReadonlyArray<number> | null => {
+  const from = ids.indexOf(id)
+  const to = direction === "up" ? from - 1 : from + 1
+
+  if (from === -1 || to < 0 || to >= ids.length) return null
+
+  return ids.map((current, index) => (index === from ? ids[to]! : index === to ? id : current))
+}
+
+export const movePlanDay = Effect.fn("movePlanDay")(function* (planDayId: number, direction: Direction) {
+  const sql = yield* sqlClient
+  const day = yield* ownedPlanDay(planDayId)
+
+  const siblings = yield* sql<{ id: number }>`
+    SELECT id FROM plan_days WHERE plan_id = ${day.planId} ORDER BY position, id`
+
+  const order = moved(siblings.map((row) => row.id), day.id, direction)
+
+  if (!order) return
+
+  yield* Effect.forEach(order, (id, position) => sql`UPDATE plan_days SET position = ${position} WHERE id = ${id}`)
+})
+
+export const movePlanExercise = Effect.fn("movePlanExercise")(function* (
+  planExerciseId: number,
+  direction: Direction,
+) {
+  const sql = yield* sqlClient
+  const exercise = yield* ownedPlanExercise(planExerciseId)
+
+  const siblings = yield* sql<{ id: number }>`
+    SELECT id FROM plan_exercises WHERE plan_day_id = ${exercise.planDayId} ORDER BY position, id`
+
+  const order = moved(siblings.map((row) => row.id), exercise.id, direction)
+
+  if (!order) return
+
+  yield* Effect.forEach(order, (id, position) => sql`UPDATE plan_exercises SET position = ${position} WHERE id = ${id}`)
+})
+
 export const removePlanDay = Effect.fn("removePlanDay")(function* (planDayId: number) {
   const sql = yield* sqlClient
   const day = yield* ownedPlanDay(planDayId)
@@ -461,6 +516,21 @@ export const startWorkout = Effect.fn("startWorkout")(function* (planDayId: numb
   return rows[0]!.id
 })
 
+/** Starts a workout that follows no plan day. Exercises are added to it as the session goes. */
+export const startOpenWorkout = Effect.fn("startOpenWorkout")(function* () {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+  const active = yield* getActiveWorkout()
+
+  if (active) return active.id
+
+  const rows = yield* sql<{ id: number }>`
+    INSERT INTO workouts (user_id, plan_day_id, name, started_at)
+    VALUES (${user.id}, NULL, 'Open workout', ${yield* now}) RETURNING id`
+
+  return rows[0]!.id
+})
+
 const workoutSets = Effect.fn("workoutSets")(function* (workoutId: number) {
   const sql = yield* sqlClient
 
@@ -550,6 +620,19 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
           swappedFrom: target.exerciseName,
         })
       } else entries.set(target.exerciseId, { exerciseName: target.exerciseName, target, swappedFrom: null })
+    }
+  }
+
+  if (workout.finishedAt === null) {
+    const extras = yield* sql<{ exerciseId: number; exerciseName: string }>`
+      SELECT x.exercise_id, e.name AS exercise_name
+      FROM workout_extras x JOIN exercises e ON e.id = x.exercise_id
+      WHERE x.workout_id = ${workout.id} ORDER BY x.position`
+
+    for (const extra of extras) {
+      if (!entries.has(extra.exerciseId)) {
+        entries.set(extra.exerciseId, { exerciseName: extra.exerciseName, target: null, swappedFrom: null })
+      }
     }
   }
 
@@ -662,13 +745,7 @@ export const swapExercise = Effect.fn("swapExercise")(function* (
 
   if (logged[0]) return yield* new Invalid({ reason: "Remove the sets you logged for it before swapping" })
 
-  const user = yield* CurrentUser
-
-  // Looked up first so an existing exercise keeps its own muscle group.
-  const known = yield* sql<{ id: number }>`
-    SELECT id FROM exercises WHERE user_id = ${user.id} AND name = ${exerciseName}`
-
-  const replacementId = known[0]?.id ?? (yield* ensureExercise(exerciseName, original.muscleGroup))
+  const replacementId = yield* exerciseIdFor(exerciseName, original.muscleGroup)
 
   if (replacementId === original.exerciseId) {
     yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id} AND plan_exercise_id = ${original.id}`
@@ -690,6 +767,42 @@ export const swapExercise = Effect.fn("swapExercise")(function* (
     INSERT INTO workout_swaps (workout_id, plan_exercise_id, exercise_id)
     VALUES (${workout.id}, ${original.id}, ${replacementId})
     ON CONFLICT (workout_id, plan_exercise_id) DO UPDATE SET exercise_id = excluded.exercise_id`
+})
+
+/** Adds an exercise to a workout in progress, on top of whatever the plan prescribes. */
+export const addWorkoutExercise = Effect.fn("addWorkoutExercise")(function* (workoutId: number, exerciseName: string) {
+  const sql = yield* sqlClient
+  const detail = yield* getWorkoutDetail(workoutId)
+
+  if (detail.workout.finishedAt !== null) return yield* new Invalid({ reason: "This workout is already finished" })
+
+  const exerciseId = yield* exerciseIdFor(exerciseName, "")
+
+  if (detail.exercises.some((exercise) => exercise.exerciseId === exerciseId)) {
+    return yield* new Invalid({ reason: `${exerciseName} is already in this workout` })
+  }
+
+  yield* sql`
+    INSERT INTO workout_extras (workout_id, exercise_id, position)
+    VALUES (${workoutId}, ${exerciseId},
+      (SELECT COALESCE(MAX(position), -1) + 1 FROM workout_extras WHERE workout_id = ${workoutId}))
+    ON CONFLICT (workout_id, exercise_id) DO NOTHING`
+})
+
+/** Takes an added exercise back out of a workout. Only allowed while it has no sets. */
+export const removeWorkoutExercise = Effect.fn("removeWorkoutExercise")(function* (
+  workoutId: number,
+  exerciseId: number,
+) {
+  const sql = yield* sqlClient
+  const workout = yield* ownedWorkout(workoutId)
+
+  const logged = yield* sql<{ id: number }>`
+    SELECT id FROM workout_sets WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId} LIMIT 1`
+
+  if (logged[0]) return yield* new Invalid({ reason: "Remove its sets first" })
+
+  yield* sql`DELETE FROM workout_extras WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId}`
 })
 
 const ownedSet = Effect.fn("ownedSet")(function* (setId: number) {
@@ -725,6 +838,7 @@ export const discardWorkout = Effect.fn("discardWorkout")(function* (workoutId: 
   const workout = yield* ownedWorkout(workoutId)
   yield* sql`DELETE FROM workout_sets WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id}`
+  yield* sql`DELETE FROM workout_extras WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workouts WHERE id = ${workout.id}`
 })
 
@@ -1001,6 +1115,41 @@ export const deleteCoachNote = Effect.fn("deleteCoachNote")(function* (noteId: n
 })
 
 // ---------------------------------------------------------------- today
+
+// ---------------------------------------------------------------- body
+
+export interface Measurement {
+  readonly id: number
+  readonly kind: MeasurementKind
+  readonly value: number
+  readonly measuredAt: number
+}
+
+export const logMeasurement = Effect.fn("logMeasurement")(function* (input: MeasurementInput, measuredAt?: number) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  yield* sql`
+    INSERT INTO body_measurements (user_id, kind, value, measured_at)
+    VALUES (${user.id}, ${input.kind}, ${input.value}, ${measuredAt ?? (yield* now)})`
+})
+
+/** Body measurements, newest first. */
+export const listMeasurements = Effect.fn("listMeasurements")(function* (limit: number) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  return yield* sql<Measurement>`
+    SELECT id, kind, value, measured_at FROM body_measurements
+    WHERE user_id = ${user.id} ORDER BY measured_at DESC, id DESC LIMIT ${limit}`
+})
+
+export const deleteMeasurement = Effect.fn("deleteMeasurement")(function* (measurementId: number) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  yield* sql`DELETE FROM body_measurements WHERE id = ${measurementId} AND user_id = ${user.id}`
+})
 
 /** The plan day that follows the most recently finished one, wrapping round. */
 export const nextPlanDayId = (plan: Plan | null, lastPlanDayId: number | null): number | null => {

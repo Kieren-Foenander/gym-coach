@@ -78,3 +78,24 @@ export const SetInput = Schema.Struct({
 export type SetInput = typeof SetInput.Type
 
 export type AdjustmentSource = "rule" | "ai" | "user"
+
+export const MEASUREMENT_KINDS = ["weight", "waist", "chest", "hips", "arm", "thigh"] as const
+
+export const MeasurementKind = Schema.Literals(MEASUREMENT_KINDS)
+
+export type MeasurementKind = typeof MeasurementKind.Type
+
+export const MeasurementInput = Schema.Struct({
+  kind: MeasurementKind,
+  value: Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 1000 })),
+})
+
+export type MeasurementInput = typeof MeasurementInput.Type
+
+export const Direction = Schema.Literals(["up", "down"])
+
+export type Direction = typeof Direction.Type
+
+/** Bodyweight uses the weight unit. Tape measurements use cm alongside kg and inches alongside lb. */
+export const measurementUnit = (kind: MeasurementKind, unit: Unit) =>
+  kind === "weight" ? unit : unit === "kg" ? "cm" : "in"

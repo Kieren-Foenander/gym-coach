@@ -6,8 +6,10 @@ import type { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
 import {
   Credentials,
+  Direction,
   ExercisePrescription,
   Id,
+  MeasurementInput,
   PlanExercisePatch,
   ProfilePatch,
   SetInput,
@@ -121,7 +123,13 @@ export const getWorkout = createServerFn({ method: "GET" })
   .handler(({ data }) => authed(Repo.getWorkoutDetail(data.workoutId)))
 
 export const getHistory = createServerFn({ method: "GET" }).handler(() =>
-  authed(Effect.all({ workouts: Repo.listWorkouts(100), exercises: Repo.listExercises() })),
+  authed(
+    Effect.all({
+      workouts: Repo.listWorkouts(100),
+      exercises: Repo.listExercises(),
+      measurements: Repo.listMeasurements(500),
+    }),
+  ),
 )
 
 export const getExerciseProgress = createServerFn({ method: "GET" })
@@ -133,6 +141,18 @@ export const getExerciseProgress = createServerFn({ method: "GET" })
 export const startWorkout = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ planDayId: Id })))
   .handler(({ data }) => authed(Repo.startWorkout(data.planDayId)))
+
+export const startOpenWorkout = createServerFn({ method: "POST" }).handler(() => authed(Repo.startOpenWorkout()))
+
+const ExerciseName = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80))
+
+export const addWorkoutExercise = createServerFn({ method: "POST" })
+  .validator(input(Schema.Struct({ workoutId: Id, exercise: ExerciseName })))
+  .handler(({ data }) => authed(Repo.addWorkoutExercise(data.workoutId, data.exercise)))
+
+export const removeWorkoutExercise = createServerFn({ method: "POST" })
+  .validator(input(Schema.Struct({ workoutId: Id, exerciseId: Id })))
+  .handler(({ data }) => authed(Repo.removeWorkoutExercise(data.workoutId, data.exerciseId)))
 
 export const logSet = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ workoutId: Id, exerciseId: Id, set: SetInput })))
@@ -190,6 +210,14 @@ export const removePlanDay = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ planDayId: Id })))
   .handler(({ data }) => authed(Repo.removePlanDay(data.planDayId)))
 
+export const movePlanDay = createServerFn({ method: "POST" })
+  .validator(input(Schema.Struct({ planDayId: Id, direction: Direction })))
+  .handler(({ data }) => authed(Repo.movePlanDay(data.planDayId, data.direction)))
+
+export const movePlanExercise = createServerFn({ method: "POST" })
+  .validator(input(Schema.Struct({ planExerciseId: Id, direction: Direction })))
+  .handler(({ data }) => authed(Repo.movePlanExercise(data.planExerciseId, data.direction)))
+
 export const addPlanExercise = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ planDayId: Id, exercise: ExercisePrescription })))
   .handler(({ data }) => authed(Effect.asVoid(Repo.addPlanExercise(data.planDayId, data.exercise))))
@@ -205,3 +233,13 @@ export const removePlanExercise = createServerFn({ method: "POST" })
 export const deleteCoachNote = createServerFn({ method: "POST" })
   .validator(input(Schema.Struct({ noteId: Id })))
   .handler(({ data }) => authed(Repo.deleteCoachNote(data.noteId)))
+
+// ---------------------------------------------------------------- body
+
+export const logMeasurement = createServerFn({ method: "POST" })
+  .validator(input(MeasurementInput))
+  .handler(({ data }) => authed(Repo.logMeasurement(data)))
+
+export const deleteMeasurement = createServerFn({ method: "POST" })
+  .validator(input(Schema.Struct({ measurementId: Id })))
+  .handler(({ data }) => authed(Repo.deleteMeasurement(data.measurementId)))

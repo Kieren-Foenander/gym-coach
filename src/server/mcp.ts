@@ -4,7 +4,16 @@ import { HttpRouter, HttpServer } from "effect/http"
 import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
-import { ExercisePrescription, Id, PlanExercisePatch, PlanInput, ProfilePatch, SetInput } from "~/domain/schema"
+import {
+  ExercisePrescription,
+  Id,
+  MeasurementInput,
+  measurementUnit,
+  PlanExercisePatch,
+  PlanInput,
+  ProfilePatch,
+  SetInput,
+} from "~/domain/schema"
 import { Invalid, type DomainError } from "./errors"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
@@ -19,6 +28,8 @@ How the app works:
 - The user logs sets in the app on their phone. All weights are in the unit given in the profile.
 - A set may carry an rpe: the user's effort rating from 6 to 10, where 10 means nothing left. Use it when judging whether a weight is right.
 - The user can swap an exercise for one workout when equipment is taken. Those sets appear in history under the stand-in exercise and do not change the plan.
+- The user can also log bodyweight and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
+- An "Open workout" follows no plan day: the user added exercises as they went.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.
@@ -137,7 +148,29 @@ const LogWorkout = Tool.make("log_workout", {
   ...options,
 }).annotate(Tool.Destructive, false)
 
+const GetBodyMeasurements = Tool.make("get_body_measurements", {
+  description: "Bodyweight and tape measurements the user has logged, newest first, with the unit for each.",
+  parameters: Schema.Struct({
+    limit: Schema.optional(describe(Schema.Int, "Most entries to return. Default 60, at most 500.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
+const LogBodyMeasurement = Tool.make("log_body_measurement", {
+  description:
+    "Record a bodyweight or tape measurement the user tells you. Weight is in the profile's unit; lengths are cm for kg users and inches for lb users.",
+  parameters: Schema.Struct({
+    ...MeasurementInput.fields,
+    date: Schema.optional(describe(Schema.String, "ISO 8601 date or date-time. Defaults to now.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, false)
+
 export const GymToolkit = Toolkit.make(
+  GetBodyMeasurements,
+  LogBodyMeasurement,
   GetOverview,
   GetTrainingHistory,
   GetExerciseProgress,
@@ -258,6 +291,36 @@ export const GymHandlers = GymToolkit.toLayer(
         run(Effect.map(Repo.removePlanExercise(planExerciseId), (removed) => ({ removed: removed.exerciseName }))),
       update_profile: (patch) => run(Effect.map(Repo.updateProfile(patch), (user) => ({ profile: profileOf(user) }))),
       add_coach_note: ({ note }) => run(Effect.as(Repo.addCoachNote(note), { saved: true })),
+      get_body_measurements: ({ limit }) =>
+        run(
+          Effect.gen(function* () {
+            const user = yield* CurrentUser
+            const entries = yield* Repo.listMeasurements(clamp(limit, 60, 500))
+
+            return {
+              measurements: entries.map((entry) => ({
+                kind: entry.kind,
+                value: entry.value,
+                unit: measurementUnit(entry.kind, user.unit),
+                date: new Date(entry.measuredAt).toISOString(),
+              })),
+            }
+          }),
+        ),
+      log_body_measurement: ({ kind, value, date }) =>
+        run(
+          Effect.gen(function* () {
+            const measuredAt = date === undefined ? undefined : Date.parse(date)
+
+            if (measuredAt !== undefined && Number.isNaN(measuredAt)) {
+              return yield* new Invalid({ reason: `"${date}" is not a date` })
+            }
+
+            yield* Repo.logMeasurement({ kind, value }, measuredAt)
+
+            return { saved: true }
+          }),
+        ),
       log_workout: (input) => run(Effect.map(Repo.logPastWorkout(input), (workoutId) => ({ workoutId }))),
     }
   }),

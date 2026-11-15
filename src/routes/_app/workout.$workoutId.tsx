@@ -21,12 +21,14 @@ import { BAR_WEIGHTS, platesPerSide, warmupSets } from "~/domain/loading"
 import type { Unit } from "~/domain/schema"
 import { formatClock, formatCompact, formatDay, formatReps, formatWeight } from "~/format"
 import {
+  addWorkoutExercise,
   deleteSet,
   discardWorkout,
   finishWorkout,
   getExercises,
   getWorkout,
   logSet,
+  removeWorkoutExercise,
   swapExercise,
 } from "~/functions/api"
 import {
@@ -86,7 +88,13 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
     0,
   )
 
-  const currentId = detail.exercises.find((exercise) => !isDone(exercise))?.exerciseId
+  // The first planned exercise still to do, or failing that the one added most recently.
+  const currentId = (
+    detail.exercises.find((exercise) => exercise.target !== null && !isDone(exercise)) ?? detail.exercises.at(-1)
+  )?.exerciseId
+
+  const [adding, setAdding] = useState(false)
+  const takenIds = detail.exercises.map((item) => item.exerciseId)
   const restOver = rest !== null && now !== null && restLeft <= 0 && now - rest.endsAt < REST_OVER_MS
   const [sound, setSound] = useState(true)
 
@@ -187,11 +195,25 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
             current={exercise.exerciseId === currentId}
             unit={unit}
             workoutId={workoutId}
-            takenIds={detail.exercises.map((item) => item.exerciseId)}
+            takenIds={takenIds}
             onLogged={startRest}
           />
         ))}
+        {detail.exercises.length === 0 ? (
+          <p className="rounded-3xl border border-dashed border-line px-4 py-10 text-center text-muted">
+            Nothing here yet. Add the first exercise you are going to do.
+          </p>
+        ) : null}
+        <Button className="w-full" variant={detail.exercises.length === 0 ? "primary" : "secondary"} onClick={() => setAdding(true)}>
+          Add exercise
+        </Button>
       </div>
+
+      {adding ? (
+        <Sheet title="Add exercise" onClose={() => setAdding(false)}>
+          <AddExerciseForm workoutId={workoutId} takenIds={takenIds} onDone={() => setAdding(false)} />
+        </Sheet>
+      ) : null}
 
       {loggedAnything ? (
         <Button variant="danger" className="w-full" disabled={pending} onClick={discard}>
@@ -434,6 +456,16 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
                 Swap exercise
               </Button>
             ) : null}
+            {!target && sets.length === 0 ? (
+              <Button
+                variant="ghost"
+                className="flex-1 px-2"
+                disabled={pending}
+                onClick={() => act(() => removeWorkoutExercise({ data: { workoutId, exerciseId: exercise.exerciseId } }))}
+              >
+                Remove
+              </Button>
+            ) : null}
           </div>
         </div>
       )}
@@ -556,20 +588,8 @@ function LoadingGuide({ weight, unit }: { readonly weight: number; readonly unit
   )
 }
 
-interface SwapFormProps {
-  readonly workoutId: number
-  readonly planExerciseId: number
-  readonly muscleGroup: string
-  readonly current: string
-  readonly swappedFrom: string | null
-  readonly takenIds: ReadonlyArray<number>
-  readonly onDone: () => void
-}
-
-/** Picks a stand-in for a planned exercise, for this workout only. */
-function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom, takenIds, onDone }: SwapFormProps) {
-  const { act, pending, error } = useAction()
-  const [name, setName] = useState("")
+/** Loads the user's exercises once, for suggestion lists. Empty until loaded, and stays empty if loading fails. */
+const useKnownExercises = () => {
   const [known, setKnown] = useState<ReadonlyArray<{ id: number; name: string; muscleGroup: string }>>([])
 
   useEffect(() => {
@@ -587,6 +607,87 @@ function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom
       active = false
     }
   }, [])
+
+  return known
+}
+
+interface AddExerciseFormProps {
+  readonly workoutId: number
+  readonly takenIds: ReadonlyArray<number>
+  readonly onDone: () => void
+}
+
+/** Adds an exercise to the workout: pick one done before, or type a new one. */
+function AddExerciseForm({ workoutId, takenIds, onDone }: AddExerciseFormProps) {
+  const { act, pending, error } = useAction()
+  const [name, setName] = useState("")
+  const known = useKnownExercises()
+  const query = name.trim().toLowerCase()
+
+  const matches = known
+    .filter((item) => !takenIds.includes(item.id) && item.name.toLowerCase().includes(query))
+    .slice(0, 12)
+
+  const add = (exercise: string) =>
+    act(async () => {
+      await addWorkoutExercise({ data: { workoutId, exercise } })
+      onDone()
+    })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    void add(name)
+  }
+
+  return (
+    <div className="space-y-4 pb-3">
+      <form onSubmit={submit} className="space-y-3">
+        <Field label="Exercise">
+          <TextInput
+            required
+            maxLength={80}
+            placeholder="Search or type a new one"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </Field>
+        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
+          Add {name.trim() === "" ? "exercise" : name.trim()}
+        </Button>
+      </form>
+      <ErrorNote message={error} />
+
+      {matches.length > 0 ? (
+        <div>
+          <p className="eyebrow pb-2 text-muted">Your exercises</p>
+          <div className="flex flex-wrap gap-2">
+            {matches.map((item) => (
+              <Button key={item.id} disabled={pending} onClick={() => add(item.name)}>
+                {item.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+interface SwapFormProps {
+  readonly workoutId: number
+  readonly planExerciseId: number
+  readonly muscleGroup: string
+  readonly current: string
+  readonly swappedFrom: string | null
+  readonly takenIds: ReadonlyArray<number>
+  readonly onDone: () => void
+}
+
+/** Picks a stand-in for a planned exercise, for this workout only. */
+function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom, takenIds, onDone }: SwapFormProps) {
+  const { act, pending, error } = useAction()
+  const [name, setName] = useState("")
+  const known = useKnownExercises()
 
   const suggestions = known.filter(
     (item) => muscleGroup !== "" && item.muscleGroup === muscleGroup && !takenIds.includes(item.id),

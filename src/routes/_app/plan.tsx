@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useState, type FormEvent } from "react"
-import { ChevronIcon } from "~/components/icons"
+import { ArrowDownIcon, ArrowUpIcon, ChevronIcon } from "~/components/icons"
 import {
   Button,
   Card,
@@ -20,10 +20,13 @@ import {
   addPlanExercise,
   applyTemplate,
   getPlan,
+  movePlanDay,
+  movePlanExercise,
   removePlanDay,
   removePlanExercise,
   updatePlanExercise,
 } from "~/functions/api"
+import type { Direction } from "~/domain/schema"
 import type { PlanExercise } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/plan")({
@@ -43,6 +46,7 @@ function PlanPage() {
   const { user } = Route.useRouteContext()
   const [editing, setEditing] = useState<Editing>(null)
   const { act, pending, error } = useAction()
+  const [reordering, setReordering] = useState(false)
   const close = () => setEditing(null)
 
   const removeDay = (planDayId: number, name: string) => {
@@ -53,7 +57,17 @@ function PlanPage() {
 
   return (
     <>
-      <PageTitle>Plan</PageTitle>
+      <PageTitle
+        action={
+          plan ? (
+            <Button variant={reordering ? "primary" : "secondary"} onClick={() => setReordering(!reordering)}>
+              {reordering ? "Done" : "Reorder"}
+            </Button>
+          ) : undefined
+        }
+      >
+        Plan
+      </PageTitle>
       <ErrorNote message={error} />
 
       {plan ? (
@@ -62,7 +76,9 @@ function PlanPage() {
             <p className="eyebrow pb-1 text-accent">{plan.source === "ai" ? "Written by your coach" : "Your plan"}</p>
             <h2 className="display text-3xl">{plan.name}</h2>
             {plan.description ? <p className="pt-1 text-muted">{plan.description}</p> : null}
-            <p className="pt-1 text-sm text-faint">Tap an exercise to change it.</p>
+            <p className="pt-1 text-sm text-faint">
+              {reordering ? "Use the arrows to move days and exercises." : "Tap an exercise to change it."}
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -73,18 +89,42 @@ function PlanPage() {
                     <span className="eyebrow block text-xs text-faint">Day {dayIndex + 1}</span>
                     <span className="display block truncate text-2xl">{day.name}</span>
                   </h3>
-                  <button
-                    type="button"
-                    className="min-h-11 shrink-0 px-2 text-sm font-semibold text-faint"
-                    disabled={pending}
-                    onClick={() => removeDay(day.id, day.name)}
-                  >
-                    Remove
-                  </button>
+                  {reordering ? (
+                    <MoveButtons
+                      name={day.name}
+                      first={dayIndex === 0}
+                      last={dayIndex === plan.days.length - 1}
+                      disabled={pending}
+                      onMove={(direction) => act(() => movePlanDay({ data: { planDayId: day.id, direction } }))}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="min-h-11 shrink-0 px-2 text-sm font-semibold text-faint"
+                      disabled={pending}
+                      onClick={() => removeDay(day.id, day.name)}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
                 <ul className="divide-y divide-white/5">
-                  {day.exercises.map((exercise) => (
+                  {day.exercises.map((exercise, exerciseIndex) => (
                     <li key={exercise.id}>
+                      {reordering ? (
+                        <div className="flex min-h-14 items-center justify-between gap-3 py-1">
+                          <span className="min-w-0 truncate font-semibold">{exercise.exerciseName}</span>
+                          <MoveButtons
+                            name={exercise.exerciseName}
+                            first={exerciseIndex === 0}
+                            last={exerciseIndex === day.exercises.length - 1}
+                            disabled={pending}
+                            onMove={(direction) =>
+                              act(() => movePlanExercise({ data: { planExerciseId: exercise.id, direction } }))
+                            }
+                          />
+                        </div>
+                      ) : (
                       <button
                         type="button"
                         className="flex min-h-14 w-full items-center justify-between gap-3 py-2 text-left"
@@ -98,6 +138,7 @@ function PlanPage() {
                         </span>
                         <ChevronIcon className="size-4 shrink-0 text-faint" />
                       </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -156,6 +197,42 @@ function PlanPage() {
         </Sheet>
       ) : null}
     </>
+  )
+}
+
+interface MoveButtonsProps {
+  readonly name: string
+  readonly first: boolean
+  readonly last: boolean
+  readonly disabled: boolean
+  readonly onMove: (direction: Direction) => void
+}
+
+const MOVE_BUTTON = "flex size-11 items-center justify-center rounded-xl bg-raised text-white disabled:opacity-25"
+
+/** Up and down arrows for moving one item within its list. */
+function MoveButtons({ name, first, last, disabled, onMove }: MoveButtonsProps) {
+  return (
+    <span className="flex shrink-0 gap-1">
+      <button
+        type="button"
+        aria-label={`Move ${name} up`}
+        className={MOVE_BUTTON}
+        disabled={disabled || first}
+        onClick={() => onMove("up")}
+      >
+        <ArrowUpIcon />
+      </button>
+      <button
+        type="button"
+        aria-label={`Move ${name} down`}
+        className={MOVE_BUTTON}
+        disabled={disabled || last}
+        onClick={() => onMove("down")}
+      >
+        <ArrowDownIcon />
+      </button>
+    </span>
   )
 }
 

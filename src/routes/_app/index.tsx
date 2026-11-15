@@ -3,7 +3,7 @@ import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "~/components/i
 import { Button, buttonClass, Card, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { summariseWeek } from "~/domain/week"
 import { estimateMinutes, formatCompact, formatDay, formatReps, formatWeight } from "~/format"
-import { deleteCoachNote, getToday, startWorkout } from "~/functions/api"
+import { deleteCoachNote, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/")({
@@ -24,9 +24,9 @@ function TodayPage() {
   const nextDay = today.plan?.days.find((day) => day.id === today.nextDayId)
   const otherDays = today.plan?.days.filter((day) => day.id !== today.nextDayId) ?? []
 
-  const start = (planDayId: number) =>
+  const start = (planDayId: number | null) =>
     act(async () => {
-      const workoutId = await startWorkout({ data: { planDayId } })
+      const workoutId = planDayId === null ? await startOpenWorkout() : await startWorkout({ data: { planDayId } })
 
       await navigate({ to: "/workout/$workoutId", params: { workoutId: String(workoutId) } })
     })
@@ -81,18 +81,26 @@ function TodayPage() {
         </Hero>
       ) : null}
 
-      {!today.activeWorkout && otherDays.length > 0 ? (
+      {today.activeWorkout ? null : (
         <>
-          <SectionTitle>Or do a different day</SectionTitle>
+          <SectionTitle>Or do something else</SectionTitle>
           <div className="flex flex-wrap gap-2">
             {otherDays.map((day) => (
               <Button key={day.id} disabled={pending || day.exercises.length === 0} onClick={() => start(day.id)}>
                 {day.name}
               </Button>
             ))}
+            <Button
+              className="border border-dashed border-line bg-transparent"
+              disabled={pending}
+              onClick={() => start(null)}
+            >
+              Open workout
+            </Button>
           </div>
+          <p className="pt-2 text-sm text-faint">An open workout follows no plan. You add exercises as you go.</p>
         </>
-      ) : null}
+      )}
 
       {today.plan ? null : (
         <Hero eyebrow="Get started" title="No plan yet">

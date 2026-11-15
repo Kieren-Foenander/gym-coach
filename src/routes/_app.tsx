@@ -2,6 +2,9 @@ import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/
 import { getSession } from "~/functions/api"
 
 export const Route = createFileRoute("/_app")({
+  // Data loads on the server, but the screens render in the browser only. Dates and times
+  // then use the phone's time zone from the first paint, instead of the server's.
+  ssr: "data-only",
   beforeLoad: async () => {
     const user = await getSession()
 
