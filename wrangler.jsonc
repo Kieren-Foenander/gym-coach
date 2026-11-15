@@ -1,0 +1,28 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "gym",
+	"main": "src/server.ts",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"observability": {
+		"enabled": true
+	},
+	// The ids below were filled in by the first `wrangler deploy`, which created both resources.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "gym",
+			"migrations_dir": "migrations",
+			"database_id": "546b9970-c76f-418d-b508-f0de6db50135"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "ce9a99e22b6e499fb8813d31884f90b8"
+		}
+	]
+}

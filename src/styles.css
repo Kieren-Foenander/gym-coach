@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0a0a0a;
+  --color-surface: #171717;
+  --color-raised: #262626;
+  --color-line: #2e2e2e;
+  --color-accent: #22c55e;
+  --color-accent-strong: #16a34a;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--color-ink);
+  color: #fafafa;
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* iOS zooms the page when a focused field's text is under 16px. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 16px);
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 12px);
+}
