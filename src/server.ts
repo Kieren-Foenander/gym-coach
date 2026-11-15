@@ -40,7 +40,7 @@ const page = (title: string, body: string) => `<!doctype html>
 <meta name="color-scheme" content="dark">
 <title>${escapeHtml(title)}</title>
 <style>
-  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #0a0a0a; color: #fafafa;
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #08090b; color: #f5f6f7;
     font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; }
   main { width: min(100% - 32px, 400px); padding: 24px 0; }
   h1 { font-size: 22px; line-height: 1.25; margin: 0 0 12px; }
@@ -49,9 +49,9 @@ const page = (title: string, body: string) => `<!doctype html>
   ul { color: #d4d4d4; padding-left: 20px; margin: 0 0 20px; }
   .warn { color: #fbbf24; }
   .row { display: flex; gap: 12px; margin-top: 24px; }
-  button { flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid #404040; background: transparent;
+  button { flex: 1; min-height: 48px; border-radius: 16px; border: 1px solid #272b33; background: transparent;
     color: #fafafa; font: inherit; font-weight: 600; }
-  button[value=approve] { background: #16a34a; border-color: #16a34a; }
+  button[value=approve] { background: #d7ff3e; border-color: #d7ff3e; color: #0b0d05; }
 </style>
 <main>${body}</main>
 </html>`

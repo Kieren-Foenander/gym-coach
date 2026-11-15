@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useState, type FormEvent } from "react"
-import { Button, Card, ErrorNote, Field, PageTitle, SectionTitle, TextArea, TextInput, useAction } from "~/components/ui"
+import {
+  Button,
+  Card,
+  ErrorNote,
+  Field,
+  PageTitle,
+  SectionTitle,
+  Segmented,
+  TextArea,
+  TextInput,
+  useAction,
+} from "~/components/ui"
 import { signOut, updateProfile } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/settings")({
@@ -50,21 +61,9 @@ function SettingsPage() {
             />
           </Field>
           <div>
-            <span className="mb-1 block text-sm text-neutral-400">Weights in</span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-ink p-1">
-              {(["kg", "lb"] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={unit === option}
-                  className={`min-h-11 rounded-lg font-semibold ${unit === option ? "bg-raised text-neutral-50" : "text-neutral-400"}`}
-                  onClick={() => setUnit(option)}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            <p className="pt-1 text-sm text-neutral-500">Changing this relabels your numbers. It does not convert them.</p>
+            <span className="mb-1.5 block text-sm text-muted">Weights in</span>
+            <Segmented label="Weights in" options={["kg", "lb"] as const} value={unit} onChange={setUnit} />
+            <p className="pt-1.5 text-sm text-faint">Changing this relabels your numbers. It does not convert them.</p>
           </div>
           <Field label="Goal">
             <TextArea
@@ -93,7 +92,7 @@ function SettingsPage() {
 
       <SectionTitle>Account</SectionTitle>
       <Card>
-        <p className="pb-3 text-neutral-400">Signed in as {user.email}</p>
+        <p className="pb-3 text-muted">Signed in as {user.email}</p>
         <Button className="w-full" onClick={leave}>
           Sign out
         </Button>
@@ -117,18 +116,18 @@ function ConnectCoach() {
 
   return (
     <Card>
-      <p className="pb-3 text-neutral-300">
+      <p className="pb-3">
         Connect this log to Claude so it can read your training, write your plan and adjust your weights. It runs on
         your Claude subscription.
       </p>
-      <ol className="list-decimal space-y-2 pb-4 pl-5 text-neutral-400">
+      <ol className="list-decimal space-y-2 pb-4 pl-5 text-muted marker:font-semibold marker:text-accent">
         <li>In Claude, open Settings, then Connectors, and choose Add custom connector.</li>
         <li>Name it Gym and paste the address below.</li>
         <li>Sign in here when asked, and tap Allow.</li>
         <li>In a chat, ask: “Look at my gym log and build me a plan.”</li>
       </ol>
       <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-xl bg-ink px-3 py-3 text-sm">{address}</code>
+        <code className="min-w-0 flex-1 truncate rounded-2xl bg-ink px-4 py-3.5 text-sm">{address}</code>
         <Button onClick={copy} disabled={!address}>
           {copied ? "Copied" : "Copy"}
         </Button>

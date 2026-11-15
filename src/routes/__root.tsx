@@ -9,7 +9,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "Gym" },
-      { name: "theme-color", content: "#0a0a0a" },
+      { name: "theme-color", content: "#08090b" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Gym" },
@@ -25,7 +25,7 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   component: Outlet,
-  notFoundComponent: () => <p className="p-6 text-neutral-400">That page does not exist.</p>,
+  notFoundComponent: () => <p className="p-6 text-muted">That page does not exist.</p>,
 })
 
 function RootDocument({ children }: { readonly children: ReactNode }) {

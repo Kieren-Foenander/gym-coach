@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { Card, SectionTitle } from "~/components/ui"
+import { Card, SectionTitle, Stat } from "~/components/ui"
 import { formatDay, formatWeight } from "~/format"
 import { getExerciseProgress } from "~/functions/api"
 import type { ProgressPoint } from "~/server/repo"
@@ -17,26 +17,16 @@ function ExercisePage() {
 
   return (
     <>
-      <Link to="/history" className="inline-flex min-h-11 items-center text-neutral-400">
+      <Link to="/history" className="eyebrow inline-flex min-h-11 items-center text-accent">
         ‹ History
       </Link>
-      <h1 className="pb-4 text-3xl font-bold tracking-tight">{exercise.name}</h1>
+      <h1 className="display pb-5 text-5xl">{exercise.name}</h1>
 
       {latest ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <p className="text-sm text-neutral-400">Last top set</p>
-              <p className="tabular text-2xl font-bold">
-                {formatWeight(latest.topWeight)} × {latest.topReps}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-neutral-400">Best estimated 1RM</p>
-              <p className="tabular text-2xl font-bold">
-                {formatWeight(best)} {user.unit}
-              </p>
-            </Card>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Last top set" value={`${formatWeight(latest.topWeight)} × ${latest.topReps}`} />
+            <Stat label="Best estimated 1RM" value={formatWeight(best)} unit={user.unit} />
           </div>
 
           <SectionTitle>Estimated one-rep max</SectionTitle>
@@ -46,13 +36,13 @@ function ExercisePage() {
 
           <SectionTitle>Sessions</SectionTitle>
           <Card>
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-white/5">
               {points.toReversed().map((point) => (
                 <li key={point.workoutId} className="flex items-baseline justify-between gap-3 py-2">
-                  <span className="text-neutral-400">{formatDay(point.date)}</span>
+                  <span className="text-muted">{formatDay(point.date)}</span>
                   <span className="tabular font-semibold">
                     {formatWeight(point.topWeight)} {user.unit} × {point.topReps}
-                    <span className="pl-2 font-normal text-neutral-500">{point.sets} sets</span>
+                    <span className="pl-2 font-normal text-faint">{point.sets} sets</span>
                   </span>
                 </li>
               ))}
@@ -60,7 +50,7 @@ function ExercisePage() {
           </Card>
         </>
       ) : (
-        <p className="text-neutral-400">Nothing logged for this exercise yet.</p>
+        <p className="text-muted">Nothing logged for this exercise yet.</p>
       )}
     </>
   )
@@ -84,7 +74,7 @@ function TrendChart({ points, unit }: { readonly points: ReadonlyArray<ProgressP
 
   return (
     <figure>
-      <div className="flex justify-between pb-1 text-xs text-neutral-500">
+      <div className="flex justify-between pb-1 text-xs text-faint">
         <span className="tabular">
           High {formatWeight(high)} {unit}
         </span>
@@ -98,14 +88,23 @@ function TrendChart({ points, unit }: { readonly points: ReadonlyArray<ProgressP
         role="img"
         aria-label={`Estimated one-rep max over ${points.length} sessions, from ${formatWeight(values[0] ?? 0)} to ${formatWeight(values.at(-1) ?? 0)} ${unit}`}
       >
-        <line x1={PAD} x2={WIDTH - PAD} y1={PAD} y2={PAD} stroke="#2e2e2e" strokeDasharray="3 4" />
-        <line x1={PAD} x2={WIDTH - PAD} y1={HEIGHT - PAD} y2={HEIGHT - PAD} stroke="#2e2e2e" strokeDasharray="3 4" />
-        <path d={path} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <defs>
+          <linearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#d7ff3e" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#d7ff3e" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={PAD} x2={WIDTH - PAD} y1={PAD} y2={PAD} stroke="#272b33" strokeDasharray="3 4" />
+        <line x1={PAD} x2={WIDTH - PAD} y1={HEIGHT - PAD} y2={HEIGHT - PAD} stroke="#272b33" strokeDasharray="3 4" />
+        {points.length > 1 ? (
+          <path d={`${path} L${x(points.length - 1).toFixed(1)},${HEIGHT} L${x(0).toFixed(1)},${HEIGHT} Z`} fill="url(#trend-fill)" />
+        ) : null}
+        <path d={path} fill="none" stroke="#d7ff3e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         {values.map((value, index) => (
-          <circle key={points[index]?.workoutId} cx={x(index)} cy={y(value)} r={index === values.length - 1 ? 4.5 : 3} fill="#22c55e" />
+          <circle key={points[index]?.workoutId} cx={x(index)} cy={y(value)} r={index === values.length - 1 ? 4.5 : 3} fill="#d7ff3e" />
         ))}
       </svg>
-      <figcaption className="flex justify-between pt-1 text-xs text-neutral-500">
+      <figcaption className="flex justify-between pt-1 text-xs text-faint">
         <span>{first ? formatDay(first.date) : ""}</span>
         <span>{last && points.length > 1 ? formatDay(last.date) : ""}</span>
       </figcaption>

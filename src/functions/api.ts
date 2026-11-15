@@ -110,7 +110,9 @@ export const updateProfile = createServerFn({ method: "POST" })
 
 // ---------------------------------------------------------------- reads
 
-export const getToday = createServerFn({ method: "GET" }).handler(() => authed(Repo.getToday()))
+export const getToday = createServerFn({ method: "GET" }).handler(() =>
+  authed(Effect.all({ today: Repo.getToday(), activity: Repo.listActivity(182) })),
+)
 
 export const getPlan = createServerFn({ method: "GET" }).handler(() => authed(Repo.getActivePlan()))
 

@@ -26,21 +26,22 @@ function AppLayout() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md">
-      <main className={`pt-safe px-4 ${inWorkout ? "pb-safe" : "pb-28"}`}>
+      <main className={`pt-safe px-4 ${inWorkout ? "pb-safe" : "pb-32"}`}>
         <Outlet />
       </main>
       {inWorkout ? null : (
-        <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/95 backdrop-blur">
-          <ul className="mx-auto flex max-w-md">
+        <nav className="bottom-safe fixed inset-x-0 z-30 px-4">
+          <ul className="mx-auto flex max-w-sm gap-1 rounded-full border border-white/10 bg-surface/85 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
             {TABS.map((tab) => (
               <li key={tab.to} className="flex-1">
                 <Link
                   to={tab.to}
                   activeOptions={{ exact: tab.to === "/" }}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs text-neutral-500"
-                  activeProps={{ className: "text-accent" }}
+                  className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-full text-[0.6875rem] font-semibold transition-colors"
+                  activeProps={{ className: "bg-accent/12 text-accent" }}
+                  inactiveProps={{ className: "text-faint" }}
                 >
-                  <svg viewBox="0 0 24 24" className="size-6" fill="currentColor" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden="true">
                     <path d={tab.icon} />
                   </svg>
                   {tab.label}

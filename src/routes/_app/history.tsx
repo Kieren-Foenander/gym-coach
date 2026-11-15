@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
-import { Card, PageTitle } from "~/components/ui"
-import { formatDay, formatVolume } from "~/format"
+import { ChevronIcon } from "~/components/icons"
+import { Card, PageTitle, Segmented, Stat } from "~/components/ui"
+import { formatCompact, formatVolume } from "~/format"
 import { getHistory } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/history")({
@@ -9,76 +10,87 @@ export const Route = createFileRoute("/_app/history")({
   component: HistoryPage,
 })
 
+const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" })
+const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" })
+
 function HistoryPage() {
   const { workouts, exercises } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const [view, setView] = useState<"workouts" | "exercises">("workouts")
   const performed = exercises.filter((exercise) => exercise.lastPerformedAt !== null)
+  const totalVolume = workouts.reduce((total, workout) => total + workout.volume, 0)
+  const totalSets = workouts.reduce((total, workout) => total + workout.setCount, 0)
 
   return (
     <>
       <PageTitle>History</PageTitle>
-      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1" role="tablist">
-        {(["workouts", "exercises"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            role="tab"
-            aria-selected={view === option}
-            className={`min-h-11 rounded-lg font-semibold capitalize ${view === option ? "bg-raised text-neutral-50" : "text-neutral-400"}`}
-            onClick={() => setView(option)}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
+
+      {workouts.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2 pb-4">
+          <Stat label="Workouts" value={workouts.length} />
+          <Stat label="Sets" value={formatCompact(totalSets)} />
+          <Stat label="Lifted" value={formatCompact(totalVolume)} unit={user.unit} />
+        </div>
+      ) : null}
+
+      <Segmented label="Show" options={["workouts", "exercises"] as const} value={view} onChange={setView} />
 
       {view === "workouts" ? (
-        <div className="space-y-2">
-          {workouts.length === 0 ? <p className="text-neutral-400">Finished workouts show up here.</p> : null}
+        <div className="space-y-2 pt-4">
+          {workouts.length === 0 ? <Empty>Finished workouts show up here.</Empty> : null}
           {workouts.map((workout) => (
             <Link
               key={workout.id}
               to="/workout/$workoutId"
               params={{ workoutId: String(workout.id) }}
-              className="block"
+              className="flex items-center gap-4 rounded-3xl border border-white/5 bg-surface p-3 active:bg-raised"
             >
-              <Card>
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-lg font-bold">{workout.name}</span>
-                  <span className="shrink-0 text-sm text-neutral-400">{formatDay(workout.startedAt)}</span>
-                </div>
-                <p className="tabular text-sm text-neutral-400">
-                  {workout.setCount} sets · {formatVolume(workout.volume, user.unit)} lifted
-                </p>
-              </Card>
+              <span className="flex w-14 shrink-0 flex-col items-center rounded-2xl bg-raised py-2">
+                <span className="eyebrow text-xs text-accent">{monthFormat.format(workout.startedAt)}</span>
+                <span className="display tabular text-3xl">{new Date(workout.startedAt).getDate()}</span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="display block truncate text-2xl">{workout.name}</span>
+                <span className="tabular block text-sm text-muted">
+                  {weekdayFormat.format(workout.startedAt)} · {workout.setCount} sets ·{" "}
+                  {formatVolume(workout.volume, user.unit)}
+                </span>
+              </span>
+              <ChevronIcon className="size-4 shrink-0 text-faint" />
             </Link>
           ))}
         </div>
       ) : (
-        <Card>
-          {performed.length === 0 ? <p className="text-neutral-400">Exercises you log show up here.</p> : null}
-          <ul className="divide-y divide-line">
-            {performed.map((exercise) => (
-              <li key={exercise.id}>
-                <Link
-                  to="/exercise/$exerciseId"
-                  params={{ exerciseId: String(exercise.id) }}
-                  className="flex min-h-14 items-center justify-between gap-3"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">{exercise.name}</span>
-                    <span className="block text-sm text-neutral-400">{exercise.muscleGroup}</span>
-                  </span>
-                  <span className="shrink-0 text-neutral-600" aria-hidden="true">
-                    ›
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <div className="pt-4">
+          {performed.length === 0 ? (
+            <Empty>Exercises you log show up here.</Empty>
+          ) : (
+            <Card>
+              <ul className="divide-y divide-white/5">
+                {performed.map((exercise) => (
+                  <li key={exercise.id}>
+                    <Link
+                      to="/exercise/$exerciseId"
+                      params={{ exerciseId: String(exercise.id) }}
+                      className="flex min-h-14 items-center justify-between gap-3"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{exercise.name}</span>
+                        <span className="block text-sm text-muted">{exercise.muscleGroup}</span>
+                      </span>
+                      <ChevronIcon className="size-4 shrink-0 text-faint" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
       )}
     </>
   )
+}
+
+function Empty({ children }: { readonly children: string }) {
+  return <p className="rounded-3xl border border-dashed border-line px-4 py-10 text-center text-muted">{children}</p>
 }

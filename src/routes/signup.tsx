@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router"
 import { Schema } from "effect"
 import { useState, type FormEvent } from "react"
+import { BarbellIcon } from "~/components/icons"
 import { Button, ErrorNote, Field, TextInput, useHydrated } from "~/components/ui"
 import { getSession, getSignupStatus, signUp } from "~/functions/api"
 import { safeRedirect } from "./login"
@@ -43,10 +44,16 @@ function SignupPage() {
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4">
-      <h1 className="pb-1 text-3xl font-bold tracking-tight">Create an account</h1>
+      <div className="flex items-center gap-3 pb-8">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-ink">
+          <BarbellIcon className="size-9" />
+        </span>
+        <span className="display text-6xl">Gym</span>
+      </div>
+      <h1 className="display pb-1 text-4xl">Create an account</h1>
       {status.open ? (
         <>
-          <p className="pb-6 text-neutral-400">
+          <p className="pb-6 text-muted">
             {status.firstUser ? "You are the first one here, so no invite is needed." : "You need an invite code to join."}
           </p>
           <form onSubmit={submit} className="space-y-4">
@@ -97,9 +104,9 @@ function SignupPage() {
           </form>
         </>
       ) : (
-        <p className="pb-6 text-neutral-400">Sign-up is closed on this server.</p>
+        <p className="pb-6 text-muted">Sign-up is closed on this server.</p>
       )}
-      <p className="pt-6 text-center text-neutral-400">
+      <p className="pt-6 text-center text-muted">
         Have an account?{" "}
         <Link to="/login" search={{ redirect: search.redirect }} className="font-semibold text-accent">
           Sign in

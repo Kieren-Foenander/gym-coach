@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useState, type FormEvent } from "react"
+import { ChevronIcon } from "~/components/icons"
 import {
   Button,
   Card,
@@ -57,29 +58,31 @@ function PlanPage() {
 
       {plan ? (
         <>
-          <div className="pb-2">
-            <h2 className="text-xl font-bold">{plan.name}</h2>
-            {plan.description ? <p className="text-neutral-400">{plan.description}</p> : null}
-            <p className="pt-1 text-sm text-neutral-500">
-              {plan.source === "ai" ? "Written by your coach" : "Your plan"} · tap an exercise to change it
-            </p>
+          <div className="pb-4">
+            <p className="eyebrow pb-1 text-accent">{plan.source === "ai" ? "Written by your coach" : "Your plan"}</p>
+            <h2 className="display text-3xl">{plan.name}</h2>
+            {plan.description ? <p className="pt-1 text-muted">{plan.description}</p> : null}
+            <p className="pt-1 text-sm text-faint">Tap an exercise to change it.</p>
           </div>
 
           <div className="space-y-3">
-            {plan.days.map((day) => (
+            {plan.days.map((day, dayIndex) => (
               <Card key={day.id}>
                 <div className="flex items-center justify-between gap-3 pb-1">
-                  <h3 className="truncate text-lg font-bold">{day.name}</h3>
+                  <h3 className="min-w-0">
+                    <span className="eyebrow block text-xs text-faint">Day {dayIndex + 1}</span>
+                    <span className="display block truncate text-2xl">{day.name}</span>
+                  </h3>
                   <button
                     type="button"
-                    className="min-h-11 shrink-0 px-2 text-sm text-neutral-500"
+                    className="min-h-11 shrink-0 px-2 text-sm font-semibold text-faint"
                     disabled={pending}
                     onClick={() => removeDay(day.id, day.name)}
                   >
                     Remove
                   </button>
                 </div>
-                <ul className="divide-y divide-line">
+                <ul className="divide-y divide-white/5">
                   {day.exercises.map((exercise) => (
                     <li key={exercise.id}>
                       <button
@@ -89,13 +92,11 @@ function PlanPage() {
                       >
                         <span className="min-w-0">
                           <span className="block truncate font-semibold">{exercise.exerciseName}</span>
-                          <span className="tabular block text-sm text-neutral-400">
+                          <span className="tabular block text-sm text-muted">
                             {formatPrescription(exercise, user.unit)}
                           </span>
                         </span>
-                        <span className="shrink-0 text-neutral-600" aria-hidden="true">
-                          ›
-                        </span>
+                        <ChevronIcon className="size-4 shrink-0 text-faint" />
                       </button>
                     </li>
                   ))}
@@ -122,7 +123,7 @@ function PlanPage() {
         </>
       ) : (
         <>
-          <p className="pb-2 text-neutral-400">
+          <p className="pb-4 text-muted">
             Ask your AI coach to write a plan for you, or start from one of these. Weights are worked out in your first
             session.
           </p>
@@ -150,7 +151,7 @@ function PlanPage() {
       ) : null}
       {editing?.mode === "templates" ? (
         <Sheet title="Switch plan" onClose={close}>
-          <p className="pb-3 text-neutral-400">Your current plan is archived, and your logged workouts are kept.</p>
+          <p className="pb-3 text-muted">Your current plan is archived, and your logged workouts are kept.</p>
           <TemplateList onDone={close} />
         </Sheet>
       ) : null}
@@ -169,7 +170,7 @@ function TemplateList({ onDone }: { readonly onDone: () => void }) {
           key={template.id}
           type="button"
           disabled={pending}
-          className="block w-full rounded-2xl border border-line bg-surface p-4 text-left active:bg-raised disabled:opacity-50"
+          className="flex w-full items-center justify-between gap-3 rounded-3xl border border-white/5 bg-raised/60 p-4 text-left transition active:scale-[0.98] active:border-accent/40 disabled:opacity-50"
           onClick={() =>
             act(async () => {
               await applyTemplate({ data: { templateId: template.id } })
@@ -177,8 +178,12 @@ function TemplateList({ onDone }: { readonly onDone: () => void }) {
             })
           }
         >
-          <span className="block text-lg font-bold">{template.plan.name}</span>
-          <span className="block text-neutral-400">{template.summary}</span>
+          <span className="min-w-0">
+            <span className="eyebrow block text-xs text-accent">{template.plan.days.length} days</span>
+            <span className="display block text-2xl">{template.plan.name}</span>
+            <span className="block text-sm text-muted">{template.summary}</span>
+          </span>
+          <ChevronIcon className="shrink-0 text-faint" />
         </button>
       ))}
     </div>
@@ -339,11 +344,11 @@ function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) 
       <label className="flex min-h-12 items-center justify-between gap-3">
         <span>
           <span className="block">Adjust weight automatically</span>
-          <span className="block text-sm text-neutral-400">Up when you hit every rep, down after two bad sessions</span>
+          <span className="block text-sm text-muted">Up when you hit every rep, down after two bad sessions</span>
         </span>
         <input
           type="checkbox"
-          className="size-6 accent-green-600"
+          className="size-6 accent-accent"
           checked={autoProgress}
           onChange={(event) => setAutoProgress(event.target.checked)}
         />

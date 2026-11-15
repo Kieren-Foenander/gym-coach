@@ -118,6 +118,8 @@ export interface WorkoutDetail {
   readonly workout: Workout
   readonly exercises: ReadonlyArray<WorkoutExercise>
   readonly adjustments: ReadonlyArray<Adjustment>
+  /** Exercises where this workout beat every earlier one on estimated one-rep max. */
+  readonly records: ReadonlyArray<number>
 }
 
 // ---------------------------------------------------------------- helpers
@@ -494,6 +496,26 @@ const adjustmentsWhere = Effect.fn("adjustmentsWhere")(function* (filter: { work
 
 export const listAdjustments = (limit: number) => adjustmentsWhere({ limit })
 
+/** The exercises in a finished workout whose best set beat the best from all earlier workouts. */
+const recordExerciseIds = Effect.fn("recordExerciseIds")(function* (workout: Workout) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  // Epley estimate, the same formula as estimateOneRepMax.
+  const rows = yield* sql<{ exerciseId: number; here: number | null; before: number | null }>`
+    SELECT s.exercise_id,
+      MAX(CASE WHEN w.id = ${workout.id}
+        THEN s.weight * (1 + CASE WHEN s.reps > 1 THEN s.reps / 30.0 ELSE 0 END) END) AS here,
+      MAX(CASE WHEN w.started_at < ${workout.startedAt}
+        THEN s.weight * (1 + CASE WHEN s.reps > 1 THEN s.reps / 30.0 ELSE 0 END) END) AS before
+    FROM workout_sets s JOIN workouts w ON w.id = s.workout_id
+    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL
+      AND s.exercise_id IN (SELECT exercise_id FROM workout_sets WHERE workout_id = ${workout.id})
+    GROUP BY s.exercise_id`
+
+  return rows.flatMap((row) => (row.here !== null && row.before !== null && row.here > row.before ? [row.exerciseId] : []))
+})
+
 export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workoutId: number) {
   const sql = yield* sqlClient
   const workout = yield* ownedWorkout(workoutId)
@@ -551,8 +573,9 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
   )
 
   const adjustments = yield* adjustmentsWhere({ workoutId: workout.id, limit: 50 })
+  const records = workout.finishedAt === null ? [] : yield* recordExerciseIds(workout)
 
-  return { workout, exercises, adjustments } satisfies WorkoutDetail
+  return { workout, exercises, adjustments, records } satisfies WorkoutDetail
 })
 
 export const logSet = Effect.fn("logSet")(function* (
@@ -685,6 +708,24 @@ export const listWorkouts = Effect.fn("listWorkouts")(function* (limit: number) 
     FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id
     WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL
     GROUP BY w.id ORDER BY w.started_at DESC LIMIT ${limit}`
+})
+
+export interface ActivityEntry {
+  readonly startedAt: number
+  readonly volume: number
+}
+
+/** When each finished workout in the last `days` days happened and how much was lifted, oldest first. */
+export const listActivity = Effect.fn("listActivity")(function* (days: number) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+  const since = (yield* now) - days * 86_400_000
+
+  return yield* sql<ActivityEntry>`
+    SELECT w.started_at, COALESCE(SUM(s.weight * s.reps), 0) AS volume
+    FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id
+    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${since}
+    GROUP BY w.id ORDER BY w.started_at`
 })
 
 export interface HistoryWorkout {

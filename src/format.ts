@@ -30,3 +30,21 @@ export const formatDay = (timestamp: number) => dayFormat.format(timestamp)
 
 export const formatVolume = (volume: number, unit: string) =>
   `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(volume)} ${unit}`
+
+/** Large totals in short form: 12,480 becomes 12.5k. */
+export const formatCompact = (value: number) =>
+  new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value).toLowerCase()
+
+interface Timed {
+  readonly sets: number
+  readonly restSeconds: number
+}
+
+const SECONDS_PER_SET = 40
+
+/** A rough session length from the prescribed sets and rests, to the nearest 5 minutes. */
+export const estimateMinutes = (exercises: ReadonlyArray<Timed>) => {
+  const seconds = exercises.reduce((total, item) => total + item.sets * (item.restSeconds + SECONDS_PER_SET), 0)
+
+  return Math.max(5, Math.round(seconds / 300) * 5)
+}

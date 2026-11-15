@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router"
 import { Schema } from "effect"
 import { useState, type FormEvent } from "react"
+import { BarbellIcon } from "~/components/icons"
 import { Button, ErrorNote, Field, TextInput, useHydrated } from "~/components/ui"
 import { getSession, signIn } from "~/functions/api"
 
@@ -43,8 +44,14 @@ function LoginPage() {
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4">
-      <h1 className="pb-1 text-3xl font-bold tracking-tight">Gym</h1>
-      <p className="pb-6 text-neutral-400">
+      <div className="flex items-center gap-3 pb-8">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-ink">
+          <BarbellIcon className="size-9" />
+        </span>
+        <span className="display text-6xl">Gym</span>
+      </div>
+      <h1 className="display pb-1 text-4xl">Welcome back</h1>
+      <p className="pb-6 text-muted">
         {search.redirect ? "Sign in to connect your AI coach." : "Sign in to your training log."}
       </p>
       <form onSubmit={submit} className="space-y-4">
@@ -72,7 +79,7 @@ function LoginPage() {
           {pending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
-      <p className="pt-6 text-center text-neutral-400">
+      <p className="pt-6 text-center text-muted">
         New here?{" "}
         <Link to="/signup" search={{ redirect: search.redirect }} className="font-semibold text-accent">
           Create an account
