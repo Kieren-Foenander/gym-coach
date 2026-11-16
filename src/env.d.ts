@@ -1,6 +1,10 @@
-declare namespace Cloudflare {
-  interface Env {
-    /** Optional secret. When set, people after the first account can sign up with this invite code. */
-    SIGNUP_CODE?: string
+import type { WebsiteEnv } from "../alchemy.run"
+
+// What `env` from "cloudflare:workers" holds: the bindings alchemy.run.ts gives the Worker.
+declare global {
+  namespace Cloudflare {
+    interface Env extends WebsiteEnv {}
   }
+
+  interface Env extends Cloudflare.Env {}
 }

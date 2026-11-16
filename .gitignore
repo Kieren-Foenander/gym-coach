@@ -1,8 +1,7 @@
 node_modules
 dist
 .wrangler
+.alchemy
 .tanstack
-.dev.vars
+.env
 *.local
-src/routeTree.gen.ts
-worker-configuration.d.ts

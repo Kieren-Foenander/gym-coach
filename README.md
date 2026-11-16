@@ -11,6 +11,7 @@ You log sets in the app. The app adjusts target weights with a simple built-in r
 - TanStack Start on Cloudflare Workers (`src/server.ts` is the Worker entry)
 - Effect v4 for the server: `effect/sql` on D1, `effect/ai` for the MCP server, Schema for every input
 - D1 for data, KV for OAuth grants (`@cloudflare/workers-oauth-provider`)
+- Alchemy for infrastructure and deploys (`alchemy.run.ts`), GitHub Actions for CI and CD
 - Tailwind v4, installable as a PWA on iPhone
 
 ```
@@ -26,23 +27,33 @@ tools/oxlint/   vendored anti-slop lint rules (see UPSTREAM.md there)
 
 ```sh
 bun install
-bun run db:migrate:local
 bun run dev
 ```
 
-The first account needs no invite. To let more people sign up locally, copy `.dev.vars.example` to `.dev.vars`.
+`bun run dev` is `alchemy dev`: it serves the app on http://localhost:1337 with a local database and applies the migrations.
+
+The first account needs no invite. To let more people sign up locally, copy `.env.example` to `.env`.
 
 `bun run check` runs lint, typecheck and tests.
 
 ## Deploy
 
+The Worker, the D1 database and the KV namespace are declared in `alchemy.run.ts` and deployed with [Alchemy](https://alchemy.run). Each stage is a separate copy of all three.
+
 ```sh
-bunx wrangler login
-bun run deploy
-bun run db:migrate:remote
+bunx alchemy profile edit --add Cloudflare   # once: sign in to Cloudflare
+bun run deploy                               # your own stage
+bun run deploy --stage prod                  # the live app
 ```
 
-Sign-up is open for the first account only. To invite others, set a code: `bunx wrangler secret put SIGNUP_CODE`.
+Migrations in `migrations/` are applied on every deploy. Sign-up is open for the first account only. To invite others, set `SIGNUP_CODE` in `.env` (or as a repository secret) and deploy again.
+
+### Pipelines
+
+- **CI** (`.github/workflows/ci.yml`): lint, typecheck and tests on every pull request.
+- **Deploy** (`.github/workflows/deploy.yml`): a push to `master` runs the checks and then deploys the `prod` stage. A pull request from a branch of this repository gets its own preview stage, `pr-<number>`, with the address posted as a comment, and closing the pull request destroys it.
+
+The pipelines need two repository secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token needs these account permissions: Workers Scripts, Workers KV Storage, D1 and Secrets Store (all Edit), and Account Settings (Read). `SIGNUP_CODE` is an optional third secret.
 
 ## Put it on your iPhone
 

@@ -11,8 +11,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "@cloudflare/workers-types"],
     "paths": { "~/*": ["./src/*"] }
   },
-  "include": ["src", "test", "worker-configuration.d.ts", "vite.config.ts"]
+  "include": ["src", "test", "alchemy.run.ts", "vite.config.ts"]
 }

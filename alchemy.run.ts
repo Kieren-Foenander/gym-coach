@@ -1,0 +1,82 @@
+import * as Cloudflare from "@alchemy.run/cloudflare"
+import * as GitHub from "@alchemy.run/github"
+import * as Alchemy from "alchemy"
+import * as Output from "alchemy/Output"
+import * as Config from "effect/Config"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Redacted from "effect/Redacted"
+
+/**
+ * Everything the app runs on, declared in one place. `alchemy deploy --stage <name>` makes it so.
+ *
+ * Each stage is a separate copy: its own Worker, database and key-value store.
+ *   prod      the live app. It keeps the names it had before Alchemy, so the address and the data stay.
+ *   pr-<n>    a preview for one pull request, made and removed by .github/workflows/deploy.yml.
+ *   anything else is yours to try things in (the default is live_<your user name>).
+ */
+
+const PRODUCTION = "prod"
+const STATE_STORE = "gym-state-store"
+
+/** The resources the live app was first deployed with, by name. Other stages get generated names. */
+const LIVE_NAMES = { worker: "gym", database: "gym", grants: "gym-oauth-kv" } as const
+
+type Names = typeof LIVE_NAMES | null
+
+// The live database and grants hold real data, so Alchemy refuses any plan that would delete or replace them.
+const database = (names: Names) =>
+  Cloudflare.D1.Database("Database", { name: names?.database, migrations: "./migrations" }).pipe(
+    Alchemy.RemovalPolicy.protect(names !== null),
+  )
+
+/** Holds the OAuth grants and tokens of connected AI coaches. */
+const grants = (names: Names) =>
+  Cloudflare.KV.Namespace("OAuthGrants", { title: names?.grants }).pipe(Alchemy.RemovalPolicy.protect(names !== null))
+
+// Optional. When set, people after the first account can sign up with this invite code. Empty means sign-up is closed.
+const signupCode = Config.Redacted("SIGNUP_CODE").pipe(Config.withDefault(Redacted.make("")))
+
+const bindings = (names: Names) => ({
+  DB: database(names),
+  OAUTH_KV: grants(names),
+  SIGNUP_CODE: signupCode,
+})
+
+/** The bindings the Worker is given. src/env.d.ts makes them the type of `env`. */
+export type WebsiteEnv = Cloudflare.InferEnv<ReturnType<typeof bindings>>
+
+export default Alchemy.Stack(
+  "Gym",
+  {
+    providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers()),
+    // State is kept in the Cloudflare account, so a laptop and CI see the same thing. It has a store of
+    // its own, so upgrading Alchemy here never touches the store other projects on the account share.
+    state: Cloudflare.state({ workerName: STATE_STORE }),
+  },
+  Effect.gen(function* () {
+    const stage = yield* Alchemy.Stage
+    const names = stage === PRODUCTION ? LIVE_NAMES : null
+
+    const app = yield* Cloudflare.Website.Vite("Website", {
+      name: names?.worker,
+      // src/server.ts wraps the TanStack Start handler with the OAuth provider and the MCP server.
+      main: "src/server.ts",
+      compatibility: { date: "2026-11-01", flags: ["nodejs_compat", "global_fetch_strictly_public"] },
+      env: bindings(names),
+    })
+
+    const github = yield* GitHub.GitHubEnv
+
+    if (github?.pr) {
+      yield* GitHub.Comment("PreviewComment", {
+        owner: github.owner,
+        repository: github.repository,
+        issueNumber: github.pr,
+        body: Output.interpolate`**Preview:** ${app.url}\n\nBuilt from ${github.sha.slice(0, 7)}. It has its own empty database, and is removed when this pull request closes.`,
+      })
+    }
+
+    return { url: app.url }
+  }),
+)
