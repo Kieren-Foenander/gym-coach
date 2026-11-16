@@ -3,6 +3,7 @@ import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import { HttpRouter, HttpServer } from "effect/http"
 import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
+import { EQUIPMENT, mergeLibrary, MUSCLES, searchLibrary } from "~/domain/catalog"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
 import {
   ExercisePrescription,
@@ -32,6 +33,8 @@ How the app works:
 - An "Open workout" follows no plan day: the user added exercises as they went.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
+- Cardio (search_exercise_library with muscle "Cardio") is logged by time, not load: a cardio set has weight 0, reps 0, a durationSeconds and optionally a distance, in km when the unit is kg and miles when it is lb. In a plan, a cardio exercise's sets are rounds; put the target time or pace in its notes. The progression rule skips cardio.
+- The app has a built-in exercise library. Before adding an exercise to a plan, find it with search_exercise_library and use that exact name. A name the library does not have still works, but shows no muscles or demonstration.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.
 - Use add_coach_note for a short message the user should see on the app's home screen, such as the focus for the coming week.
 - Base advice on the logged data. If there is little history, say so and ask about goals, schedule, equipment and injuries, then save what you learn with update_profile.`
@@ -74,6 +77,19 @@ const GetExerciseProgress = Tool.make("get_exercise_progress", {
 
 const ListExercises = Tool.make("list_exercises", {
   description: "Every exercise the user has in a plan or has logged, with when it was last performed.",
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
+const SearchExerciseLibrary = Tool.make("search_exercise_library", {
+  description:
+    "Search the app's built-in exercise library by name, muscle or equipment. Use the exact names it returns when writing a plan, so the app can show the muscles worked and a demonstration.",
+  parameters: Schema.Struct({
+    query: Schema.optional(describe(Schema.String, "Words to look for, such as 'incline press' or 'cable'.")),
+    muscle: Schema.optional(describe(Schema.Literals(MUSCLES), "Only exercises that mainly work this muscle.")),
+    equipment: Schema.optional(describe(Schema.Literals(EQUIPMENT), "Only exercises done with this equipment.")),
+    limit: Schema.optional(describe(Schema.Int, "Most exercises to return. Default 40, at most 100.")),
+  }),
   success: Schema.Unknown,
   ...options,
 }).annotate(Tool.Readonly, true)
@@ -140,7 +156,10 @@ const LogWorkout = Tool.make("log_workout", {
     exercises: Schema.Array(
       Schema.Struct({
         exercise: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
-        sets: Schema.Array(SetInput),
+        sets: describe(
+          Schema.Array(SetInput),
+          "For cardio give weight 0, reps 0 and durationSeconds, plus distance if known.",
+        ),
       }),
     ),
   }),
@@ -175,6 +194,7 @@ export const GymToolkit = Toolkit.make(
   GetTrainingHistory,
   GetExerciseProgress,
   ListExercises,
+  SearchExerciseLibrary,
   CreatePlan,
   UpdatePlanExercise,
   AddPlanExercise,
@@ -268,6 +288,8 @@ export const GymHandlers = GymToolkit.toLayer(
                 estimatedOneRepMax: point.estimatedOneRepMax,
                 volume: point.volume,
                 sets: point.sets,
+                durationSeconds: point.durationSeconds,
+                distance: point.distance,
               })),
             }
           }),
@@ -282,6 +304,23 @@ export const GymHandlers = GymToolkit.toLayer(
             })),
           })),
         ),
+      search_exercise_library: ({ query, muscle, equipment, limit }) => {
+        const matches = searchLibrary(mergeLibrary([]), query ?? "").flatMap((item) =>
+          item.entry && (!muscle || item.entry.primary.includes(muscle)) && (!equipment || item.entry.equipment === equipment)
+            ? [item.entry]
+            : [],
+        )
+
+        return Effect.succeed({
+          total: matches.length,
+          exercises: matches.slice(0, clamp(limit, 40, 100)).map((entry) => ({
+            name: entry.name,
+            equipment: entry.equipment,
+            primaryMuscles: entry.primary,
+            secondaryMuscles: entry.secondary,
+          })),
+        })
+      },
       create_plan: (input) => run(Effect.map(Repo.createPlan(input, "ai"), (plan) => ({ plan }))),
       update_plan_exercise: ({ planExerciseId, changes, reason }) =>
         run(Effect.map(Repo.updatePlanExercise(planExerciseId, changes, "ai", reason), (planExercise) => ({ planExercise }))),

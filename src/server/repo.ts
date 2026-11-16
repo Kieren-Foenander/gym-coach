@@ -1,5 +1,6 @@
 import { Clock, Context, Effect } from "effect"
 import { SqlClient } from "effect/sql"
+import { catalogByName, isCardio, muscleGroupFor, type KnownExercise } from "~/domain/catalog"
 import {
   estimateOneRepMax,
   evaluateProgression,
@@ -74,6 +75,9 @@ export interface WorkoutSet {
   readonly weight: number
   readonly reps: number
   readonly rpe: number | null
+  /** Set for cardio, which is logged by time. */
+  readonly durationSeconds: number | null
+  readonly distance: number | null
 }
 
 export interface Workout {
@@ -116,7 +120,7 @@ export interface WorkoutExercise {
   /** The planned exercise this one stands in for, when it was swapped in for this workout. */
   readonly swappedFrom: string | null
   /** What was done for this exercise in the most recent earlier workout. */
-  readonly previous: ReadonlyArray<{ readonly weight: number; readonly reps: number }>
+  readonly previous: ReadonlyArray<Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">>
 }
 
 export interface WorkoutDetail {
@@ -135,7 +139,11 @@ const defaultIncrement = (unit: Unit) => (unit === "kg" ? 2.5 : 5)
 
 type PlanExerciseRow = Omit<PlanExercise, "autoProgress"> & { readonly autoProgress: number }
 
-const toPlanExercise = (row: PlanExerciseRow): PlanExercise => ({ ...row, autoProgress: row.autoProgress === 1 })
+const toPlanExercise = (row: PlanExerciseRow): PlanExercise => ({
+  ...row,
+  muscleGroup: muscleGroupFor(row.exerciseName, row.muscleGroup),
+  autoProgress: row.autoProgress === 1,
+})
 
 const PLAN_EXERCISE_COLUMNS = `pe.id, pe.plan_day_id, pe.exercise_id, e.name AS exercise_name, e.muscle_group,
   pe.position, pe.sets, pe.rep_min, pe.rep_max, pe.target_weight, pe.increment, pe.rest_seconds, pe.notes,
@@ -167,12 +175,18 @@ export const updateProfile = Effect.fn("updateProfile")(function* (patch: Profil
 
 // ---------------------------------------------------------------- exercises
 
+/**
+ * The user's row for an exercise, created if it is new. A name the library knows is stored
+ * with the library's spelling and muscle group, whatever was typed.
+ */
 const ensureExercise = Effect.fn("ensureExercise")(function* (name: string, muscleGroup = "") {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
+  const entry = catalogByName(name)
+  const group = entry?.primary[0] ?? muscleGroup
 
   const rows = yield* sql<{ id: number }>`
-    INSERT INTO exercises (user_id, name, muscle_group) VALUES (${user.id}, ${name}, ${muscleGroup})
+    INSERT INTO exercises (user_id, name, muscle_group) VALUES (${user.id}, ${entry?.name ?? name}, ${group})
     ON CONFLICT (user_id, name) DO UPDATE SET
       muscle_group = CASE WHEN excluded.muscle_group != '' THEN excluded.muscle_group ELSE muscle_group END
     RETURNING id`
@@ -195,13 +209,15 @@ export const listExercises = Effect.fn("listExercises")(function* () {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
 
-  return yield* sql<{ id: number; name: string; muscleGroup: string; lastPerformedAt: number | null }>`
+  const rows = yield* sql<KnownExercise>`
     SELECT e.id, e.name, e.muscle_group, MAX(w.started_at) AS last_performed_at
     FROM exercises e
     LEFT JOIN workout_sets s ON s.exercise_id = e.id
     LEFT JOIN workouts w ON w.id = s.workout_id
     WHERE e.user_id = ${user.id}
     GROUP BY e.id ORDER BY e.name`
+
+  return rows.map((row): KnownExercise => ({ ...row, muscleGroup: muscleGroupFor(row.name, row.muscleGroup) }))
 })
 
 // ---------------------------------------------------------------- plans
@@ -252,7 +268,7 @@ const insertPlanExercise = Effect.fn("insertPlanExercise")(function* (
       (plan_day_id, exercise_id, position, sets, rep_min, rep_max, target_weight, increment, rest_seconds, notes, auto_progress)
     VALUES (${planDayId}, ${exerciseId}, ${position}, ${input.sets}, ${input.repMin}, ${input.repMax},
       ${input.targetWeight ?? null}, ${input.increment ?? defaultIncrement(user.unit)}, ${input.restSeconds ?? 120},
-      ${input.notes ?? ""}, ${input.autoProgress === false ? 0 : 1})
+      ${input.notes ?? ""}, ${input.autoProgress === false || isCardio(input.exercise) ? 0 : 1})
     RETURNING id`
 
   return rows[0]!.id
@@ -535,7 +551,8 @@ const workoutSets = Effect.fn("workoutSets")(function* (workoutId: number) {
   const sql = yield* sqlClient
 
   return yield* sql<WorkoutSet & { exerciseName: string }>`
-    SELECT s.id, s.exercise_id, e.name AS exercise_name, s.plan_exercise_id, s.set_number, s.weight, s.reps, s.rpe
+    SELECT s.id, s.exercise_id, e.name AS exercise_name, s.plan_exercise_id, s.set_number, s.weight, s.reps, s.rpe,
+      s.duration_seconds, s.distance
     FROM workout_sets s JOIN exercises e ON e.id = s.exercise_id
     WHERE s.workout_id = ${workoutId} ORDER BY s.set_number, s.id`
 })
@@ -544,8 +561,8 @@ const previousSets = Effect.fn("previousSets")(function* (exerciseId: number, be
   const sql = yield* sqlClient
   const user = yield* CurrentUser
 
-  return yield* sql<{ weight: number; reps: number }>`
-    SELECT s.weight, s.reps FROM workout_sets s
+  return yield* sql<Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">>`
+    SELECT s.weight, s.reps, s.duration_seconds, s.distance FROM workout_sets s
     WHERE s.exercise_id = ${exerciseId} AND s.workout_id = (
       SELECT w.id FROM workouts w JOIN workout_sets s2 ON s2.workout_id = w.id
       WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at < ${before.startedAt}
@@ -665,6 +682,8 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
                   weight: set.weight,
                   reps: set.reps,
                   rpe: set.rpe,
+                  durationSeconds: set.durationSeconds,
+                  distance: set.distance,
                 },
               ]
             : [],
@@ -690,10 +709,16 @@ export const logSet = Effect.fn("logSet")(function* (
 
   if (workout.finishedAt !== null) return yield* new Invalid({ reason: "This workout is already finished" })
 
-  const exercises = yield* sql<{ id: number }>`
-    SELECT id FROM exercises WHERE id = ${input.exerciseId} AND user_id = ${user.id}`
+  const exercises = yield* sql<{ id: number; name: string }>`
+    SELECT id, name FROM exercises WHERE id = ${input.exerciseId} AND user_id = ${user.id}`
 
-  if (!exercises[0]) return yield* new NotFound({ what: `Exercise ${input.exerciseId}` })
+  const exercise = exercises[0]
+
+  if (!exercise) return yield* new NotFound({ what: `Exercise ${input.exerciseId}` })
+
+  if (isCardio(exercise.name) && !input.durationSeconds) {
+    return yield* new Invalid({ reason: `Enter how long you did ${exercise.name} for` })
+  }
 
   const planExercises =
     workout.planDayId === null
@@ -703,11 +728,13 @@ export const logSet = Effect.fn("logSet")(function* (
           WHERE plan_day_id = ${workout.planDayId} AND exercise_id = ${input.exerciseId} LIMIT 1`
 
   const rows = yield* sql<{ id: number }>`
-    INSERT INTO workout_sets (workout_id, exercise_id, plan_exercise_id, set_number, weight, reps, rpe, created_at)
+    INSERT INTO workout_sets
+      (workout_id, exercise_id, plan_exercise_id, set_number, weight, reps, rpe, duration_seconds, distance, created_at)
     VALUES (${workout.id}, ${input.exerciseId}, ${planExercises[0]?.id ?? null},
       (SELECT COALESCE(MAX(set_number), 0) + 1 FROM workout_sets
         WHERE workout_id = ${workout.id} AND exercise_id = ${input.exerciseId}),
-      ${input.weight}, ${input.reps}, ${input.rpe ?? null}, ${yield* now})
+      ${input.weight}, ${input.reps}, ${input.rpe ?? null}, ${input.durationSeconds ?? null},
+      ${input.distance || null}, ${yield* now})
     RETURNING id`
 
   return rows[0]!.id
@@ -823,7 +850,8 @@ const ownedSet = Effect.fn("ownedSet")(function* (setId: number) {
 export const updateSet = Effect.fn("updateSet")(function* (setId: number, input: SetInput) {
   const sql = yield* sqlClient
   const set = yield* ownedSet(setId)
-  yield* sql`UPDATE workout_sets SET weight = ${input.weight}, reps = ${input.reps}, rpe = ${input.rpe ?? null}
+  yield* sql`UPDATE workout_sets SET weight = ${input.weight}, reps = ${input.reps}, rpe = ${input.rpe ?? null},
+    duration_seconds = ${input.durationSeconds ?? null}, distance = ${input.distance || null}
     WHERE id = ${set.id}`
 })
 
@@ -867,7 +895,8 @@ export const finishWorkout = Effect.fn("finishWorkout")(function* (workoutId: nu
     const target = exercise.target
 
     // A stand-in says nothing about the planned exercise, so its target is left alone.
-    if (!target || !target.autoProgress || exercise.swappedFrom !== null) continue
+    // Cardio has no weight to move.
+    if (!target || !target.autoProgress || exercise.swappedFrom !== null || isCardio(exercise.exerciseName)) continue
     const decision = evaluateProgression(target, exercise.sets, user.unit)
 
     if (decision.kind === "none") continue
@@ -933,9 +962,11 @@ export interface HistoryWorkout {
   readonly notes: string
   readonly exercises: ReadonlyArray<{
     readonly exercise: string
-    readonly sets: ReadonlyArray<{ readonly weight: number; readonly reps: number; readonly rpe: number | null }>
+    readonly sets: ReadonlyArray<HistorySet>
   }>
 }
+
+type HistorySet = Pick<WorkoutSet, "weight" | "reps" | "rpe" | "durationSeconds" | "distance">
 
 /** Finished workouts with every set, newest first. This is what the AI coach reads. */
 export const getHistory = Effect.fn("getHistory")(function* (options: {
@@ -957,8 +988,11 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
     weight: number
     reps: number
     rpe: number | null
+    durationSeconds: number | null
+    distance: number | null
   }>`
-    SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name AS exercise_name, s.weight, s.reps, s.rpe
+    SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name AS exercise_name, s.weight, s.reps, s.rpe,
+      s.duration_seconds, s.distance
     FROM workouts w
     JOIN workout_sets s ON s.workout_id = w.id
     JOIN exercises e ON e.id = s.exercise_id
@@ -966,7 +1000,7 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
       AND (${exercise} IS NULL OR e.name = ${exercise})
     ORDER BY w.started_at DESC, s.id`
 
-  type MutableEntry = { exercise: string; sets: Array<{ weight: number; reps: number; rpe: number | null }> }
+  type MutableEntry = { exercise: string; sets: Array<HistorySet> }
 
   const workouts = new Map<number, Omit<HistoryWorkout, "exercises"> & { exercises: Array<MutableEntry> }>()
 
@@ -993,7 +1027,13 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
       workout.exercises.push(entry)
     }
 
-    entry.sets.push({ weight: row.weight, reps: row.reps, rpe: row.rpe })
+    entry.sets.push({
+      weight: row.weight,
+      reps: row.reps,
+      rpe: row.rpe,
+      durationSeconds: row.durationSeconds,
+      distance: row.distance,
+    })
   }
 
   return [...workouts.values()] satisfies ReadonlyArray<HistoryWorkout>
@@ -1007,14 +1047,24 @@ export interface ProgressPoint {
   readonly estimatedOneRepMax: number
   readonly volume: number
   readonly sets: number
+  /** Totals for the session. Zero for anything that is not cardio. */
+  readonly durationSeconds: number
+  readonly distance: number
 }
 
 const progressPoints = Effect.fn("progressPoints")(function* (exerciseId: number, limit: number) {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
 
-  const rows = yield* sql<{ workoutId: number; startedAt: number; weight: number; reps: number }>`
-    SELECT w.id AS workout_id, w.started_at, s.weight, s.reps
+  const rows = yield* sql<{
+    workoutId: number
+    startedAt: number
+    weight: number
+    reps: number
+    durationSeconds: number | null
+    distance: number | null
+  }>`
+    SELECT w.id AS workout_id, w.started_at, s.weight, s.reps, s.duration_seconds, s.distance
     FROM workout_sets s JOIN workouts w ON w.id = s.workout_id
     WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND s.exercise_id = ${exerciseId}
     ORDER BY w.started_at, s.id`
@@ -1032,6 +1082,8 @@ const progressPoints = Effect.fn("progressPoints")(function* (exerciseId: number
       estimatedOneRepMax: Math.max(current?.estimatedOneRepMax ?? 0, estimateOneRepMax(row.weight, row.reps)),
       volume: (current?.volume ?? 0) + row.weight * row.reps,
       sets: (current?.sets ?? 0) + 1,
+      durationSeconds: (current?.durationSeconds ?? 0) + (row.durationSeconds ?? 0),
+      distance: (current?.distance ?? 0) + (row.distance ?? 0),
     })
   }
 
@@ -1055,6 +1107,20 @@ export const getExerciseProgress = Effect.fn("getExerciseProgress")(function* (
   const found = rows[0] ?? (yield* new NotFound({ what: "Exercise" }))
 
   return { exercise: found, points: yield* progressPoints(found.id, limit) }
+})
+
+/** The progress for an exercise by name. An exercise the user has never planned or logged has none, which is not an error. */
+export const getProgressByName = Effect.fn("getProgressByName")(function* (name: string, limit: number) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  const rows = yield* sql<{ id: number; name: string }>`
+    SELECT id, name FROM exercises WHERE name = ${name.trim()} AND user_id = ${user.id}`
+
+  const found = rows[0]
+  const points: ReadonlyArray<ProgressPoint> = found ? yield* progressPoints(found.id, limit) : []
+
+  return { exercise: found ?? null, points }
 })
 
 /** Records a workout that already happened (told to the AI coach rather than logged in the app). */
@@ -1084,8 +1150,10 @@ export const logPastWorkout = Effect.fn("logPastWorkout")(function* (input: {
 
     for (const [index, set] of entry.sets.entries()) {
       yield* sql`
-        INSERT INTO workout_sets (workout_id, exercise_id, set_number, weight, reps, rpe, created_at)
-        VALUES (${workoutId}, ${exerciseId}, ${index + 1}, ${set.weight}, ${set.reps}, ${set.rpe ?? null}, ${startedAt})`
+        INSERT INTO workout_sets
+          (workout_id, exercise_id, set_number, weight, reps, rpe, duration_seconds, distance, created_at)
+        VALUES (${workoutId}, ${exerciseId}, ${index + 1}, ${set.weight}, ${set.reps}, ${set.rpe ?? null},
+          ${set.durationSeconds ?? null}, ${set.distance || null}, ${startedAt})`
     }
   }
 

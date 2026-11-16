@@ -69,10 +69,13 @@ export const PlanExercisePatch = Schema.Struct({
 
 export type PlanExercisePatch = typeof PlanExercisePatch.Type
 
+/** One logged set. Cardio is logged with weight 0, reps 0 and a duration, with a distance if there is one. */
 export const SetInput = Schema.Struct({
   weight: Weight,
   reps: Int(0, 1000),
   rpe: Schema.optional(Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 10 })))),
+  durationSeconds: Schema.optional(Schema.NullOr(Int(1, 86_400))),
+  distance: Schema.optional(Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1000 })))),
 })
 
 export type SetInput = typeof SetInput.Type
@@ -95,6 +98,9 @@ export type MeasurementInput = typeof MeasurementInput.Type
 export const Direction = Schema.Literals(["up", "down"])
 
 export type Direction = typeof Direction.Type
+
+/** Cardio distance is in km alongside kg and miles alongside lb. */
+export const distanceUnit = (unit: Unit) => (unit === "kg" ? "km" : "mi")
 
 /** Bodyweight uses the weight unit. Tape measurements use cm alongside kg and inches alongside lb. */
 export const measurementUnit = (kind: MeasurementKind, unit: Unit) =>

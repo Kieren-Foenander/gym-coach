@@ -15,9 +15,10 @@ import {
   SetInput,
   SignUpInput,
 } from "~/domain/schema"
+import { catalogBySlug } from "~/domain/catalog"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import * as Auth from "~/server/auth"
-import { Invalid, type DomainError } from "~/server/errors"
+import { Invalid, NotFound, type DomainError } from "~/server/errors"
 import * as Repo from "~/server/repo"
 import { CurrentUser } from "~/server/repo"
 import { runtime, signupCode } from "~/server/runtime"
@@ -134,7 +135,22 @@ export const getHistory = createServerFn({ method: "GET" }).handler(() =>
 
 export const getExerciseProgress = createServerFn({ method: "GET" })
   .validator(input(Schema.Struct({ exerciseId: Id })))
-  .handler(({ data }) => authed(Repo.getExerciseProgress({ id: data.exerciseId }, 60)))
+  .handler(({ data }) =>
+    authed(Effect.all({ progress: Repo.getExerciseProgress({ id: data.exerciseId }, 60), plan: Repo.getActivePlan() })),
+  )
+
+/** A library exercise, with the user's own progress on it if they have any. */
+export const getLibraryExercise = createServerFn({ method: "GET" })
+  .validator(input(Schema.Struct({ slug: Schema.String.check(Schema.isMaxLength(100)) })))
+  .handler(({ data }) => {
+    const entry = catalogBySlug(data.slug)
+
+    return authed(
+      entry
+        ? Effect.all({ progress: Repo.getProgressByName(entry.name, 60), plan: Repo.getActivePlan() })
+        : Effect.fail(new NotFound({ what: "That exercise" })),
+    )
+  })
 
 // ---------------------------------------------------------------- workouts
 

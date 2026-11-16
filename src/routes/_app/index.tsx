@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "~/components/icons"
 import { Button, buttonClass, Card, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { summariseWeek } from "~/domain/week"
-import { estimateMinutes, formatCompact, formatDay, formatReps, formatWeight } from "~/format"
+import { isCardio } from "~/domain/catalog"
+import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import { deleteCoachNote, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
@@ -61,12 +62,18 @@ function TodayPage() {
               <li key={exercise.id} className="flex items-center gap-3 py-2.5">
                 <span className="display tabular w-5 shrink-0 text-lg text-faint">{index + 1}</span>
                 <span className="min-w-0 flex-1 truncate font-semibold">{exercise.exerciseName}</span>
-                <span className="tabular shrink-0 text-right text-sm text-muted">
-                  {exercise.sets} × {formatReps(exercise.repMin, exercise.repMax)}
-                  <span className="block font-semibold text-white">
-                    {exercise.targetWeight === null ? "Find it" : `${formatWeight(exercise.targetWeight)} ${user.unit}`}
+                {isCardio(exercise.exerciseName) ? (
+                  <span className="tabular shrink-0 text-right text-sm text-muted">
+                    {formatPrescription(exercise, user.unit)}
                   </span>
-                </span>
+                ) : (
+                  <span className="tabular shrink-0 text-right text-sm text-muted">
+                    {exercise.sets} × {formatReps(exercise.repMin, exercise.repMax)}
+                    <span className="block font-semibold text-white">
+                      {exercise.targetWeight === null ? "Find it" : `${formatWeight(exercise.targetWeight)} ${user.unit}`}
+                    </span>
+                  </span>
+                )}
               </li>
             ))}
           </ol>

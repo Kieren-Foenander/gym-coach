@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_app")({
 const TABS = [
   { to: "/", label: "Today", icon: "M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
   { to: "/plan", label: "Plan", icon: "M5 4h14v3H5zM5 10.5h14v3H5zM5 17h14v3H5z" },
+  { to: "/exercises", label: "Exercises", icon: "M2 9h2.5v6H2zM5.5 6.5h3v11h-3zM9.5 11h5v2h-5zM15.5 6.5h3v11h-3zM19.5 9H22v6h-2.5z" },
   { to: "/history", label: "History", icon: "M4 20V10h3v10zM10.5 20V4h3v16zM17 20v-7h3v7z" },
   { to: "/settings", label: "Settings", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 9a8 8 0 0 1 16 0z" },
 ] as const
@@ -34,7 +35,7 @@ function AppLayout() {
       </main>
       {inWorkout ? null : (
         <nav className="bottom-safe fixed inset-x-0 z-30 px-4">
-          <ul className="mx-auto flex max-w-sm gap-1 rounded-full border border-white/10 bg-surface/85 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
+          <ul className="mx-auto flex max-w-sm gap-0.5 rounded-full border border-white/10 bg-surface/85 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
             {TABS.map((tab) => (
               <li key={tab.to} className="flex-1">
                 <Link

@@ -1,8 +1,11 @@
+import { isCardio } from "~/domain/catalog"
 import { formatWeight } from "~/domain/progression"
+import { distanceUnit, type Unit } from "~/domain/schema"
 
 export { formatWeight }
 
 interface Prescription {
+  readonly exerciseName: string
   readonly sets: number
   readonly repMin: number
   readonly repMax: number
@@ -11,7 +14,29 @@ interface Prescription {
 
 export const formatReps = (repMin: number, repMax: number) => (repMin === repMax ? `${repMin}` : `${repMin}–${repMax}`)
 
+const formatRounds = (count: number) => `${count} ${count === 1 ? "round" : "rounds"}`
+
+/** A length of time for a cardio set: whole minutes as "20 min", anything else as a clock. */
+export const formatDuration = (seconds: number) => (seconds % 60 === 0 ? `${seconds / 60} min` : formatClock(seconds))
+
+interface Effort {
+  readonly weight: number
+  readonly reps: number
+  readonly durationSeconds: number | null
+  readonly distance: number | null
+}
+
+/** One logged set in a few characters: "60×8" for a lift, "20 min · 5 km" for cardio. */
+export const formatSet = (set: Effort, unit: Unit) =>
+  set.durationSeconds === null
+    ? `${formatWeight(set.weight)}×${set.reps}`
+    : [formatDuration(set.durationSeconds), ...(set.distance ? [`${formatWeight(set.distance)} ${distanceUnit(unit)}`] : [])].join(
+        " · ",
+      )
+
 export const formatPrescription = (target: Prescription, unit: string) => {
+  if (isCardio(target.exerciseName)) return formatRounds(target.sets)
+
   const weight = target.targetWeight === null ? "find your weight" : `${formatWeight(target.targetWeight)} ${unit}`
 
   return `${target.sets} × ${formatReps(target.repMin, target.repMax)} · ${weight}`

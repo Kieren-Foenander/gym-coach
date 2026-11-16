@@ -4,23 +4,23 @@ export const DEMO_VIEWS = { front: "", back: "-rear", muscles: "-muscles" } as c
 export type DemoView = keyof typeof DEMO_VIEWS
 
 export interface ExerciseDemo {
-  /** File name under /exercises, without the view or the extension. */
+  /** The exercise's slug in the library, which is also the file name under /exercises without the view or extension. */
   readonly slug: string
   /** The views that have been rendered. The first is shown to begin with. */
   readonly views: ReadonlyArray<DemoView>
-  readonly primary: ReadonlyArray<string>
-  readonly secondary: ReadonlyArray<string>
+  /** How to do the movement, one step per line. */
   readonly cues: ReadonlyArray<string>
 }
 
-/** Rendered demonstrations, by exercise name in lower case. Made with tools/blender. */
-const DEMOS: ReadonlyArray<ExerciseDemo & { readonly exercise: string }> = [
+/**
+ * Rendered demonstrations, made with tools/blender. To add one, render it to
+ * public/exercises/<slug>.mp4 and .webp (the slug is in src/domain/catalog.ts) and list it here.
+ * The muscles shown beside it come from the library entry.
+ */
+const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
-    exercise: "dumbbell curl",
     slug: "dumbbell-curl",
     views: ["front", "muscles"],
-    primary: ["Biceps"],
-    secondary: ["Forearms"],
     cues: [
       "Stand tall with your elbows pinned to your sides.",
       "Curl both dumbbells up without swinging your body.",
@@ -28,11 +28,8 @@ const DEMOS: ReadonlyArray<ExerciseDemo & { readonly exercise: string }> = [
     ],
   },
   {
-    exercise: "squat",
     slug: "squat",
     views: ["front", "back", "muscles"],
-    primary: ["Quads", "Glutes"],
-    secondary: ["Hamstrings", "Adductors", "Lower back"],
     cues: [
       "Set the bar across your upper back, feet a little wider than your hips with toes turned out.",
       "Sit your hips back and down, knees tracking over your toes, until your thighs are level.",
@@ -40,11 +37,8 @@ const DEMOS: ReadonlyArray<ExerciseDemo & { readonly exercise: string }> = [
     ],
   },
   {
-    exercise: "deadlift",
     slug: "deadlift",
     views: ["front", "back", "muscles"],
-    primary: ["Glutes", "Hamstrings"],
-    secondary: ["Quads", "Adductors", "Lower back", "Lats", "Traps", "Forearms"],
     cues: [
       "Set your feet about hip-width apart and grip the bar just outside your legs.",
       "Brace, keep your arms straight, and push through your feet as your hips and shoulders rise.",
@@ -53,8 +47,9 @@ const DEMOS: ReadonlyArray<ExerciseDemo & { readonly exercise: string }> = [
   },
 ]
 
-export const demoFor = (exerciseName: string): ExerciseDemo | null =>
-  DEMOS.find((demo) => demo.exercise === exerciseName.trim().toLowerCase()) ?? null
+export const demoFor = (slug: string): ExerciseDemo | null => DEMOS.find((demo) => demo.slug === slug) ?? null
+
+export const RENDERED_SLUGS: ReadonlyArray<string> = DEMOS.map((demo) => demo.slug)
 
 /** Where a demonstration's video and poster image are served from, without the extension. */
 export const demoFile = (demo: ExerciseDemo, view: DemoView): string => `/exercises/${demo.slug}${DEMO_VIEWS[view]}`

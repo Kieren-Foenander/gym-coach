@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useState, type FormEvent } from "react"
+import { ExercisePicker } from "~/components/exercise"
 import { ArrowDownIcon, ArrowUpIcon, ChevronIcon } from "~/components/icons"
 import {
   Button,
@@ -13,6 +14,7 @@ import {
   TextInput,
   useAction,
 } from "~/components/ui"
+import { isCardio } from "~/domain/catalog"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import { formatPrescription, formatWeight } from "~/format"
 import {
@@ -182,7 +184,12 @@ function PlanPage() {
       ) : null}
       {editing?.mode === "add" ? (
         <Sheet title={`Add to ${editing.dayName}`} onClose={close}>
-          <ExerciseForm planDayId={editing.planDayId} unit={user.unit} onDone={close} />
+          <ExerciseForm
+            planDayId={editing.planDayId}
+            taken={plan?.days.find((day) => day.id === editing.planDayId)?.exercises.map((item) => item.exerciseName)}
+            unit={user.unit}
+            onDone={close}
+          />
         </Sheet>
       ) : null}
       {editing?.mode === "day" ? (
@@ -302,11 +309,13 @@ function DayForm({ onDone }: { readonly onDone: () => void }) {
 interface ExerciseFormProps {
   readonly exercise?: PlanExercise
   readonly planDayId?: number
+  /** Exercises already on the day being added to. */
+  readonly taken?: ReadonlyArray<string>
   readonly unit: "kg" | "lb"
   readonly onDone: () => void
 }
 
-function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) {
+function ExerciseForm({ exercise, planDayId, taken = [], unit, onDone }: ExerciseFormProps) {
   const { act, pending, error } = useAction()
   const [formError, setFormError] = useState<string | null>(null)
   const [name, setName] = useState(exercise?.exerciseName ?? "")
@@ -323,13 +332,16 @@ function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) 
   const [notes, setNotes] = useState(exercise?.notes ?? "")
   const [autoProgress, setAutoProgress] = useState(exercise?.autoProgress ?? true)
 
+  // Cardio has rounds and a rest between them. What to aim for goes in the notes.
+  const cardio = isCardio(name)
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
 
     const numbers = {
       sets: parseNumber(sets),
-      repMin: parseNumber(repMin),
-      repMax: parseNumber(repMax),
+      repMin: cardio ? 1 : parseNumber(repMin),
+      repMax: cardio ? 1 : parseNumber(repMax),
       increment: parseNumber(increment),
       restSeconds: parseNumber(rest),
     }
@@ -354,9 +366,9 @@ function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) 
       repMax: numbers.repMax,
       increment: numbers.increment,
       restSeconds: numbers.restSeconds,
-      targetWeight: parseNumber(weight),
+      targetWeight: cardio ? null : parseNumber(weight),
       notes,
-      autoProgress,
+      autoProgress: cardio ? false : autoProgress,
     }
 
     void act(async () => {
@@ -378,19 +390,17 @@ function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) 
     })
   }
 
-  return (
-    <form onSubmit={submit} className="space-y-4 pb-2">
-      {exercise ? null : (
-        <Field label="Exercise">
-          <TextInput
-            required
-            maxLength={80}
-            placeholder="Bench Press"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-      )}
+  // Adding starts with choosing the exercise; the numbers come after.
+  if (!exercise && name === "") {
+    return (
+      <div className="pb-3">
+        <ExercisePicker taken={taken} disabled={pending} onPick={setName} />
+      </div>
+    )
+  }
+
+  const strengthFields = (
+    <>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Sets">
           <TextInput inputMode="numeric" value={sets} onChange={(event) => setSets(event.target.value)} />
@@ -430,7 +440,32 @@ function ExerciseForm({ exercise, planDayId, unit, onDone }: ExerciseFormProps) 
           onChange={(event) => setAutoProgress(event.target.checked)}
         />
       </label>
-      <Field label="Notes">
+    </>
+  )
+
+  return (
+    <form onSubmit={submit} className="space-y-4 pb-2">
+      {exercise ? null : (
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="display min-w-0 truncate text-2xl">{name}</h3>
+          <Button variant="ghost" className="shrink-0 px-3" onClick={() => setName("")}>
+            Change
+          </Button>
+        </div>
+      )}
+      {cardio ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Rounds">
+            <TextInput inputMode="numeric" value={sets} onChange={(event) => setSets(event.target.value)} />
+          </Field>
+          <Field label="Rest between (sec)">
+            <TextInput inputMode="numeric" value={rest} onChange={(event) => setRest(event.target.value)} />
+          </Field>
+        </div>
+      ) : (
+        strengthFields
+      )}
+      <Field label={cardio ? "Target, such as 20 min easy" : "Notes"}>
         <TextArea rows={2} maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
       <ErrorNote message={formError ?? error} />

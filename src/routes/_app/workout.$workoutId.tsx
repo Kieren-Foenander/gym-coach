@@ -1,31 +1,30 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useState } from "react"
+import { ExercisePicker } from "~/components/exercise"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, CloseIcon, TrophyIcon } from "~/components/icons"
 import {
   Button,
   buttonClass,
   Card,
   ErrorNote,
-  Field,
   parseNumber,
   SectionTitle,
   Segmented,
   Sheet,
   Stat,
   Stepper,
-  TextInput,
   useAction,
   useNow,
 } from "~/components/ui"
+import { isCardio } from "~/domain/catalog"
 import { BAR_WEIGHTS, platesPerSide, warmupSets } from "~/domain/loading"
-import type { Unit } from "~/domain/schema"
-import { formatClock, formatCompact, formatDay, formatReps, formatWeight } from "~/format"
+import { distanceUnit, type Unit } from "~/domain/schema"
+import { formatClock, formatCompact, formatDay, formatPrescription, formatReps, formatSet, formatWeight } from "~/format"
 import {
   addWorkoutExercise,
   deleteSet,
   discardWorkout,
   finishWorkout,
-  getExercises,
   getWorkout,
   logSet,
   removeWorkoutExercise,
@@ -94,7 +93,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
   )?.exerciseId
 
   const [adding, setAdding] = useState(false)
-  const takenIds = detail.exercises.map((item) => item.exerciseId)
+  const taken = detail.exercises.map((item) => item.exerciseName)
   const restOver = rest !== null && now !== null && restLeft <= 0 && now - rest.endsAt < REST_OVER_MS
   const [sound, setSound] = useState(true)
 
@@ -195,7 +194,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
             current={exercise.exerciseId === currentId}
             unit={unit}
             workoutId={workoutId}
-            takenIds={takenIds}
+            taken={taken}
             onLogged={startRest}
           />
         ))}
@@ -211,7 +210,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
 
       {adding ? (
         <Sheet title="Add exercise" onClose={() => setAdding(false)}>
-          <AddExerciseForm workoutId={workoutId} takenIds={takenIds} onDone={() => setAdding(false)} />
+          <AddExerciseForm workoutId={workoutId} taken={taken} onDone={() => setAdding(false)} />
         </Sheet>
       ) : null}
 
@@ -287,11 +286,11 @@ interface ExerciseCardProps {
   readonly unit: Unit
   readonly workoutId: number
   /** Every exercise already in this workout, so a swap does not offer them. */
-  readonly takenIds: ReadonlyArray<number>
+  readonly taken: ReadonlyArray<string>
   readonly onLogged: (restSeconds: number) => void
 }
 
-function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, onLogged }: ExerciseCardProps) {
+function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onLogged }: ExerciseCardProps) {
   const { act, pending, error } = useAction()
   const { target, sets, previous } = exercise
   const lastSet = sets.at(-1)
@@ -309,11 +308,25 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
     String(lastSet?.reps ?? previous[sets.length]?.reps ?? target?.repMin ?? 8),
   )
 
+  const cardio = isCardio(exercise.exerciseName)
+  const lastEffort = lastSet ?? previous[sets.length] ?? previous[0]
+  const [minutes, setMinutes] = useState(() => formatWeight((lastEffort?.durationSeconds ?? 1200) / 60))
+  const [distance, setDistance] = useState(() => formatWeight(lastEffort?.distance ?? 0))
+  const noun = cardio ? "round" : "set"
+
   const log = () => {
-    const parsedWeight = parseNumber(weight)
-    const parsedReps = parseNumber(reps)
+    const parsedWeight = cardio ? 0 : parseNumber(weight)
+    const parsedReps = cardio ? 0 : parseNumber(reps)
+    const parsedMinutes = parseNumber(minutes)
+    const parsedDistance = parseNumber(distance)
 
     if (parsedWeight === null || parsedReps === null) return
+
+    if (cardio && (parsedMinutes === null || parsedMinutes <= 0)) return
+
+    const timed = cardio
+      ? { durationSeconds: Math.round((parsedMinutes ?? 0) * 60), distance: parsedDistance || null }
+      : {}
 
     // Audio has to be woken inside the tap itself, before the request goes out.
     primeRestAlert()
@@ -323,7 +336,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
         data: {
           workoutId,
           exerciseId: exercise.exerciseId,
-          set: { weight: parsedWeight, reps: parsedReps, rpe: effort },
+          set: { weight: parsedWeight, reps: parsedReps, rpe: effort, ...timed },
         },
       })
       setAddingExtra(false)
@@ -351,7 +364,8 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
             <p className="eyebrow truncate text-xs text-accent">In for {exercise.swappedFrom}</p>
           )}
           <h2 className="display truncate pt-0.5 text-2xl">{exercise.exerciseName}</h2>
-          {target ? (
+          {target && cardio ? <p className="tabular text-sm text-muted">{formatPrescription(target, unit)}</p> : null}
+          {target && !cardio ? (
             <p className="tabular text-sm text-muted">
               {target.sets} × {formatReps(target.repMin, target.repMax)} ·{" "}
               <span className="font-semibold text-white">
@@ -373,7 +387,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
         <p className="tabular pt-3 text-sm text-faint">
           Last time{" "}
           <span className="text-muted">
-            {previous.map((set) => `${formatWeight(set.weight)}×${set.reps}`).join("  ")}
+            {previous.map((set) => formatSet(set, unit)).join(cardio ? ", " : "  ")}
           </span>
         </p>
       ) : null}
@@ -388,16 +402,20 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
             >
               <span className="tabular flex items-center gap-3">
                 <span className="display w-4 text-lg text-faint">{index + 1}</span>
-                <span className="display text-2xl">
-                  {formatWeight(set.weight)}
-                  <span className="px-1 text-base text-muted">{unit} ×</span>
-                  {set.reps}
-                </span>
+                {set.durationSeconds === null ? (
+                  <span className="display text-2xl">
+                    {formatWeight(set.weight)}
+                    <span className="px-1 text-base text-muted">{unit} ×</span>
+                    {set.reps}
+                  </span>
+                ) : (
+                  <span className="display text-2xl">{formatSet(set, unit)}</span>
+                )}
                 {set.rpe === null ? null : <span className="text-sm text-muted">RPE {formatWeight(set.rpe)}</span>}
               </span>
               <button
                 type="button"
-                aria-label={`Remove set ${index + 1}`}
+                aria-label={`Remove ${noun} ${index + 1}`}
                 className="flex size-11 items-center justify-center text-faint"
                 disabled={pending}
                 onClick={() => act(() => deleteSet({ data: { setId: set.id } }))}
@@ -413,14 +431,21 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
 
       {done && !addingExtra ? (
         <Button variant="ghost" className="mt-2 w-full" onClick={() => setAddingExtra(true)}>
-          Add another set
+          Add another {noun}
         </Button>
       ) : (
         <div className="mt-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Stepper label={unit} value={weight} step={target?.increment || 2.5} decimal onChange={setWeight} />
-            <Stepper label="Reps" value={reps} step={1} onChange={setReps} />
-          </div>
+          {cardio ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Stepper label="Minutes" value={minutes} step={1} decimal onChange={setMinutes} />
+              <Stepper label={distanceUnit(unit)} value={distance} step={0.5} decimal onChange={setDistance} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Stepper label={unit} value={weight} step={target?.increment || 2.5} decimal onChange={setWeight} />
+              <Stepper label="Reps" value={reps} step={1} onChange={setReps} />
+            </div>
+          )}
           <div role="group" aria-label="Effort, optional">
             <p className="flex items-baseline justify-between pb-1.5 text-xs text-faint">
               <span className="eyebrow text-xs">Effort · optional</span>
@@ -444,13 +469,15 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
             </div>
           </div>
           <Button variant={current || done ? "primary" : "secondary"} className="w-full" disabled={pending} onClick={log}>
-            Log set {sets.length + 1}
+            Log {noun} {sets.length + 1}
             {prescribed > 0 && !done ? ` of ${prescribed}` : ""}
           </Button>
           <div className="flex gap-2">
-            <Button variant="ghost" className="flex-1 px-2" onClick={() => setSheet("load")}>
-              Warm-up and plates
-            </Button>
+            {cardio ? null : (
+              <Button variant="ghost" className="flex-1 px-2" onClick={() => setSheet("load")}>
+                Warm-up and plates
+              </Button>
+            )}
             {target && sets.length === 0 ? (
               <Button variant="ghost" className="flex-1 px-2" onClick={() => setSheet("swap")}>
                 Swap exercise
@@ -483,7 +510,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, takenIds, 
             muscleGroup={target.muscleGroup}
             current={exercise.exerciseName}
             swappedFrom={exercise.swappedFrom}
-            takenIds={takenIds}
+            taken={taken}
             onDone={() => setSheet(null)}
           />
         </Sheet>
@@ -588,45 +615,15 @@ function LoadingGuide({ weight, unit }: { readonly weight: number; readonly unit
   )
 }
 
-/** Loads the user's exercises once, for suggestion lists. Empty until loaded, and stays empty if loading fails. */
-const useKnownExercises = () => {
-  const [known, setKnown] = useState<ReadonlyArray<{ id: number; name: string; muscleGroup: string }>>([])
-
-  useEffect(() => {
-    let active = true
-
-    // Suggestions are a convenience. If they fail to load, typing a name still works.
-    getExercises().then(
-      (list) => {
-        if (active) setKnown(list)
-      },
-      () => undefined,
-    )
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  return known
-}
-
 interface AddExerciseFormProps {
   readonly workoutId: number
-  readonly takenIds: ReadonlyArray<number>
+  readonly taken: ReadonlyArray<string>
   readonly onDone: () => void
 }
 
-/** Adds an exercise to the workout: pick one done before, or type a new one. */
-function AddExerciseForm({ workoutId, takenIds, onDone }: AddExerciseFormProps) {
+/** Adds an exercise to the workout: search the library, pick one done before, or type a new one. */
+function AddExerciseForm({ workoutId, taken, onDone }: AddExerciseFormProps) {
   const { act, pending, error } = useAction()
-  const [name, setName] = useState("")
-  const known = useKnownExercises()
-  const query = name.trim().toLowerCase()
-
-  const matches = known
-    .filter((item) => !takenIds.includes(item.id) && item.name.toLowerCase().includes(query))
-    .slice(0, 12)
 
   const add = (exercise: string) =>
     act(async () => {
@@ -634,41 +631,10 @@ function AddExerciseForm({ workoutId, takenIds, onDone }: AddExerciseFormProps) 
       onDone()
     })
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    void add(name)
-  }
-
   return (
     <div className="space-y-4 pb-3">
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Exercise">
-          <TextInput
-            required
-            maxLength={80}
-            placeholder="Search or type a new one"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
-          Add {name.trim() === "" ? "exercise" : name.trim()}
-        </Button>
-      </form>
       <ErrorNote message={error} />
-
-      {matches.length > 0 ? (
-        <div>
-          <p className="eyebrow pb-2 text-muted">Your exercises</p>
-          <div className="flex flex-wrap gap-2">
-            {matches.map((item) => (
-              <Button key={item.id} disabled={pending} onClick={() => add(item.name)}>
-                {item.name}
-              </Button>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <ExercisePicker taken={taken} disabled={pending} onPick={add} />
     </div>
   )
 }
@@ -679,30 +645,19 @@ interface SwapFormProps {
   readonly muscleGroup: string
   readonly current: string
   readonly swappedFrom: string | null
-  readonly takenIds: ReadonlyArray<number>
+  readonly taken: ReadonlyArray<string>
   readonly onDone: () => void
 }
 
 /** Picks a stand-in for a planned exercise, for this workout only. */
-function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom, takenIds, onDone }: SwapFormProps) {
+function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom, taken, onDone }: SwapFormProps) {
   const { act, pending, error } = useAction()
-  const [name, setName] = useState("")
-  const known = useKnownExercises()
-
-  const suggestions = known.filter(
-    (item) => muscleGroup !== "" && item.muscleGroup === muscleGroup && !takenIds.includes(item.id),
-  )
 
   const swapTo = (exercise: string) =>
     act(async () => {
       await swapExercise({ data: { workoutId, planExerciseId, exercise } })
       onDone()
     })
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    void swapTo(name)
-  }
 
   return (
     <div className="space-y-4 pb-3">
@@ -711,39 +666,13 @@ function SwapForm({ workoutId, planExerciseId, muscleGroup, current, swappedFrom
       </p>
       <ErrorNote message={error} />
 
-      {suggestions.length > 0 ? (
-        <div>
-          <p className="eyebrow pb-2 text-muted">Other {muscleGroup.toLowerCase()} exercises</p>
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((item) => (
-              <Button key={item.id} disabled={pending} onClick={() => swapTo(item.name)}>
-                {item.name}
-              </Button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Or type an exercise">
-          <TextInput
-            required
-            maxLength={80}
-            placeholder="Dumbbell Bench Press"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
-          Swap
-        </Button>
-      </form>
-
       {swappedFrom === null ? null : (
-        <Button variant="ghost" className="w-full" disabled={pending} onClick={() => swapTo(swappedFrom)}>
+        <Button className="w-full" disabled={pending} onClick={() => swapTo(swappedFrom)}>
           Back to {swappedFrom}
         </Button>
       )}
+
+      <ExercisePicker taken={taken} group={muscleGroup} disabled={pending} onPick={swapTo} />
     </div>
   )
 }
@@ -814,12 +743,10 @@ function FinishedWorkout({ detail, unit }: WorkoutViewProps) {
             <span className="tabular flex flex-wrap gap-1.5 pt-2">
               {exercise.sets.map((set) => (
                 <span key={set.id} className="rounded-lg bg-raised px-2 py-1 text-sm font-semibold">
-                  {formatWeight(set.weight)}
-                  <span className="px-0.5 text-faint">×</span>
-                  {set.reps}
+                  {formatSet(set, unit)}
                 </span>
               ))}
-              <span className="self-center pl-1 text-sm text-faint">{unit}</span>
+              {isCardio(exercise.exerciseName) ? null : <span className="self-center pl-1 text-sm text-faint">{unit}</span>}
             </span>
           </Link>
         ))}
