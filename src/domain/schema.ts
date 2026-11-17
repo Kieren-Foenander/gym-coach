@@ -1,4 +1,7 @@
 import { Schema } from "effect"
+import { MEASUREMENT_KINDS } from "./units"
+
+export { distanceUnit, MEASUREMENT_KINDS, measurementUnit } from "./units"
 
 export const Unit = Schema.Literals(["kg", "lb"])
 
@@ -82,8 +85,6 @@ export type SetInput = typeof SetInput.Type
 
 export type AdjustmentSource = "rule" | "ai" | "user"
 
-export const MEASUREMENT_KINDS = ["weight", "waist", "chest", "hips", "arm", "thigh"] as const
-
 export const MeasurementKind = Schema.Literals(MEASUREMENT_KINDS)
 
 export type MeasurementKind = typeof MeasurementKind.Type
@@ -98,10 +99,3 @@ export type MeasurementInput = typeof MeasurementInput.Type
 export const Direction = Schema.Literals(["up", "down"])
 
 export type Direction = typeof Direction.Type
-
-/** Cardio distance is in km alongside kg and miles alongside lb. */
-export const distanceUnit = (unit: Unit) => (unit === "kg" ? "km" : "mi")
-
-/** Bodyweight uses the weight unit. Tape measurements use cm alongside kg and inches alongside lb. */
-export const measurementUnit = (kind: MeasurementKind, unit: Unit) =>
-  kind === "weight" ? unit : unit === "kg" ? "cm" : "in"

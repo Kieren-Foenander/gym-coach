@@ -1,6 +1,6 @@
 import { isCardio } from "~/domain/catalog"
 import { formatWeight } from "~/domain/progression"
-import { distanceUnit, type Unit } from "~/domain/schema"
+import { distanceUnit, type Unit } from "~/domain/units"
 
 export { formatWeight }
 
@@ -56,9 +56,31 @@ export const formatDay = (timestamp: number) => dayFormat.format(timestamp)
 export const formatVolume = (volume: number, unit: string) =>
   `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(volume)} ${unit}`
 
-/** Large totals in short form: 12,480 becomes 12.5k. */
-export const formatCompact = (value: number) =>
-  new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value).toLowerCase()
+const COMPACT_STEPS = [
+  { size: 1e9, suffix: "b" },
+  { size: 1e6, suffix: "m" },
+  { size: 1e3, suffix: "k" },
+] as const
+
+const oneDecimal = (value: number) => String(Math.round(value * 10) / 10)
+
+/**
+ * Large totals in short form: 12,480 becomes 12.5k. Written out by hand because
+ * the phone's JavaScript engine does not have Intl's compact notation on iOS.
+ */
+export const formatCompact = (value: number) => {
+  const size = Math.abs(value)
+  const index = COMPACT_STEPS.findIndex((item) => size >= item.size)
+  const step = COMPACT_STEPS[index]
+
+  if (!step) return oneDecimal(value)
+
+  // 999,960 would read 1000k at one decimal, so it is written with the step above.
+  const larger = COMPACT_STEPS[index - 1]
+  const used = larger && Math.round((size / step.size) * 10) / 10 >= 1000 ? larger : step
+
+  return `${oneDecimal(value / used.size)}${used.suffix}`
+}
 
 interface Timed {
   readonly sets: number
