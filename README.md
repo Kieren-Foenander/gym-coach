@@ -37,6 +37,17 @@ The first account needs no invite. To let more people sign up locally, copy `.en
 
 `bun run check` runs lint, typecheck and tests.
 
+### Seed data
+
+`seed/training-history.json` is a real training history: 242 workouts and 3,560 sets from Nov 2022 to Jul 2026, exported from Gymverse and converted to the app's exercise names. Use it whenever a database needs realistic history. Sign up first, then load it into that account:
+
+```sh
+bun tools/seed/load.ts --local --email you@example.com              # the bun run dev database
+bun tools/seed/load.ts --database <d1-id> --email you@example.com   # a deployed stage (find the id with cf d1 list)
+```
+
+Loading twice adds nothing the second time. Every workout it adds has the note `Imported from Gymverse.`, so deleting the workouts with that note removes it again. `tools/seed/from-gymverse.ts` rebuilds the file from a Gymverse export, and holds the map from Gymverse's exercise names to the library's.
+
 ## Deploy
 
 The Worker, the D1 database and the KV namespace are declared in `alchemy.run.ts` and deployed with [Alchemy](https://alchemy.run). Each stage is a separate copy of all three.
