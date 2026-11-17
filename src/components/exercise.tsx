@@ -18,6 +18,7 @@ import {
 import { demoFile, demoFor, type ExerciseDemo } from "~/domain/demos"
 import { howToFor } from "~/domain/howto"
 import { distanceUnit, type Unit } from "~/domain/schema"
+import { heaviestSet } from "~/domain/progression"
 import { formatDay, formatDuration, formatSet, formatWeight } from "~/format"
 import { addPlanExercise, getExercises } from "~/functions/api"
 import type { Plan, ProgressPoint } from "~/server/repo"
@@ -382,7 +383,7 @@ export function ExerciseDetail({ name, entry, points, plan, unit }: ExerciseDeta
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const latest = points.at(-1)
-  const best = points.reduce((max, point) => Math.max(max, point.estimatedOneRepMax), 0)
+  const heaviest = heaviestSet(points)
   const demo = entry ? demoFor(entry.slug) : null
   const cardio = isCardio(name)
 
@@ -414,18 +415,19 @@ export function ExerciseDetail({ name, entry, points, plan, unit }: ExerciseDeta
         <>
           <div className="grid grid-cols-2 gap-2">
             <Stat label="Last top set" value={`${formatWeight(latest.topWeight)} × ${latest.topReps}`} />
-            <Stat label="Best estimated 1RM" value={formatWeight(best)} unit={unit} />
+            <Stat label="Heaviest set" value={heaviest ? `${formatWeight(heaviest.topWeight)} × ${heaviest.topReps}` : ""} />
           </div>
 
-          <SectionTitle>Estimated one-rep max</SectionTitle>
+          <SectionTitle>Top set weight</SectionTitle>
           <Card>
             <TrendChart
-              label="Estimated one-rep max"
+              label="Heaviest set each session"
               unit={unit}
+              best
               points={points.map((point) => ({
                 id: point.workoutId,
                 date: point.date,
-                value: point.estimatedOneRepMax,
+                value: point.topWeight,
               }))}
             />
           </Card>

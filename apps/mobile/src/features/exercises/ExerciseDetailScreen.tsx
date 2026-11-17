@@ -3,6 +3,7 @@ import { View } from "react-native"
 import { catalogByName, catalogBySlug, isCardio, type CatalogExercise } from "~/domain/catalog"
 import { howToFor } from "~/domain/howto"
 import { distanceUnit, type Unit } from "~/domain/units"
+import { heaviestSet } from "~/domain/progression"
 import { formatDay, formatDuration, formatSet, formatWeight } from "~/format"
 import type { Plan, ProgressPoint } from "~/server/repo"
 import { describeError } from "@/api/client"
@@ -148,21 +149,22 @@ function CardioProgress({ points, unit }: ProgressProps) {
 
 function StrengthProgress({ points, unit }: ProgressProps) {
   const latest = points.at(-1)
-  const best = points.reduce((max, point) => Math.max(max, point.estimatedOneRepMax), 0)
+  const heaviest = heaviestSet(points)
 
   return (
     <>
       <View className="flex-row gap-2">
         <Stat label="Last top set" value={latest ? `${formatWeight(latest.topWeight)} × ${latest.topReps}` : ""} />
-        <Stat label="Best estimated 1RM" value={formatWeight(best)} unit={unit} />
+        <Stat label="Heaviest set" value={heaviest ? `${formatWeight(heaviest.topWeight)} × ${heaviest.topReps}` : ""} />
       </View>
 
-      <SectionTitle>Estimated one-rep max</SectionTitle>
+      <SectionTitle>Top set weight</SectionTitle>
       <Card>
         <TrendChart
-          label="Estimated one-rep max"
+          label="Heaviest set each session"
           unit={unit}
-          points={points.map((point) => ({ id: point.workoutId, date: point.date, value: point.estimatedOneRepMax }))}
+          best
+          points={points.map((point) => ({ id: point.workoutId, date: point.date, value: point.topWeight }))}
         />
       </Card>
 
