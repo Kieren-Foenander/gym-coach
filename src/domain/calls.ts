@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import {
   Direction,
   ExercisePrescription,
+  HealthImport,
   Id,
   MeasurementInput,
   PlanExercisePatch,
@@ -69,6 +70,10 @@ export const CallInputs = {
   // body
   logMeasurement: MeasurementInput,
   deleteMeasurement: Schema.Struct({ measurementId: Id }),
+
+  // Apple Health, from the iPhone app
+  importHealth: HealthImport,
+  getHealth: Nothing,
 } as const
 
 export type CallName = keyof typeof CallInputs

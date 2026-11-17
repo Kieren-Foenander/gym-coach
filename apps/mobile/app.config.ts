@@ -68,6 +68,16 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "expo-sqlite",
     "expo-video",
+    // Reads bodyweight, workouts, sleep and heart data from Apple Health. Gym never writes to Health.
+    [
+      "@kingstinct/react-native-healthkit",
+      {
+        NSHealthShareUsageDescription:
+          "Gym reads your bodyweight, body fat, waist, workouts, heart rate, sleep, steps and VO2 max to log them and to help your coach judge recovery.",
+        NSHealthUpdateUsageDescription: false,
+        background: false,
+      },
+    ],
     [
       "expo-notifications",
       { icon: "./assets/notification-icon.png", color: ACCENT, defaultChannel: "rest" },

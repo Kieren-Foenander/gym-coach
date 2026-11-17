@@ -6,6 +6,7 @@ import { catalogBySlug } from "~/domain/catalog"
 import { demoFor, RENDERED_SLUGS } from "~/domain/demos"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import { Invalid, NotFound, type DomainError } from "./errors"
+import * as Health from "./health"
 import * as Repo from "./repo"
 import { CurrentUser } from "./repo"
 
@@ -114,6 +115,11 @@ export const Calls = {
   // body
   logMeasurement: define(CallInputs.logMeasurement, (data) => Repo.logMeasurement(data)),
   deleteMeasurement: define(CallInputs.deleteMeasurement, (data) => Repo.deleteMeasurement(data.measurementId)),
+
+  // Apple Health
+  importHealth: define(CallInputs.importHealth, (data) => Health.importHealth(data)),
+  /** Daily readings from the last five weeks: enough for the latest of each and what is usual. */
+  getHealth: define(CallInputs.getHealth, () => Effect.map(Health.listHealthDaily(35), (daily) => ({ daily }))),
 } satisfies { readonly [K in CallName]: { readonly run: (data: (typeof CallInputs)[K]["Type"]) => CallEffect<Answer> } }
 
 /** What a client sends for a call: its input as JSON, before the server trims or checks it. */
