@@ -64,6 +64,10 @@ Open the deployed URL in Safari, tap Share, then Add to Home Screen.
 
 `apps/mobile` is the same app built with React Native and Expo. It signs in to the same server and shows the same data, logs sets with no signal, and alerts you on the lock screen when a rest ends. It talks to the Worker through a JSON API at `/api/v1` (`src/server/http.ts`), which runs the same calls as the web app. See [apps/mobile/README.md](apps/mobile/README.md).
 
+## Adding a feature
+
+Build each feature for both the web app and the native app in the same pull request, unless it can only work on one of them. [CLAUDE.md](CLAUDE.md) lists the steps and the exceptions.
+
 ## Connect Claude
 
 1. In Claude: Settings, Connectors, Add custom connector.

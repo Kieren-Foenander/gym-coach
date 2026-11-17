@@ -61,7 +61,7 @@ export const post = async <A>(destination: Destination, path: string, input: {})
     const answer: Envelope<A> | null = await response.json().catch(() => null)
 
     if (answer === null || !("ok" in answer)) {
-      throw new ApiError("server", "That address did not answer like a Gym server.")
+      throw new ApiError("server", "No Gym server for this app at that address. Check the server address, or update the server if it is an older one.")
     }
 
     if (!answer.ok) throw new ApiError(answer.error.code, answer.error.message)
