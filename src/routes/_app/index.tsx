@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "~/components/icons"
-import { Button, buttonClass, Card, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "~/components/icons"
+import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { summariseWeek } from "~/domain/week"
 import { isCardio } from "~/domain/catalog"
-import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
+import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import { deleteCoachNote, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
@@ -212,17 +212,24 @@ interface WeekCardProps {
   readonly unit: string
 }
 
-/** This week at a glance: which days were trained, the totals, and the weekly streak. */
+/** This week at a glance: which days were trained, the totals, and the weekly streak. Opens the calendar. */
 function WeekCard({ activity, now, unit }: WeekCardProps) {
   const week = now === null ? null : summariseWeek(activity, now)
 
   return (
-    <Card>
+    <Link
+      to="/calendar"
+      aria-label={week ? `This week: ${week.workouts} workouts, ${describeStreak(week.streakWeeks)}. Open calendar` : "Open calendar"}
+      className={`${cardClass} block transition-colors active:bg-raised`}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="eyebrow text-muted">This week</p>
         <p className={`flex items-center gap-1 text-sm font-semibold ${week?.streakWeeks ? "text-accent" : "text-faint"}`}>
           <FlameIcon className="size-4" />
-          {week?.streakWeeks ? `${week.streakWeeks} week streak` : "No streak yet"}
+          {describeStreak(week?.streakWeeks ?? 0)}
+          <span className="text-faint">
+            <ChevronIcon className="size-4" />
+          </span>
         </p>
       </div>
       <ol className="grid grid-cols-7 gap-1 pt-3" aria-label="Days trained this week">
@@ -262,7 +269,7 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
           <dt className="text-xs text-muted">Lifted</dt>
         </div>
       </dl>
-    </Card>
+    </Link>
   )
 }
 

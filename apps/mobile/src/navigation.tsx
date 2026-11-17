@@ -12,6 +12,7 @@ import { Text } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import { SignInScreen } from "@/features/auth/SignInScreen"
 import { SignUpScreen } from "@/features/auth/SignUpScreen"
+import { CalendarScreen } from "@/features/calendar/CalendarScreen"
 import { AddToPlanSheet } from "@/features/exercises/AddToPlanSheet"
 import { LibraryExerciseScreen, OwnExerciseScreen } from "@/features/exercises/ExerciseDetailScreen"
 import { ExercisesScreen } from "@/features/exercises/ExercisesScreen"
@@ -38,6 +39,7 @@ export type TabParams = { readonly [K in TabName]: undefined }
 export type AppStackParams = {
   readonly Tabs: NavigatorScreenParams<TabParams> | undefined
   readonly Workout: { readonly workoutId: number }
+  readonly Calendar: undefined
   readonly MuscleGroup: { readonly muscle: Muscle }
   readonly LibraryExercise: { readonly slug: string }
   readonly OwnExercise: { readonly exerciseId: number }
@@ -162,6 +164,7 @@ export function Navigation() {
             <AppStack.Screen name="Tabs" component={TabScreens} />
             {/* A workout is left with its own buttons, so a stray swipe cannot drop you out of it mid-set. */}
             <AppStack.Screen name="Workout" component={WorkoutScreen} options={{ gestureEnabled: false }} />
+            <AppStack.Screen name="Calendar" component={CalendarScreen} />
             <AppStack.Screen name="MuscleGroup" component={MuscleGroupScreen} />
             <AppStack.Screen name="LibraryExercise" component={LibraryExerciseScreen} />
             <AppStack.Screen name="OwnExercise" component={OwnExerciseScreen} />

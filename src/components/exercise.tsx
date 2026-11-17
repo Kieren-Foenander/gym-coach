@@ -1,8 +1,8 @@
-import { Link, useRouter } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { useEffect, useState, type ReactNode } from "react"
 import { TrendChart } from "~/components/chart"
 import { BarbellIcon, CheckIcon, ChevronIcon, CloseIcon, SearchIcon } from "~/components/icons"
-import { Button, Card, ErrorNote, SectionTitle, Segmented, Sheet, Stat, TextInput, useAction } from "~/components/ui"
+import { BackButton, Button, Card, ErrorNote, SectionTitle, Segmented, Sheet, Stat, TextInput, useAction } from "~/components/ui"
 import {
   CATALOG,
   catalogForMuscle,
@@ -380,23 +380,15 @@ interface ExerciseDetailProps {
 
 /** Everything about one exercise: how it is done, what it works, and the user's progress on it. */
 export function ExerciseDetail({ name, entry, points, plan, unit }: ExerciseDetailProps) {
-  const router = useRouter()
   const [adding, setAdding] = useState(false)
   const latest = points.at(-1)
   const heaviest = heaviestSet(points)
   const demo = entry ? demoFor(entry.slug) : null
   const cardio = isCardio(name)
 
-  const back = () => {
-    if (router.history.canGoBack()) router.history.back()
-    else void router.navigate({ to: "/exercises" })
-  }
-
   return (
     <>
-      <button type="button" className="eyebrow inline-flex min-h-11 items-center text-accent" onClick={back}>
-        ‹ Back
-      </button>
+      <BackButton fallback="/exercises" />
       <p className="eyebrow min-h-4 pb-1 text-muted">{entry ? entry.equipment : "Your own exercise"}</p>
       <h1 className="display pb-5 text-5xl">{name}</h1>
 

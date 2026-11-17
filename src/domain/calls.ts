@@ -30,6 +30,7 @@ export const CallInputs = {
   getPlan: Nothing,
   getWorkout: Schema.Struct({ workoutId: Id }),
   getHistory: Nothing,
+  getCalendar: Nothing,
   getExercises: Nothing,
   getExerciseProgress: Schema.Struct({ exerciseId: Id }),
   getLibraryExercise: Schema.Struct({ slug: Schema.String.check(Schema.isMaxLength(100)) }),

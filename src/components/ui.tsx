@@ -27,8 +27,27 @@ export function Button({ variant = "secondary", className = "", type = "button",
   return <button type={type} className={buttonClass(variant, className)} {...props} />
 }
 
+/** Card styling for elements that are not a plain section, such as a card that is a link. */
+export const cardClass = "rounded-3xl border border-white/5 bg-surface p-4"
+
 export function Card({ children, className = "" }: { readonly children: ReactNode; readonly className?: string }) {
-  return <section className={`rounded-3xl border border-white/5 bg-surface p-4 ${className}`}>{children}</section>
+  return <section className={`${cardClass} ${className}`}>{children}</section>
+}
+
+/** The way back at the top of a page. Goes back in history, or to `fallback` when the page was opened directly. */
+export function BackButton({ fallback }: { readonly fallback: "/" | "/exercises" }) {
+  const router = useRouter()
+
+  const back = () => {
+    if (router.history.canGoBack()) router.history.back()
+    else void router.navigate({ to: fallback })
+  }
+
+  return (
+    <button type="button" className="eyebrow inline-flex min-h-11 items-center text-accent" onClick={back}>
+      ‹ Back
+    </button>
+  )
 }
 
 interface PageTitleProps {

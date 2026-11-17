@@ -113,6 +113,8 @@ export const getWorkout = createServerFn({ method: "GET" })
 
 export const getHistory = createServerFn({ method: "GET" }).handler(() => authed(Calls.getHistory.run({})))
 
+export const getCalendar = createServerFn({ method: "GET" }).handler(() => authed(Calls.getCalendar.run({})))
+
 export const getExerciseProgress = createServerFn({ method: "GET" })
   .validator(input(CallInputs.getExerciseProgress))
   .handler(({ data }) => authed(Calls.getExerciseProgress.run(data)))
