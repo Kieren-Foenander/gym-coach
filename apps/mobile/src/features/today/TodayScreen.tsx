@@ -11,6 +11,7 @@ import { call } from "@/api/session"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "@/components/icons"
 import { Button, Card, Display, Divider, ErrorNote, Eyebrow, Loading, PageTitle, Screen, SectionTitle, Text } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
+import { RecoveryCard } from "@/features/health/RecoveryCard"
 import { useUser } from "@/features/user"
 import { cn } from "@/lib/cn"
 import { useNow } from "@/lib/useNow"
@@ -121,6 +122,8 @@ export function TodayScreen() {
           <Text className="pt-2 text-sm text-faint">An open workout follows no plan. You add exercises as you go.</Text>
         </>
       )}
+
+      <RecoveryCard now={now} />
 
       {today.plan ? null : (
         <Hero eyebrow="Get started" title="No plan yet">

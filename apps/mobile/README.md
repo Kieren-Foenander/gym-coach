@@ -6,6 +6,7 @@ The native version of the training log, built with React Native and Expo. It sig
 - When a rest ends you get a notification with a sound, even with the phone locked.
 - On an iPhone, the rest countdown shows on the Lock Screen and in the Dynamic Island (a Live Activity). This needs the app's own build; it does not appear in Expo Go.
 - The screen stays on during a workout, and logging a set gives a tap of haptic feedback.
+- On an iPhone, it can connect to Apple Health (Settings, Apple Health). It reads bodyweight, body fat and waist, cardio workouts from an Apple Watch or other apps, heart rate and calories for workouts tracked on a watch, and daily sleep, resting heart rate, HRV, steps and VO2 max, which show on Today and are there for the AI coach. It syncs when the app opens and only reads; it never writes to Health. This needs the app's own build.
 
 Run every command below from `apps/mobile`.
 
@@ -25,7 +26,7 @@ Scan the QR code it prints with the iPhone camera. The phone and this computer m
 
 The app signs in to the live server by default. To point it somewhere else, type another address in the "Server address" field on the sign-in screen, or set `EXPO_PUBLIC_GYM_SERVER_URL` before starting.
 
-Everything works in Expo Go except the Live Activity.
+Everything works in Expo Go except the Live Activity and Apple Health.
 
 ## Build the real app
 

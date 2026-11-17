@@ -1,11 +1,12 @@
 import * as Clipboard from "expo-clipboard"
 import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
-import { View } from "react-native"
+import { Platform, View } from "react-native"
 import { call, rememberUser, signOut, useSession } from "@/api/session"
 import { Button, Card, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
 import { useAction } from "@/data/calls"
 import { useOutbox } from "@/data/outbox-store"
+import { AppleHealthCard } from "@/features/health/AppleHealthCard"
 import { useUser } from "@/features/user"
 
 const COACH_STEPS = [
@@ -43,6 +44,13 @@ export function SettingsScreen() {
 
       <SectionTitle>AI coach</SectionTitle>
       <ConnectCoach address={`${serverUrl}/mcp`} />
+
+      {Platform.OS === "ios" ? (
+        <>
+          <SectionTitle>Apple Health</SectionTitle>
+          <AppleHealthCard />
+        </>
+      ) : null}
 
       <SectionTitle>About you</SectionTitle>
       <Card className="gap-4">

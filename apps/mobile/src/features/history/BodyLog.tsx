@@ -12,6 +12,7 @@ import { colors } from "@/theme"
 
 const LABELS: Record<MeasurementKind, string> = {
   weight: "Bodyweight",
+  bodyFat: "Body fat",
   waist: "Waist",
   chest: "Chest",
   hips: "Hips",

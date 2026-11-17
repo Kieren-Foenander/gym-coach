@@ -123,12 +123,19 @@ export interface WorkoutExercise {
   readonly previous: ReadonlyArray<Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">>
 }
 
+/** Heart rate and energy from Apple Health, for a workout a Health workout was recorded during. */
+export interface WorkoutHealth {
+  readonly energyKcal: number | null
+  readonly avgHeartRate: number | null
+}
+
 export interface WorkoutDetail {
   readonly workout: Workout
   readonly exercises: ReadonlyArray<WorkoutExercise>
   readonly adjustments: ReadonlyArray<Adjustment>
   /** Exercises where this workout beat every earlier one on estimated one-rep max. */
   readonly records: ReadonlyArray<number>
+  readonly health: WorkoutHealth | null
 }
 
 // ---------------------------------------------------------------- helpers
@@ -179,7 +186,7 @@ export const updateProfile = Effect.fn("updateProfile")(function* (patch: Profil
  * The user's row for an exercise, created if it is new. A name the library knows is stored
  * with the library's spelling and muscle group, whatever was typed.
  */
-const ensureExercise = Effect.fn("ensureExercise")(function* (name: string, muscleGroup = "") {
+export const ensureExercise = Effect.fn("ensureExercise")(function* (name: string, muscleGroup = "") {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
   const entry = catalogByName(name)
@@ -696,7 +703,13 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
   const adjustments = yield* adjustmentsWhere({ workoutId: workout.id, limit: 50 })
   const records = workout.finishedAt === null ? [] : yield* recordExerciseIds(workout)
 
-  return { workout, exercises, adjustments, records } satisfies WorkoutDetail
+  // When Health recorded the session more than once (a watch, and an app copying it), the longest recording speaks for it.
+  const health = yield* sql<WorkoutHealth>`
+    SELECT energy_kcal, avg_heart_rate FROM health_workouts
+    WHERE workout_id = ${workout.id} AND (energy_kcal IS NOT NULL OR avg_heart_rate IS NOT NULL)
+    ORDER BY ended_at - started_at DESC LIMIT 1`
+
+  return { workout, exercises, adjustments, records, health: health[0] ?? null } satisfies WorkoutDetail
 })
 
 /**
@@ -902,7 +915,13 @@ export const finishWorkout = Effect.fn("finishWorkout")(function* (workoutId: nu
     return { discarded: true, adjustments: none }
   }
 
-  yield* sql`UPDATE workouts SET finished_at = ${yield* now} WHERE id = ${workoutId}`
+  const finishedAt = yield* now
+  yield* sql`UPDATE workouts SET finished_at = ${finishedAt} WHERE id = ${workoutId}`
+
+  // A workout an Apple Watch recorded during this one, brought in before this one was finished.
+  yield* sql`UPDATE health_workouts SET workout_id = ${workoutId}
+    WHERE user_id = ${user.id} AND workout_id IS NULL
+      AND started_at < ${finishedAt} AND ended_at > ${detail.workout.startedAt}`
 
   for (const exercise of detail.exercises) {
     const target = exercise.target

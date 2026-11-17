@@ -4,6 +4,7 @@ import { HttpRouter, HttpServer } from "effect/http"
 import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
 import { EQUIPMENT, mergeLibrary, MUSCLES, searchLibrary } from "~/domain/catalog"
+import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
 import {
   ExercisePrescription,
@@ -16,6 +17,7 @@ import {
   SetInput,
 } from "~/domain/schema"
 import { Invalid, type DomainError } from "./errors"
+import * as Health from "./health"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
 import { DbLive } from "./runtime"
@@ -29,7 +31,8 @@ How the app works:
 - The user logs sets in the app on their phone. All weights are in the unit given in the profile.
 - A set may carry an rpe: the user's effort rating from 6 to 10, where 10 means nothing left. Use it when judging whether a weight is right.
 - The user can swap an exercise for one workout when equipment is taken. Those sets appear in history under the stand-in exercise and do not change the plan.
-- The user can also log bodyweight and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
+- The user can also log bodyweight, body fat and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
+- If the user connected Apple Health in the iPhone app, bodyweight, body fat and waist arrive from it on their own, and so do cardio workouts (from an Apple Watch, say), which appear in history named after the exercise with the note "From Apple Health". get_health_metrics returns their daily sleep, resting heart rate, HRV, steps, active energy and VO2 max, and every workout Health recorded, including sports the log does not show. Use sleep and resting heart rate or HRV against their usual levels when judging recovery, and the other activity when judging total load. It returns nothing if Apple Health is not connected.
 - An "Open workout" follows no plan day: the user added exercises as they went.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
@@ -187,7 +190,18 @@ const LogBodyMeasurement = Tool.make("log_body_measurement", {
   ...options,
 }).annotate(Tool.Destructive, false)
 
+const GetHealthMetrics = Tool.make("get_health_metrics", {
+  description:
+    "Daily numbers from Apple Health (sleep, resting heart rate, HRV, steps, active energy, VO2 max), newest day first, and every workout Health recorded with its heart rate and energy. Today's steps and active energy are still adding up. Empty if the user has not connected Apple Health.",
+  parameters: Schema.Struct({
+    days: Schema.optional(describe(Schema.Int, "How many days back to look. Default 14, at most 90.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
 export const GymToolkit = Toolkit.make(
+  GetHealthMetrics,
   GetBodyMeasurements,
   LogBodyMeasurement,
   GetOverview,
@@ -361,6 +375,22 @@ export const GymHandlers = GymToolkit.toLayer(
           }),
         ),
       log_workout: (input) => run(Effect.map(Repo.logPastWorkout(input), (workoutId) => ({ workoutId }))),
+      get_health_metrics: ({ days }) =>
+        run(
+          Effect.gen(function* () {
+            const span = clamp(days, 14, 90)
+            const readings = yield* Health.listHealthDaily(span)
+            const workouts = yield* Health.listHealthWorkouts(span)
+
+            return {
+              metrics: Object.fromEntries(
+                HEALTH_METRICS.map((metric) => [metric, `${HEALTH_METRIC_INFO[metric].unit}: ${HEALTH_METRIC_INFO[metric].meaning}`]),
+              ),
+              days: Health.healthDays(readings),
+              workouts,
+            }
+          }),
+        ),
     }
   }),
 )
