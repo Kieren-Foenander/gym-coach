@@ -973,17 +973,38 @@ export interface ActivityEntry {
   readonly volume: number
 }
 
-/** When each finished workout in the last `days` days happened and how much was lifted, oldest first. */
-export const listActivity = Effect.fn("listActivity")(function* (days: number) {
+/**
+ * When each finished workout happened, oldest first: all of them, so a long streak is counted in full.
+ * Volume is only added up for the last eight days, which covers this week in any time zone, because
+ * that is the only volume shown. Older workouts carry 0, so this stays cheap however long the history.
+ */
+export const listActivity = Effect.fn("listActivity")(function* () {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
-  const since = (yield* now) - days * 86_400_000
+  const recent = (yield* now) - 8 * 86_400_000
 
   return yield* sql<ActivityEntry>`
     SELECT w.started_at, COALESCE(SUM(s.weight * s.reps), 0) AS volume
-    FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id
-    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${since}
+    FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id AND w.started_at >= ${recent}
+    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL
     GROUP BY w.id ORDER BY w.started_at`
+})
+
+export interface CalendarWorkout {
+  readonly id: number
+  readonly name: string
+  readonly startedAt: number
+}
+
+/** Every finished workout, oldest first, with just what a calendar needs to mark and open it. */
+export const listCalendar = Effect.fn("listCalendar")(function* () {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  return yield* sql<CalendarWorkout>`
+    SELECT id, name, started_at FROM workouts
+    WHERE user_id = ${user.id} AND finished_at IS NOT NULL
+    ORDER BY started_at`
 })
 
 export interface HistoryWorkout {

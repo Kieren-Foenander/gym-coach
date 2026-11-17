@@ -119,8 +119,11 @@ interface CardProps extends ViewProps {
   readonly className?: string
 }
 
+/** Card styling, for a card that is something other than a plain View, such as a Pressable. */
+export const CARD_CLASS = "rounded-3xl border border-white/5 bg-surface p-4"
+
 export function Card({ className, ...props }: CardProps) {
-  return <View className={cn("rounded-3xl border border-white/5 bg-surface p-4", className)} {...props} />
+  return <View className={cn(CARD_CLASS, className)} {...props} />
 }
 
 interface PageTitleProps {

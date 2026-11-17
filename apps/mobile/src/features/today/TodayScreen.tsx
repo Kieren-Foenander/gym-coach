@@ -1,15 +1,15 @@
 import { useNavigation } from "@react-navigation/native"
 import type { ReactNode } from "react"
-import { View } from "react-native"
+import { Pressable, View } from "react-native"
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg"
 import { isCardio } from "~/domain/catalog"
 import { summariseWeek } from "~/domain/week"
-import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
+import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 import { describeError } from "@/api/client"
 import { call } from "@/api/session"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "@/components/icons"
-import { Button, Card, Display, Divider, ErrorNote, Eyebrow, Loading, PageTitle, Screen, SectionTitle, Text } from "@/components/ui"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "@/components/icons"
+import { Button, Card, CARD_CLASS, Display, Divider, ErrorNote, Eyebrow, Loading, PageTitle, Screen, SectionTitle, Text } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
 import { RecoveryCard } from "@/features/health/RecoveryCard"
 import { useUser } from "@/features/user"
@@ -54,7 +54,7 @@ export function TodayScreen() {
       <PageTitle eyebrow={longDay.format(now)}>{`Hi ${user.displayName}`}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} now={now} unit={user.unit} />
+      <WeekCard activity={activity} now={now} unit={user.unit} onPress={() => navigation.navigate("Calendar")} />
 
       {activeWorkout ? (
         <Hero eyebrow="In progress" title={activeWorkout.name}>
@@ -238,21 +238,28 @@ interface WeekCardProps {
   readonly activity: ReadonlyArray<ActivityEntry>
   readonly now: number
   readonly unit: string
+  readonly onPress: () => void
 }
 
-/** This week at a glance: which days were trained, the totals, and the weekly streak. */
-function WeekCard({ activity, now, unit }: WeekCardProps) {
+/** This week at a glance: which days were trained, the totals, and the weekly streak. Opens the calendar. */
+function WeekCard({ activity, now, unit, onPress }: WeekCardProps) {
   const week = summariseWeek(activity, now)
 
   return (
-    <Card>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Opens the training calendar"
+      onPress={onPress}
+      className={cn(CARD_CLASS, "active:bg-raised")}
+    >
       <View className="flex-row items-center justify-between gap-3">
         <Eyebrow>This week</Eyebrow>
         <View className="flex-row items-center gap-1">
           <FlameIcon size={16} color={week.streakWeeks ? colors.accent : colors.faint} />
           <Text className={cn("text-sm font-semibold", week.streakWeeks ? "text-accent" : "text-faint")}>
-            {week.streakWeeks ? `${week.streakWeeks} week streak` : "No streak yet"}
+            {describeStreak(week.streakWeeks)}
           </Text>
+          <ChevronIcon size={14} color={colors.faint} />
         </View>
       </View>
       <View accessibilityLabel="Days trained this week" className="flex-row pt-3">
@@ -293,7 +300,7 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
           <Text className="text-xs text-muted">Lifted</Text>
         </View>
       </View>
-    </Card>
+    </Pressable>
   )
 }
 

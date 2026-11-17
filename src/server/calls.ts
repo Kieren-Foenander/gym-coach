@@ -39,7 +39,8 @@ export const Calls = {
   updateProfile: define(CallInputs.updateProfile, (data) => Repo.updateProfile(data)),
 
   // reads
-  getToday: define(CallInputs.getToday, () => Effect.all({ today: Repo.getToday(), activity: Repo.listActivity(182) })),
+  getToday: define(CallInputs.getToday, () => Effect.all({ today: Repo.getToday(), activity: Repo.listActivity() })),
+  getCalendar: define(CallInputs.getCalendar, () => Repo.listCalendar()),
   getPlan: define(CallInputs.getPlan, () => Repo.getActivePlan()),
   getWorkout: define(CallInputs.getWorkout, (data) => Repo.getWorkoutDetail(data.workoutId)),
   getHistory: define(CallInputs.getHistory, () =>
