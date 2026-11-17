@@ -15,10 +15,11 @@ You log sets in the app. The app adjusts target weights with a simple built-in r
 - Tailwind v4, installable as a PWA on iPhone
 
 ```
-src/domain/     pure logic: progression rule, input schemas, starter plans
-src/server/     Effect code: repository (repo.ts), auth, MCP tools (mcp.ts)
-src/functions/  server functions the screens call
-src/routes/     screens
+src/domain/     pure logic: progression rule, input schemas, starter plans, the exercise library
+src/server/     Effect code: repository (repo.ts), auth, MCP tools (mcp.ts), the calls clients make (calls.ts)
+src/functions/  server functions the web screens call
+src/routes/     web screens
+apps/mobile/    the native iPhone and Android app (see its README)
 migrations/     D1 schema
 tools/oxlint/   vendored anti-slop lint rules (see UPSTREAM.md there)
 ```
@@ -58,6 +59,10 @@ The pipelines need two repository secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLAR
 ## Put it on your iPhone
 
 Open the deployed URL in Safari, tap Share, then Add to Home Screen.
+
+## The native app
+
+`apps/mobile` is the same app built with React Native and Expo. It signs in to the same server and shows the same data, logs sets with no signal, and alerts you on the lock screen when a rest ends. It talks to the Worker through a JSON API at `/api/v1` (`src/server/http.ts`), which runs the same calls as the web app. See [apps/mobile/README.md](apps/mobile/README.md).
 
 ## Connect Claude
 

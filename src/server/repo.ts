@@ -699,13 +699,25 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
   return { workout, exercises, adjustments, records } satisfies WorkoutDetail
 })
 
+/**
+ * Logs one set and returns its id. With a client key, logging the same set again
+ * returns the set already there instead of adding another.
+ */
 export const logSet = Effect.fn("logSet")(function* (
   workoutId: number,
-  input: SetInput & { readonly exerciseId: number },
+  input: SetInput & { readonly exerciseId: number; readonly clientKey?: string | undefined },
 ) {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
   const workout = yield* ownedWorkout(workoutId)
+  const clientKey = input.clientKey ?? null
+
+  if (clientKey !== null) {
+    const already = yield* sql<{ id: number }>`
+      SELECT id FROM workout_sets WHERE workout_id = ${workout.id} AND client_key = ${clientKey}`
+
+    if (already[0]) return already[0].id
+  }
 
   if (workout.finishedAt !== null) return yield* new Invalid({ reason: "This workout is already finished" })
 
@@ -729,12 +741,13 @@ export const logSet = Effect.fn("logSet")(function* (
 
   const rows = yield* sql<{ id: number }>`
     INSERT INTO workout_sets
-      (workout_id, exercise_id, plan_exercise_id, set_number, weight, reps, rpe, duration_seconds, distance, created_at)
+      (workout_id, exercise_id, plan_exercise_id, set_number, weight, reps, rpe, duration_seconds, distance,
+        client_key, created_at)
     VALUES (${workout.id}, ${input.exerciseId}, ${planExercises[0]?.id ?? null},
       (SELECT COALESCE(MAX(set_number), 0) + 1 FROM workout_sets
         WHERE workout_id = ${workout.id} AND exercise_id = ${input.exerciseId}),
       ${input.weight}, ${input.reps}, ${input.rpe ?? null}, ${input.durationSeconds ?? null},
-      ${input.distance || null}, ${yield* now})
+      ${input.distance || null}, ${clientKey}, ${yield* now})
     RETURNING id`
 
   return rows[0]!.id

@@ -4,30 +4,20 @@ import { deleteCookie, getCookie, getRequestProtocol, setCookie } from "@tanstac
 import { Effect, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
-import {
-  Credentials,
-  Direction,
-  ExercisePrescription,
-  Id,
-  MeasurementInput,
-  PlanExercisePatch,
-  ProfilePatch,
-  SetInput,
-  SignUpInput,
-} from "~/domain/schema"
-import { catalogBySlug } from "~/domain/catalog"
-import { PLAN_TEMPLATES } from "~/domain/templates"
+import { CallInputs } from "~/domain/calls"
+import { Credentials, SignUpInput } from "~/domain/schema"
 import * as Auth from "~/server/auth"
-import { Invalid, NotFound, type DomainError } from "~/server/errors"
-import * as Repo from "~/server/repo"
+import { Calls } from "~/server/calls"
+import type { DomainError } from "~/server/errors"
+import type * as Repo from "~/server/repo"
 import { CurrentUser } from "~/server/repo"
 import { runtime, signupCode } from "~/server/runtime"
 
 /**
- * Every call the app makes to the server. Each one validates its input with
+ * Every call the web app makes to the server. Each one validates its input with
  * an Effect Schema, resolves the signed-in user from the session cookie, and
- * runs a repository effect. A native client can call the same repository
- * through a thin HTTP layer later.
+ * runs a call from src/server/calls.ts. The native app runs the same calls
+ * through the HTTP API in src/server/http.ts.
  */
 
 // ---------------------------------------------------------------- plumbing
@@ -108,154 +98,115 @@ export const signOut = createServerFn({ method: "POST" }).handler(async () => {
 })
 
 export const updateProfile = createServerFn({ method: "POST" })
-  .validator(input(ProfilePatch))
-  .handler(({ data }) => authed(Repo.updateProfile(data)))
+  .validator(input(CallInputs.updateProfile))
+  .handler(({ data }) => authed(Calls.updateProfile.run(data)))
 
 // ---------------------------------------------------------------- reads
 
-export const getToday = createServerFn({ method: "GET" }).handler(() =>
-  authed(Effect.all({ today: Repo.getToday(), activity: Repo.listActivity(182) })),
-)
+export const getToday = createServerFn({ method: "GET" }).handler(() => authed(Calls.getToday.run({})))
 
-export const getPlan = createServerFn({ method: "GET" }).handler(() => authed(Repo.getActivePlan()))
+export const getPlan = createServerFn({ method: "GET" }).handler(() => authed(Calls.getPlan.run({})))
 
 export const getWorkout = createServerFn({ method: "GET" })
-  .validator(input(Schema.Struct({ workoutId: Id })))
-  .handler(({ data }) => authed(Repo.getWorkoutDetail(data.workoutId)))
+  .validator(input(CallInputs.getWorkout))
+  .handler(({ data }) => authed(Calls.getWorkout.run(data)))
 
-export const getHistory = createServerFn({ method: "GET" }).handler(() =>
-  authed(
-    Effect.all({
-      workouts: Repo.listWorkouts(100),
-      exercises: Repo.listExercises(),
-      measurements: Repo.listMeasurements(500),
-    }),
-  ),
-)
+export const getHistory = createServerFn({ method: "GET" }).handler(() => authed(Calls.getHistory.run({})))
 
 export const getExerciseProgress = createServerFn({ method: "GET" })
-  .validator(input(Schema.Struct({ exerciseId: Id })))
-  .handler(({ data }) =>
-    authed(Effect.all({ progress: Repo.getExerciseProgress({ id: data.exerciseId }, 60), plan: Repo.getActivePlan() })),
-  )
+  .validator(input(CallInputs.getExerciseProgress))
+  .handler(({ data }) => authed(Calls.getExerciseProgress.run(data)))
 
-/** A library exercise, with the user's own progress on it if they have any. */
 export const getLibraryExercise = createServerFn({ method: "GET" })
-  .validator(input(Schema.Struct({ slug: Schema.String.check(Schema.isMaxLength(100)) })))
-  .handler(({ data }) => {
-    const entry = catalogBySlug(data.slug)
+  .validator(input(CallInputs.getLibraryExercise))
+  .handler(({ data }) => authed(Calls.getLibraryExercise.run(data)))
 
-    return authed(
-      entry
-        ? Effect.all({ progress: Repo.getProgressByName(entry.name, 60), plan: Repo.getActivePlan() })
-        : Effect.fail(new NotFound({ what: "That exercise" })),
-    )
-  })
+export const getExercises = createServerFn({ method: "GET" }).handler(() => authed(Calls.getExercises.run({})))
 
 // ---------------------------------------------------------------- workouts
 
 export const startWorkout = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planDayId: Id })))
-  .handler(({ data }) => authed(Repo.startWorkout(data.planDayId)))
+  .validator(input(CallInputs.startWorkout))
+  .handler(({ data }) => authed(Calls.startWorkout.run(data)))
 
-export const startOpenWorkout = createServerFn({ method: "POST" }).handler(() => authed(Repo.startOpenWorkout()))
-
-const ExerciseName = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80))
+export const startOpenWorkout = createServerFn({ method: "POST" }).handler(() => authed(Calls.startOpenWorkout.run({})))
 
 export const addWorkoutExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ workoutId: Id, exercise: ExerciseName })))
-  .handler(({ data }) => authed(Repo.addWorkoutExercise(data.workoutId, data.exercise)))
+  .validator(input(CallInputs.addWorkoutExercise))
+  .handler(({ data }) => authed(Calls.addWorkoutExercise.run(data)))
 
 export const removeWorkoutExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ workoutId: Id, exerciseId: Id })))
-  .handler(({ data }) => authed(Repo.removeWorkoutExercise(data.workoutId, data.exerciseId)))
+  .validator(input(CallInputs.removeWorkoutExercise))
+  .handler(({ data }) => authed(Calls.removeWorkoutExercise.run(data)))
 
 export const logSet = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ workoutId: Id, exerciseId: Id, set: SetInput })))
-  .handler(({ data }) => authed(Repo.logSet(data.workoutId, { ...data.set, exerciseId: data.exerciseId })))
+  .validator(input(CallInputs.logSet))
+  .handler(({ data }) => authed(Calls.logSet.run(data)))
 
 export const swapExercise = createServerFn({ method: "POST" })
-  .validator(
-    input(
-      Schema.Struct({
-        workoutId: Id,
-        planExerciseId: Id,
-        exercise: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
-      }),
-    ),
-  )
-  .handler(({ data }) => authed(Repo.swapExercise(data.workoutId, data.planExerciseId, data.exercise)))
-
-export const getExercises = createServerFn({ method: "GET" }).handler(() => authed(Repo.listExercises()))
+  .validator(input(CallInputs.swapExercise))
+  .handler(({ data }) => authed(Calls.swapExercise.run(data)))
 
 export const updateSet = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ setId: Id, set: SetInput })))
-  .handler(({ data }) => authed(Repo.updateSet(data.setId, data.set)))
+  .validator(input(CallInputs.updateSet))
+  .handler(({ data }) => authed(Calls.updateSet.run(data)))
 
 export const deleteSet = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ setId: Id })))
-  .handler(({ data }) => authed(Repo.deleteSet(data.setId)))
+  .validator(input(CallInputs.deleteSet))
+  .handler(({ data }) => authed(Calls.deleteSet.run(data)))
 
 export const finishWorkout = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ workoutId: Id })))
-  .handler(({ data }) => authed(Repo.finishWorkout(data.workoutId)))
+  .validator(input(CallInputs.finishWorkout))
+  .handler(({ data }) => authed(Calls.finishWorkout.run(data)))
 
 export const discardWorkout = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ workoutId: Id })))
-  .handler(({ data }) => authed(Repo.discardWorkout(data.workoutId)))
+  .validator(input(CallInputs.discardWorkout))
+  .handler(({ data }) => authed(Calls.discardWorkout.run(data)))
 
 // ---------------------------------------------------------------- plan editing
 
 export const applyTemplate = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ templateId: Schema.String })))
-  .handler(({ data }) => {
-    const template = PLAN_TEMPLATES.find((item) => item.id === data.templateId)
-
-    return authed(
-      template
-        ? Effect.asVoid(Repo.createPlan(template.plan, "user"))
-        : Effect.fail(new Invalid({ reason: "That starter plan does not exist" })),
-    )
-  })
+  .validator(input(CallInputs.applyTemplate))
+  .handler(({ data }) => authed(Calls.applyTemplate.run(data)))
 
 export const addPlanDay = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80)) })))
-  .handler(({ data }) => authed(Repo.addPlanDay(data.name)))
+  .validator(input(CallInputs.addPlanDay))
+  .handler(({ data }) => authed(Calls.addPlanDay.run(data)))
 
 export const removePlanDay = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planDayId: Id })))
-  .handler(({ data }) => authed(Repo.removePlanDay(data.planDayId)))
+  .validator(input(CallInputs.removePlanDay))
+  .handler(({ data }) => authed(Calls.removePlanDay.run(data)))
 
 export const movePlanDay = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planDayId: Id, direction: Direction })))
-  .handler(({ data }) => authed(Repo.movePlanDay(data.planDayId, data.direction)))
+  .validator(input(CallInputs.movePlanDay))
+  .handler(({ data }) => authed(Calls.movePlanDay.run(data)))
 
 export const movePlanExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planExerciseId: Id, direction: Direction })))
-  .handler(({ data }) => authed(Repo.movePlanExercise(data.planExerciseId, data.direction)))
+  .validator(input(CallInputs.movePlanExercise))
+  .handler(({ data }) => authed(Calls.movePlanExercise.run(data)))
 
 export const addPlanExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planDayId: Id, exercise: ExercisePrescription })))
-  .handler(({ data }) => authed(Effect.asVoid(Repo.addPlanExercise(data.planDayId, data.exercise))))
+  .validator(input(CallInputs.addPlanExercise))
+  .handler(({ data }) => authed(Calls.addPlanExercise.run(data)))
 
 export const updatePlanExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planExerciseId: Id, changes: PlanExercisePatch })))
-  .handler(({ data }) => authed(Effect.asVoid(Repo.updatePlanExercise(data.planExerciseId, data.changes, "user"))))
+  .validator(input(CallInputs.updatePlanExercise))
+  .handler(({ data }) => authed(Calls.updatePlanExercise.run(data)))
 
 export const removePlanExercise = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ planExerciseId: Id })))
-  .handler(({ data }) => authed(Effect.asVoid(Repo.removePlanExercise(data.planExerciseId))))
+  .validator(input(CallInputs.removePlanExercise))
+  .handler(({ data }) => authed(Calls.removePlanExercise.run(data)))
 
 export const deleteCoachNote = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ noteId: Id })))
-  .handler(({ data }) => authed(Repo.deleteCoachNote(data.noteId)))
+  .validator(input(CallInputs.deleteCoachNote))
+  .handler(({ data }) => authed(Calls.deleteCoachNote.run(data)))
 
 // ---------------------------------------------------------------- body
 
 export const logMeasurement = createServerFn({ method: "POST" })
-  .validator(input(MeasurementInput))
-  .handler(({ data }) => authed(Repo.logMeasurement(data)))
+  .validator(input(CallInputs.logMeasurement))
+  .handler(({ data }) => authed(Calls.logMeasurement.run(data)))
 
 export const deleteMeasurement = createServerFn({ method: "POST" })
-  .validator(input(Schema.Struct({ measurementId: Id })))
-  .handler(({ data }) => authed(Repo.deleteMeasurement(data.measurementId)))
+  .validator(input(CallInputs.deleteMeasurement))
+  .handler(({ data }) => authed(Calls.deleteMeasurement.run(data)))

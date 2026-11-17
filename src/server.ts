@@ -4,14 +4,16 @@ import startHandler from "@tanstack/react-start/server-entry"
 import { Effect, Option, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import { SESSION_COOKIE, userById, userFromSession } from "./server/auth"
+import { API_PREFIX, handleApiRequest } from "./server/http"
 import { handleMcpRequest, MCP_PATH } from "./server/mcp"
 import type { User } from "./server/repo"
 import { runtime } from "./server/runtime"
 
 /**
- * Worker entry. Three things live behind one hostname:
+ * Worker entry. Four things live behind one hostname:
  *   /mcp              the MCP server the AI coach connects to (OAuth access token required)
  *   /oauth/*          the OAuth endpoints an MCP client uses to get that token
+ *   /api/v1/*         the JSON API the native app uses (session token required)
  *   everything else   the TanStack Start app
  */
 
@@ -162,7 +164,11 @@ const mcpHandler = {
 
 const appHandler = {
   fetch(request: Request, env: OAuthEnv) {
-    if (new URL(request.url).pathname === AUTHORIZE_PATH) return authorize(request, env)
+    const { pathname } = new URL(request.url)
+
+    if (pathname === AUTHORIZE_PATH) return authorize(request, env)
+
+    if (pathname.startsWith(API_PREFIX)) return handleApiRequest(request)
 
     return startHandler.fetch(request)
   },

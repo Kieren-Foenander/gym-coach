@@ -1,6 +1,6 @@
 name: CI
 
-# Lint, typecheck and tests. Runs on every pull request, and deploy.yml calls it before a production deploy.
+# Lint, typecheck and tests, for the web app and the native app. Runs on every pull request, and deploy.yml calls it before a production deploy.
 on:
   pull_request:
   workflow_call:
@@ -24,3 +24,19 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run check
+
+  mobile:
+    name: Native app typecheck and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      # The native app shares src/domain with the web app and reads the server's types, so both installs are needed.
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: apps/mobile
+      - run: bun run check
+        working-directory: apps/mobile

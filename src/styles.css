@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The native app has its own stylesheet. Its class names are not this one's business. */
+@source not "../apps";
 @import "@fontsource/barlow-condensed/600.css";
 @import "@fontsource/barlow-condensed/700.css";
 
