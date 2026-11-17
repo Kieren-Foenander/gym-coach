@@ -1,14 +1,12 @@
+import { useId } from "react"
 import { View } from "react-native"
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg"
-import { formatDay, formatWeight } from "~/format"
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Stop, Text as SvgText } from "react-native-svg"
+import { CHART, layoutTrend, type TrendPoint } from "~/domain/chart"
+import { formatWeight } from "~/format"
 import { Text } from "@/components/ui"
 import { colors } from "@/theme"
 
-export interface TrendPoint {
-  readonly id: number
-  readonly date: number
-  readonly value: number
-}
+export type { TrendPoint }
 
 interface TrendChartProps {
   /** Oldest first. */
@@ -16,59 +14,63 @@ interface TrendChartProps {
   readonly unit: string
   /** What the line measures, for screen readers. */
   readonly label: string
+  /** Also draw the highest value so far, for numbers that should climb. */
+  readonly best?: boolean
 }
 
-const WIDTH = 320
-const HEIGHT = 140
-const PAD = 8
-
-/** A single line over time, oldest on the left, with the high and low marked. */
-export function TrendChart({ points, unit, label }: TrendChartProps) {
-  const values = points.map((point) => point.value)
-  const low = Math.min(...values)
-  const high = Math.max(...values)
-  const span = high - low || 1
-  const x = (index: number) => (points.length === 1 ? WIDTH / 2 : PAD + (index * (WIDTH - PAD * 2)) / (points.length - 1))
-  const y = (value: number) => HEIGHT - PAD - ((value - low) / span) * (HEIGHT - PAD * 2)
-  const path = values.map((value, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ")
-  const first = points[0]
-  const last = points.at(-1)
+/** A line over time with dates along the bottom and values up the side. */
+export function TrendChart({ points, unit, label, best = false }: TrendChartProps) {
+  const layout = layoutTrend(points, { best })
+  // An id per chart, so two charts on one screen do not share a fill.
+  const fill = `trend-fill-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`
+  const first = layout.points[0]
+  const last = layout.points.at(-1)
 
   return (
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`${label} over ${points.length} entries, from ${formatWeight(values[0] ?? 0)} to ${formatWeight(values.at(-1) ?? 0)} ${unit}`}
+      accessibilityLabel={`${label} over ${points.length} entries, from ${formatWeight(first?.value ?? 0)} to ${formatWeight(last?.value ?? 0)} ${unit}`}
     >
-      <View className="flex-row justify-between pb-1">
-        <Text className="text-xs tabular-nums text-faint">
-          High {formatWeight(high)} {unit}
-        </Text>
-        <Text className="text-xs tabular-nums text-faint">
-          Low {formatWeight(low)} {unit}
-        </Text>
-      </View>
-      <Svg width="100%" height={undefined} style={{ aspectRatio: WIDTH / HEIGHT }} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+      {layout.best ? (
+        <View className="flex-row justify-end gap-4 pb-1">
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-0.5 w-4 rounded bg-accent" />
+            <Text className="text-xs text-faint">Each session</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-4 border-t-2 border-dashed border-muted" />
+            <Text className="text-xs text-faint">Best so far</Text>
+          </View>
+        </View>
+      ) : null}
+      <Svg width="100%" height={undefined} style={{ aspectRatio: CHART.width / CHART.height }} viewBox={`0 0 ${CHART.width} ${CHART.height}`}>
         <Defs>
-          <LinearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
-            <Stop offset="0" stopColor={colors.accent} stopOpacity={0.28} />
+          <LinearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+            <Stop offset="0" stopColor={colors.accent} stopOpacity={0.22} />
             <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
           </LinearGradient>
         </Defs>
-        <Line x1={PAD} x2={WIDTH - PAD} y1={PAD} y2={PAD} stroke={colors.line} strokeDasharray="3 4" />
-        <Line x1={PAD} x2={WIDTH - PAD} y1={HEIGHT - PAD} y2={HEIGHT - PAD} stroke={colors.line} strokeDasharray="3 4" />
-        {points.length > 1 ? (
-          <Path d={`${path} L${x(points.length - 1).toFixed(1)},${HEIGHT} L${x(0).toFixed(1)},${HEIGHT} Z`} fill="url(#trend-fill)" />
-        ) : null}
-        <Path d={path} fill="none" stroke={colors.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point, index) => (
-          <Circle key={point.id} cx={x(index)} cy={y(point.value)} r={index === points.length - 1 ? 4.5 : 3} fill={colors.accent} />
+        {layout.valueTicks.map((tick) => (
+          <G key={tick.label}>
+            <Line x1={CHART.left} x2={CHART.right} y1={tick.y} y2={tick.y} stroke={colors.line} strokeDasharray="3 4" />
+            <SvgText x={CHART.left - 6} y={tick.y + 3.5} textAnchor="end" fontSize={10} fill={colors.faint}>
+              {tick.label}
+            </SvgText>
+          </G>
+        ))}
+        {layout.dateTicks.map((tick) => (
+          <SvgText key={tick.label} x={tick.x} y={CHART.dateLabelY} textAnchor={tick.anchor} fontSize={10} fill={colors.faint}>
+            {tick.label}
+          </SvgText>
+        ))}
+        {layout.area ? <Path d={layout.area} fill={`url(#${fill})`} /> : null}
+        {layout.best ? <Path d={layout.best} fill="none" stroke={colors.muted} strokeWidth={1.5} strokeDasharray="4 3" /> : null}
+        <Path d={layout.line} fill="none" stroke={colors.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        {layout.points.map((point, index) => (
+          <Circle key={point.id} cx={point.x} cy={point.y} r={index === layout.points.length - 1 ? 4.5 : 3} fill={colors.accent} />
         ))}
       </Svg>
-      <View className="flex-row justify-between pt-1">
-        <Text className="text-xs text-faint">{first ? formatDay(first.date) : ""}</Text>
-        <Text className="text-xs text-faint">{last && points.length > 1 ? formatDay(last.date) : ""}</Text>
-      </View>
     </View>
   )
 }
