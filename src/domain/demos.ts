@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-external-rotation",
+    views: ["front"],
+    cues: [
+      "Lift your upper arms out to the sides and bend your elbows to a right angle.",
+      "Rotate the weights upward while keeping your elbows still.",
+      "Lower until your forearms point forward again.",
+    ],
+  },
+  {
     slug: "dumbbell-pullover",
     views: ["front"],
     cues: [
