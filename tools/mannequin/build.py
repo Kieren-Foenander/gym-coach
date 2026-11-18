@@ -250,7 +250,7 @@ def hand_frame(wrist, middle, index, pinky):
     return Matrix((across, along, across.cross(along))).transposed()
 
 
-def make_fists():
+def make_fists(hand_shapes):
     """Two closed fists, built from a MakeHuman man whose hands are made to bend.
 
     Each hand is replaced by a fist that never changes shape, so a grip can never deform badly: the fingers wrap round a tunnel a bar fits through, and the thumb
@@ -278,6 +278,31 @@ def make_fists():
         head = lambda name: rest[f"{name}.{tag}"].head_local.copy()  # noqa: E731
         frame = hand_frame(head("wrist"), head("finger3-1"), head("finger2-1"), head("finger5-1"))
         palm = -frame.col[2] * sign  # found by eye: this way the fingers close over the palm
+        shape = hand_shapes[side]
+        if shape != "fist":
+            if shape not in {"support", "pinch", "cup"}:
+                raise ValueError(f"Unknown hand shape {shape}")
+            # Keep the MakeHuman phalanx lengths. The long fingers share a
+            # contact plane on a plate, or turn up around a dumbbell head.
+            bends = {"support": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70)}[shape]
+            for finger in (2, 3, 4, 5):
+                for joint, degrees in enumerate(bends, 1):
+                    angle = math.radians(degrees)
+                    spread = (3.5 - finger)*(.055 if shape == "support" else .028)
+                    direction = Vector((spread, math.cos(angle), -sign*math.sin(angle)))
+                    swing(f"finger{finger}-{joint}.{tag}", frame @ direction)
+            if shape in ("support", "pinch", "cup"):
+                targets = ((.053,.063,-.038),(.047,.089,-.055),(.031,.113,-.052)) if shape == "pinch" else (
+                    (.058,.056,-.022),(.067,.080,-.039),(.060,.102,-.055))
+                if shape == "support":
+                    targets = ((.068,.052,-.008),(.079,.074,-.010),(.087,.092,-.012))
+                for joint, (x,y,z) in enumerate(targets, 1):
+                    name = f"finger1-{joint}.{tag}"
+                    swing(name, head("wrist") + frame @ Vector((x,y,sign*z)) - pose[name].head)
+            origin = head("wrist") + frame @ Vector((0,.09,-sign*.018))
+            fists[side] = {"shape":shape, "frame":frame, "wrist":head("wrist"),
+                           "length":(head("finger3-1")-head("wrist")).length, "tunnel":origin}
+            continue
         # Adduct the fingers and close them around a shared cylindrical grip.
         # Pose each phalanx around one straight cylinder, rather than giving unequal
         # fingers identical joint angles (which puts the shaft through the pinky).
@@ -404,6 +429,20 @@ def attach_fists(rig, body, fists, joints, material):
         bpy.context.view_layer.objects.active = thing
         bpy.ops.object.modifier_apply(modifier=smooth.name)
         centre = fit_point(fist["tunnel"])
+        if fist.get("shape", "fist") != "fist":
+            if fist["shape"] == "support":
+                # A loaded palm flattens at the thenar pad and fingertips.
+                sign = 1 if side == "Left" else -1
+                for v in thing.data.vertices:
+                    q = frame.transposed() @ (v.co - wrist)
+                    q.z -= sign * .010 * max(0,min(1,(q.y-.10)/.06))
+                    q.z = sign * max(-.020, sign*q.z)
+                    v.co = wrist + frame @ q
+            thing["grip_axis"] = frame.col[0]
+            thing["grip_origin"] = wrist + frame @ centre
+            thing["grip_sections"] = [0.0]
+            measurements[side] = frame @ centre
+            continue
         clearance = GRIP_RADIUS + 0.00025
         moved = 0
         for vertex in thing.data.vertices:
@@ -947,7 +986,11 @@ def main():
     out = sys.argv[sys.argv.index("--") + 1]
     bpy.ops.wm.read_factory_settings(use_empty=True)
     body, rig, joints, hand = make_body()
-    fists = make_fists()
+    args = sys.argv[sys.argv.index("--")+1:]
+    shapes = dict(zip(("Left","Right"), args[1:] or ("fist","fist")))
+    for side, shape in shapes.items():
+        rig["hand_shape." + side] = shape
+    fists = make_fists(shapes)
     # Capture the intact wrist skin before cutting out the open hands.
     from mathutils.bvhtree import BVHTree
     body.modifiers["smooth"].levels = 2

@@ -49,7 +49,12 @@ done
 # Isolate different rig builds across worktrees. Publish only a complete .blend.
 cache="${XDG_DATA_HOME:-$HOME/.local/share}/gym-trainer"
 mkdir -p "$cache"
-key="$( { sha256sum < "$here/build.py"; blender --version | head -n 1; } | sha256sum | cut -d' ' -f1)"
+poses=(fist fist)
+if [[ "$slug" != --verify-rig ]]; then
+  pair="$(bun -e 'const s=await Bun.file(process.argv[1]).json(); console.log(["Left","Right"].map(side=>s.hands?.[side] ?? "fist").join(" "))' "$spec")"
+  read -r -a poses <<< "$pair"
+fi
+key="$( { sha256sum < "$here/build.py"; echo "${poses[*]}"; blender --version | head -n 1; } | sha256sum | cut -d' ' -f1)"
 scene_dir="$cache/scenes/$key"
 blend="$scene_dir/mannequin.blend"
 mkdir -p "$scene_dir"
@@ -59,7 +64,7 @@ if [[ ! -f "$blend" ]]; then
     [[ ! -f "$blend" ]] || exit 0
     tmp="$(mktemp -d "$scene_dir/build.XXXXXX")"
     trap 'rm -rf "$tmp"' EXIT
-    blender -b --python-exit-code 1 --python "$here/build.py" -- "$tmp/mannequin.blend" > "$scene_dir/build.log" 2>&1 \
+    blender -b --python-exit-code 1 --python "$here/build.py" -- "$tmp/mannequin.blend" "${poses[@]}" > "$scene_dir/build.log" 2>&1 \
       || { tail -n 30 "$scene_dir/build.log"; exit 1; }
     mv "$tmp/mannequin.blend" "$blend"
   ) 9>"$scene_dir/build.lock"

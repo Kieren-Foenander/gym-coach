@@ -286,12 +286,12 @@ def hand_on_bar(forearm, palm_wanted, bar):
     return along, palm if palm.dot(palm_wanted) > 0 else -palm
 
 
-def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0))):
+def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0)), contact_frame=None):
     sign = SIDES[side]
     upper, fore = segment(f"{side}Arm", f"{side}ForeArm", f"{side}Hand")
     shoulder = head(f"{side}Arm")
     forearm = FOREARM.get(side, (grip_point - shoulder).normalized())
-    along, palm = hand_on_bar(forearm, palm_facing(grip, forearm, pole, torso, sign, bar), bar)
+    along, palm = contact_frame or hand_on_bar(forearm, palm_facing(grip, forearm, pole, torso, sign, bar), bar)
     # The wrist sits back from the grip along the hand, and the forearm's angle depends on where
     # the wrist is, so go round until they agree. There can be two answers (elbow in front or behind),
     # so start from the frame before: the arm then stays on one answer instead of flicking between them.
@@ -301,7 +301,7 @@ def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0))):
         turned = (wrist - elbow).normalized()
         settled = (turned - forearm).length < 1e-5
         forearm = forearm.lerp(turned, 0.5).normalized()
-        along, palm = hand_on_bar(forearm, palm_facing(grip, forearm, pole, torso, sign, bar), bar)
+        along, palm = contact_frame or hand_on_bar(forearm, palm_facing(grip, forearm, pole, torso, sign, bar), bar)
         if settled:
             break
     wrist = grip_point - along * GRIP[side][0] - palm * GRIP[side][1]
@@ -467,11 +467,11 @@ class Dumbbells:
     INNER = 0.065  # half the handle's length between the heads
     HEAD, DEPTH = 0.062, 0.06
 
-    def __init__(self):
+    def __init__(self, sides=SIDES):
         steel = material("steel", STEEL, 0.9, 0.3)
         iron = material("iron", IRON, 0.3, 0.55)
         self.roots, self.centres, self.axes = {}, {}, {}
-        for side in SIDES:
+        for side in sides:
             root = bpy.data.objects.new(f"dumbbell.{side}", None)
             root.rotation_mode = "QUATERNION"
             scene.collection.objects.link(root)
@@ -563,6 +563,125 @@ class Kettlebells(Dumbbells):
                 for z in (-self.DROP-self.RADIUS,self.HANDLE)]
 
 
+class ContactLoad:
+    """One or two loads held by their faces or ends. Dimensions drive mesh and contact checks."""
+
+    def __init__(self, config):
+        self.kind = config["type"]
+        self.paired = config.get("paired", False)
+        self.roots = {}
+        self.discs = []
+        if self.kind == "plate":
+            self.discs.append((0., config.get("radius", .115), config.get("thickness", .018)/2, .014))
+            self.axis = Vector(config.get("axis", [1,0,0])).normalized()
+        else:
+            self.discs = [(-.094,.077,.032,0), (0,.014,.063,0), (.094,.077,.032,0)]
+            self.axis = Vector((0,0,1))
+        finish = material("cast weight", IRON, .38, .42)
+        for name in (SIDES if self.paired else ["both"]):
+            root = bpy.data.objects.new(self.kind+"."+name, None)
+            root.rotation_mode = "QUATERNION"
+            scene.collection.objects.link(root)
+            self.roots[name] = root
+            for offset, radius, half, bore in self.discs:
+                if bore:
+                    # Revolve the rim and bore together so the centre hole is real.
+                    profile = [(bore,-half),(radius-.002,-half),(radius,-half+.002),
+                               (radius,half-.002),(radius-.002,half),(bore,half)]
+                    verts, faces = [], []
+                    for i in range(64):
+                        angle = 2*math.pi*i/64
+                        for r,z in profile:
+                            verts.append((r*math.cos(angle),r*math.sin(angle),z))
+                        for j in range(len(profile)):
+                            n = len(profile)
+                            faces.append((i*n+j, ((i+1)%64)*n+j, ((i+1)%64)*n+(j+1)%n, i*n+(j+1)%n))
+                    mesh = bpy.data.meshes.new("plate with bore")
+                    mesh.from_pydata(verts, [], faces)
+                    part = bpy.data.objects.new("weight plate",mesh)
+                    scene.collection.objects.link(part)
+                    part.data.materials.append(finish)
+                    part.parent = root
+                else:
+                    part = cylinder("dumbbell end" if offset else "handle", radius, half*2, 0, finish, root)
+                part.rotation_euler = self.axis.to_track_quat("Z","Y").to_euler()
+                part.location = self.axis*offset
+
+    def distance(self, local):
+        axial = local @ np.array(self.axis)
+        radial = np.linalg.norm(local - np.outer(axial,self.axis),axis=1)
+        distances = []
+        for offset, radius, half, bore in self.discs:
+            across = radial-radius
+            if bore:
+                across = np.maximum(across,bore-radial)
+            end = np.abs(axial-offset)-half
+            distances.append(np.hypot(np.maximum(across,0),np.maximum(end,0)) +
+                             np.minimum(np.maximum(across,end),0))
+        return np.minimum.reduce(distances)
+
+    def pose(self, spec, span, torso, grips, frame, gaps, problems):
+        centre = Vector(span.sample("load", resolve=lambda t:bar_centre(t,torso)))
+        angle = math.radians(span.sample("load_pitch",0))
+        rotation = Matrix.Rotation(angle,3,"X")
+        if "follow" in spec:
+            follow = spec["follow"]
+            bone = follow["bone"]
+            delta = world_rotation(bone) @ REST[bone].transposed()
+            centre = head(bone) + delta @ centre
+            rotation = delta @ rotation
+        for name, root in self.roots.items():
+            root.location = centre.copy()
+            if self.paired:
+                root.location.x += SIDES[name]*span.sample("spacing")
+            root.rotation_quaternion = rotation.to_quaternion()
+            for field in ("location","rotation_quaternion"):
+                root.keyframe_insert(field,frame=frame)
+        for side,sign in SIDES.items():
+            root = self.roots[side if self.paired else "both"]
+            socket = spec["contact"]
+            def vector(field):
+                x,y,z = socket[field]
+                return rotation @ Vector((sign*x,y,z))
+            along, palm = vector("along").normalized(), vector("palm").normalized()
+            palm = (palm-along*palm.dot(along)).normalized()
+            wrist = root.location + vector("wrist")
+            target = wrist + along*GRIP[side][0] + palm*GRIP[side][1]
+            pole = torso.direction(span.sample("elbows",[.4,-.5,-1]),sign)
+            gaps.append((side+" contact wrist",pose_arm(side,target,pole,"pronated",torso,contact_frame=(along,palm))))
+            surface = grips[side]
+            posed = surface.points @ np.array(surface.transform.to_3x3()).T + np.array(surface.transform.translation)
+            local = (posed-np.array(root.location)) @ np.array(rotation)
+            distance = self.distance(local)
+            if distance.min() < -.002:
+                problems.add(frame,side+" hand intersects load",-distance.min())
+            if distance.min() > .0025:
+                problems.add(frame,side+" hand loses load",distance.min())
+            surface.record_contact(distance.min())
+            if spec.get("hands", {}).get(side) == "pinch" and self.kind == "plate":
+                axial = local @ np.array(self.axis)
+                for face in (-1,1):
+                    patch = distance[axial*face>0]
+                    if patch.min(initial=1) > .0025:
+                        problems.add(frame,side+" pinch loses plate face "+str(face),patch.min(initial=1))
+
+    def check_body(self, points, frame, problems, samples, contact_bone=None):
+        for root in self.roots.values():
+            local = (points-np.array(root.location)) @ np.array(root.rotation_quaternion.to_matrix())
+            distance = self.distance(local)
+            if contact_bone:
+                near = np.linalg.norm(points - np.array(head(contact_bone)), axis=1) < .18
+                if distance[near].min(initial=1) > .004:
+                    problems.add(frame,"load loses "+contact_bone+" contact",distance[near].min(initial=1))
+            if distance.min() < -.004:
+                problems.add(frame,self.kind+" intersects the body",-distance.min())
+            for part in root.children:
+                corners = np.array([part.matrix_world @ Vector(v) for v in part.bound_box])
+                samples.append(corners)
+                if corners[:,2].min() < -.005:
+                    problems.add(frame,self.kind+" crosses the floor",-corners[:,2].min())
+
+
 class Bench:
     def __init__(self, at, length=1.2, angle=None, support="back"):
         self.top, self.length = Vector(at), length
@@ -596,7 +715,8 @@ class Bench:
             box("bench rail", (.065, support_y + .23, .06),
                 (x, y + direction*(support_y - .21)/2, .09), frame)
             return
-        box("bench pad", (0.3, length, 0.08), (x, y, z - 0.04), pad)
+        flat_pad = box("bench pad", (0.3, length, 0.08), (x, y, z - 0.04), pad)
+        self.surfaces.append(self.surface(flat_pad))
         box("bench spine", (0.08, length * 0.9, 0.06), (x, y, z - 0.11), frame)
         for end in (-1, 1):
             leg_y = y + end * length * 0.4
@@ -892,6 +1012,13 @@ class GripSurface:
         self.cache = {}
         self.metrics = {"penetration_mm": 0, "gap_mm": 0, "wrist_degrees": 0, "coverage_degrees": 360}
 
+    def record_contact(self, distance):
+        """Track face contact separately from the shaft enclosure measured for fists."""
+        if not hasattr(self, "contact_metrics"):
+            self.contact_metrics = {"penetration_mm": 0., "gap_mm": 0.}
+        for key, value in (("penetration_mm", -distance), ("gap_mm", distance)):
+            self.contact_metrics[key] = max(self.contact_metrics[key], value * 1000)
+
     @property
     def transform(self):
         return self.skin.matrix_world @ self.bone.matrix @ self.bone.bone.matrix_local.inverted()
@@ -1009,14 +1136,14 @@ def wrist_collision_points():
     return samples
 
 
-def shoulder_corrective(side):
+def shoulder_corrective(side, radius):
     """Spread high-elevation deltoid and armpit strain over the shoulder girdle."""
     joint = rig.data.bones[side + "Arm"].head_local
     group = body.vertex_groups.new(name=side + " shoulder corrective")
     for vertex in body.data.vertices:
         distance = (vertex.co - joint).length
-        if distance < .27:
-            group.add([vertex.index], min(1, (.27-distance)/.06), "REPLACE")
+        if distance < radius:
+            group.add([vertex.index], min(1, (radius-distance)/.06), "REPLACE")
     mod = body.modifiers.new(group.name, "CORRECTIVE_SMOOTH")
     mod.vertex_group = group.name
     mod.smooth_type = "LENGTH_WEIGHTED"
@@ -1032,8 +1159,8 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m"}
-        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m"}:
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
@@ -1043,7 +1170,7 @@ def movement_checkpoints(spec, frames):
     return scheduled
 
 
-def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
+def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, contact_load=None):
     """Measure actual joints and rendered apparatus transforms in world coordinates."""
     for check in checks:
         for side in ([check["side"]] if "side" in check else SIDES):
@@ -1058,7 +1185,15 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
                     problems.add(frame, f"{side} {label} outside [{lo}, {hi}] {unit}",
                                  max(lo-value, value-hi), "cm" if unit == "m" else unit)
 
-            tool = barbell.root if barbell else dumbbells.roots[side] if dumbbells else None
+            tool = barbell.root if barbell else dumbbells.roots.get(side) if dumbbells else None
+            if contact_load:
+                tool = contact_load.roots[side if contact_load.paired else "both"]
+            if "head_pitch" in check:
+                head_delta = world_rotation("Head") @ REST["Head"].transposed()
+                forward = head_delta @ Vector((0, -1, 0))
+                torso = Torso()
+                pitch = math.degrees(math.atan2(-forward.dot(torso.up), forward.dot(torso.forward)))
+                bounds("head pitch relative to torso", pitch, check["head_pitch"], "degrees")
             if "elbow" in check:
                 upper = joint("ForeArm") - joint("Arm")
                 fore = joint("Hand") - joint("ForeArm")
@@ -1094,6 +1229,8 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
                     cosine = actual.dot(direction)
                 else:
                     actual = tool.matrix_world.to_3x3().col[0].normalized()
+                    if contact_load:
+                        actual = tool.matrix_world.to_3x3() @ contact_load.axis
                     if isinstance(barbell, BentBar):
                         actual = barbell.handles[side].matrix_world.to_3x3().col[2].normalized()
                     cosine = abs(actual.dot(direction))
@@ -1107,19 +1244,34 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "bench"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "bench"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = Barbell() if "barbell" in equipment else None
     for kind in ("ez-bar", "trap-bar"):
         if kind in equipment:
             barbell = BentBar(kind)
-    dumbbells = Dumbbells() if "dumbbells" in equipment else None
+    db_spec = next((e for e in spec.get("equipment", []) if e["type"] == "dumbbells"), None)
+    dumbbells = Dumbbells([db_spec["side"]] if "side" in db_spec else SIDES) if db_spec else None
     if "kettlebells" in equipment:
         dumbbells = Kettlebells()
     bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back")) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
+    contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
+    support_side = spec.get("support", {}).get("side")
+    if support_side and (not bench or bench.pads or not dumbbells or support_side in dumbbells.roots):
+        raise ValueError("A support hand needs a free arm and a flat bench")
+    for side in SIDES:
+        shape = spec.get("hands", {}).get(side, "fist")
+        if side == support_side and shape != "support":
+            raise ValueError("Bench contact needs the open support hand")
+        if (barbell or dumbbells and side in dumbbells.roots) and shape != "fist":
+            raise ValueError("A handle needs a closed fist")
+        if contact_load and shape == "fist":
+            raise ValueError("Face contact needs a pinch, cup or open hand")
+        if rig.get("hand_shape." + side, "fist") != shape:
+            raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -1127,6 +1279,11 @@ def bake(spec, keys):
     shoulders = [ShoulderShape(side) for side in SIDES]
     pose_clavicles = any("clavicle" in key for key in keys)
     correctives = {}
+    smooth = spec.get("shoulder_smoothing", {})
+    onset, full = smooth.get("elevation_range", [-.22, .63])
+    radius = smooth.get("radius", .27)
+    if not -1 <= onset < full <= 1 or not .06 < radius <= .27:
+        raise ValueError("Invalid shoulder smoothing range or radius")
     tracked = [f"{side}{bone}" for side in SIDES for bone in ("ForeArm", "Hand", "Leg", "Foot")]
     previous, first = {}, {}
     samples, closest = [], {"bar": math.inf, "bench": math.inf, "dumbbells": math.inf}
@@ -1226,8 +1383,27 @@ def bake(spec, keys):
                 if outer > barbell.INNER:
                     problems.add(frame, f"{side} fist reaches the bar collar", outer - barbell.INNER)
                 tucked(side, torso, problems, frame)
+        if contact_load:
+            contact_load.pose(spec,span,torso,grips,frame,gaps,problems)
+        if "support" in spec:
+            support = spec["support"]
+            side = support["side"]
+            along, palm = Vector((0,-1,0)), Vector((0,0,-1))
+            target = Vector(support["wrist"]) + along*GRIP[side][0] + palm*GRIP[side][1]
+            gap = pose_arm(side, target, torso.direction([.22,-.7,-1], SIDES[side]), "pronated",
+                           torso, contact_frame=(along, palm))
+            gaps.append((side + " support wrist", gap))
+            surface = grips[side]
+            posed = surface.points @ np.array(surface.transform.to_3x3()).T + np.array(surface.transform.translation)
+            on_pad = ((np.abs(posed[:,0]-bench.top.x) <= .15) &
+                      (np.abs(posed[:,1]-bench.top.y) <= bench.length/2))
+            height = posed[:,2]-bench.top.z
+            surface.record_contact(height[on_pad].min(initial=1))
+            if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
+                problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
         if dumbbells:
-            for side, sign in SIDES.items():
+            for side in dumbbells.roots:
+                sign = SIDES[side]
                 phase = spec.get("arm_phase", {}).get(side, 0)
                 arm_span = PoseSpan(keys, (frame - 1) / frames + phase) if phase else span
                 arm_key = arm_span.keys[1]
@@ -1275,10 +1451,10 @@ def bake(spec, keys):
             upper = (head(side + "ForeArm") - head(side + "Arm")).normalized()
             elevation = upper.dot(torso.up)
             # Ease the correction in as the upper arm approaches horizontal.
-            strength = max(0, min(1, (elevation + .22) / .85))
+            strength = max(0, min(1, (elevation - onset) / (full - onset)))
             if strength or side in correctives:
                 if side not in correctives:
-                    mod = correctives[side] = shoulder_corrective(side)
+                    mod = correctives[side] = shoulder_corrective(side, radius)
                     if frame > 1:
                         mod.iterations = 0
                         mod.keyframe_insert("iterations", frame=frame-1)
@@ -1291,7 +1467,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -1312,6 +1488,8 @@ def bake(spec, keys):
         posed_wrists.data.vertices.foreach_get("co", wrist_points.ravel())
         everything = np.vstack((everything, wrist_points))
         hands = np.concatenate((hands, np.zeros(len(wrist_points), dtype=bool)))
+        if contact_load:
+            contact_load.check_body(everything,frame,problems,samples,spec.get("follow",{}).get("bone"))
         low = everything[:, 2].min()
         if low < -0.012:
             problems.add(frame, "the body goes through the floor", -low)
@@ -1332,7 +1510,8 @@ def bake(spec, keys):
                 problems.add(frame, "a dumbbell passes through the body", max(-gap, 0.001))
         if bench:
             if bench.surfaces:
-                bench.check_apparatus([barbell.root] if barbell else dumbbells.roots.values() if dumbbells else [],
+                bench.check_apparatus([barbell.root] if barbell else dumbbells.roots.values() if dumbbells else
+                                      contact_load.roots.values() if contact_load else [],
                                       frame, problems)
             if bench.chest_support:
                 # Sample the front midline between spine and shoulders, excluding the arms.
@@ -1354,7 +1533,7 @@ def bake(spec, keys):
     for patch in shoulders:
         print("SHOULDER CHECKS", patch.side, {k: round(float(v), 3) for k, v in patch.worst.items()})
     for side, surface in grips.items():
-        print("GRIP CHECKS", side, json.dumps({k: round(v, 2) for k, v in surface.metrics.items()}))
+        print("GRIP CHECKS", side, json.dumps({k: round(v, 2) for k, v in getattr(surface, "contact_metrics", surface.metrics).items()}))
     bpy.data.objects.remove(wrists, do_unlink=True)
     scene.frame_start, scene.frame_end = 1, frames
     return problems, np.vstack(samples), closest

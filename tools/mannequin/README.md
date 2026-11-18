@@ -266,3 +266,28 @@ the backrest rising toward the front of the figure. The checks measure depth
 normal to each pad, equipment intersections and chest contact on prone setups.
 For a rear foot raised on a bench, the stance can also specify a world-space
 `knee_direction` for either side to select the downward-bending knee solution.
+
+### Face grips and the support hand
+
+Set `hands.Left` and `hands.Right` independently to `pinch`, `cup`, `support`
+or `fist` (the default). The scene cache includes both shapes. All four poses
+use the mannequin's own skin and the same wrist blend.
+
+For a `plate` or `vertical-dumbbell`, each key supplies a load centre in
+metres and an optional pitch in degrees around world X. A shared `contact`
+specifies the left wrist offset and the hand's longitudinal and palmar
+directions in load coordinates. The right socket mirrors across X. Paired
+plates also use a lateral `spacing` per side. The checks measure the rigid
+skin against the weight every frame, including both faces for a pinch. A
+`follow.bone` carries the load with that joint and checks skin contact there.
+
+For a bench-supported row, set the dumbbell's `side` and give the opposite
+side a `support.wrist` in world coordinates. At least 20 open-hand vertices
+must stay within 4 mm of the flat pad and none may sink deeper than 2 mm.
+
+For a pull with high elbows, `shoulder_smoothing.elevation_range` sets the
+start and end of the shoulder correction ramp. Values measure the upper arm
+against the torso's upward axis, from −1 hanging down to +1 overhead.
+`radius` limits the correction around the shoulder in metres. The overhead
+extension uses a smaller radius to preserve the flexing elbow's cross section.
+Both the elbow-section and shoulder-stretch checks still run on every frame.

@@ -160,3 +160,13 @@ for support, angle in (("back", 0), ("back", 32), ("back", -15), ("chest", 50)):
             sample = top + rotation @ np.array([0, along, depth])
             assert abs(bench.gap(np.array([sample])) - depth) < 1e-5
 print("ADJUSTABLE BENCH REGRESSIONS PASSED")
+
+# The bore is empty, the rim is solid, and rotating the cylinder axis changes
+# which points are outside its two faces.
+plate = api["ContactLoad"]({"type": "plate", "axis": [0, 1, 0], "thickness": .02})
+samples = np.array([[0, 0, 0], [.06, 0, 0], [.06, .011, 0], [.12, 0, 0]])
+assert np.allclose(plate.distance(samples), [.014, -.01, .001, .005])
+bell = api["ContactLoad"]({"type": "vertical-dumbbell"})
+assert np.all(bell.distance(np.array([[.06, 0, .094], [0, 0, 0]])) < 0)
+assert bell.distance(np.array([[.06, 0, 0]]))[0] > .03
+print("FACE CONTACT REGRESSIONS PASSED")
