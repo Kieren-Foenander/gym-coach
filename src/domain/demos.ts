@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "paused-squat",
+    views: ["front", "back"],
+    cues: [
+      "Set the bar across your upper back and brace.",
+      "Sit down between your hips and hold still at depth.",
+      "Keep pressure across your whole foot as you stand.",
+    ],
+  },
+  {
+    slug: "box-squat",
+    views: ["front", "back"],
+    cues: [
+      "Set a flat bench behind you and brace under the bar.",
+      "Sit back until your hips settle lightly on the pad.",
+      "Keep your feet planted and stand without rocking forward.",
+    ],
+  },
+  {
     slug: "paused-bench-press",
     views: ["front"],
     cues: [
