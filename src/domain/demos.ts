@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "good-morning",
+    views: ["front", "back"],
+    cues: [
+      "Rest the bar across your upper back and soften your knees.",
+      "Brace and push your hips back as your torso tips forward.",
+      "Press through your feet and bring your hips forward to stand tall.",
+    ],
+  },
+  {
+    slug: "front-raise",
+    views: ["front"],
+    cues: [
+      "Stand tall with a dumbbell in each hand and your palms facing back.",
+      "Raise both weights in front of you with a slight bend in your elbows.",
+      "Pause near shoulder height, then lower without rocking back.",
+    ],
+  },
+  {
+    slug: "dumbbell-shrug",
+    views: ["front", "back"],
+    cues: [
+      "Hold the dumbbells beside your thighs with your arms long.",
+      "Lift your shoulders toward your ears while keeping your head still.",
+      "Pause at the top, then slowly lower your shoulders.",
+    ],
+  },
+  {
     slug: "dumbbell-curl",
     views: ["front"],
     cues: [

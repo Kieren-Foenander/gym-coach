@@ -1,0 +1,11 @@
+{
+  "equipment": [{"type": "dumbbells"}],
+  "stance": {"width": 0.26, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.932], "upper_arm": [0.22, 0.08, -1], "curl": 12, "grip": "pronated", "elbows": [0.1, -0.5, -1], "clavicle": [0, 0]},
+    {"at": 0.42, "clavicle": [4, 20]},
+    {"at": 0.52},
+    {"at": 0.92, "clavicle": [0, 0]}
+  ]
+}
