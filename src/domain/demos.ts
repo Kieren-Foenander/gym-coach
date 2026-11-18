@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "y-raise",
+    views: ["front", "back"],
+    cues: [
+      "Rest your chest on the pad and let the dumbbells hang.",
+      "Lift your arms forward and apart into a Y with a soft elbow bend.",
+      "Lower smoothly while keeping your chest against the pad.",
+    ],
+  },
+  {
     slug: "chest-supported-row",
     views: ["front", "back"],
     cues: [
