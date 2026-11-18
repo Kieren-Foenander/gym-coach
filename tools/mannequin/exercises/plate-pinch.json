@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "plate", "paired": true, "radius": 0.115, "thickness": 0.0136}],
+  "stance": {"width": 0.26, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"pelvis": [0, 0, 0.91], "load": [0, -0.055, 0.63], "spacing": 0.27, "elbows": [0.2, -1, -0.4], "at": 0},
+    {"at": 0.18, "pelvis": [0, 0, 0.932], "load": [0, -0.055, 0.652]},
+    {"at": 0.76},
+    {"at": 0.94, "pelvis": [0, 0, 0.91], "load": [0, -0.055, 0.63]}
+  ],
+  "hands": {"Left": "pinch", "Right": "pinch"},
+  "contact": {"along": [0, 0, -1], "palm": [-1, 0, 0], "wrist": [0.0314, 0, 0.1916]},
+  "checkpoints": [
+    {"at": 0, "position": {"point": "handle", "y": [-0.07, -0.04], "z": [0.618, 0.642]}, "handle_axis": {"direction": [1, 0, 0], "degrees": 3}},
+    {"at": 0.18, "position": {"point": "handle", "y": [-0.07, -0.04], "z": [0.64, 0.664]}, "handle_axis": {"direction": [1, 0, 0], "degrees": 3}}
+  ]
+}

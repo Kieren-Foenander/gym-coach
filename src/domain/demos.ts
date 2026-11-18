@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "plate-pinch",
+    views: ["front"],
+    cues: [
+      "Stand tall with a plate beside each thigh.",
+      "Pinch each rim between your thumb and fingers.",
+      "Hold the plates steady with your wrists straight.",
+    ],
+  },
+  {
+    slug: "svend-press",
+    views: ["front"],
+    cues: [
+      "Stand with a plate between your palms at chest height.",
+      "Squeeze inward as you press the plate forward.",
+      "Draw it back toward your chest under control.",
+    ],
+  },
+  {
+    slug: "plate-front-raise",
+    views: ["front"],
+    cues: [
+      "Pinch the upper rim of the plate with both hands.",
+      "Raise it in front of you to shoulder height.",
+      "Lower slowly with a soft bend in your elbows.",
+    ],
+  },
+  {
     slug: "bulgarian-split-squat",
     views: ["front", "back"],
     cues: [
