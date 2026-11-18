@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "chest-supported-row",
+    views: ["front", "back"],
+    cues: [
+      "Rest your chest against the inclined pad with a weight in each hand.",
+      "Pull your elbows behind you and bring the weights alongside your ribs.",
+      "Lower the weights while keeping your chest on the pad.",
+    ],
+  },
+  {
     slug: "incline-dumbbell-curl",
     views: ["front"],
     cues: [
