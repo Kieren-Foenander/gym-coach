@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "vertical-dumbbell"}],
+  "stance": {"width": 0.7, "toe_out": 32, "knee_direction": {"Left": [0.35, -1, 0], "Right": [-0.35, -1, 0]}},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.883], "lean": 4, "elbows": [0.28, -0.15, -1], "load": {"at": "chest", "offset": [0, 0.20500000000000002, -0.33099999999999996]}},
+    {"at": 0.42, "pelvis": [0, 0.15, 0.48800000000000004], "lean": 38, "head": -20},
+    {"at": 0.52},
+    {"at": 0.9, "pelvis": [0, 0, 0.883], "lean": 4, "head": 0}
+  ],
+  "hands": {"Left": "cup", "Right": "cup"},
+  "contact": {"wrist": [0.11235, 0.06443, 0.04753], "along": [-0.25376, -0.96727, 0], "palm": [-0.7868, 0.20642, 0.58167]},
+  "checkpoints": [
+    {"at": 0, "side": "Left", "position": {"point": "Hips", "z": [0.868, 0.898]}},
+    {"at": 0.42, "side": "Left", "position": {"point": "Hips", "z": [0.473, 0.503]}}
+  ]
+}

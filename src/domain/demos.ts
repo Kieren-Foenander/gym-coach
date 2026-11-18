@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "goblet-squat",
+    views: ["front"],
+    cues: [
+      "Cup the upper end of a dumbbell against your chest.",
+      "Bend your hips and knees together and keep your heels planted.",
+      "Push through both feet to stand tall.",
+    ],
+  },
+  {
+    slug: "sumo-squat",
+    views: ["front"],
+    cues: [
+      "Stand wide with your toes turned out and the dumbbell between your legs.",
+      "Bend your knees in line with your toes.",
+      "Drive through both feet to return to standing.",
+    ],
+  },
+  {
     slug: "plate-pinch",
     views: ["front"],
     cues: [
