@@ -1,3 +1,4 @@
+import { daysBetween } from "./days"
 import type { Unit } from "./units"
 
 /**
@@ -51,6 +52,18 @@ export const HEALTH_METRICS = [
 
 export type HealthMetric = (typeof HEALTH_METRICS)[number]
 
+/**
+ * Goes up whenever a daily metric is added. A phone that last synced with an older version reads
+ * the whole backfill again, so a new metric arrives with its history and not just the last week.
+ */
+export const HEALTH_DAILY_VERSION = 2
+
+/**
+ * The daily metrics that are totals of what was logged in another app, which someone can delete
+ * again. The phone sends 0 for a day with none of them, so a day emptied in that app empties here too.
+ */
+export const HEALTH_TOTAL_METRICS = ["dietaryEnergy", "dietaryProtein", "dietaryCarbs", "dietaryFat"] as const satisfies ReadonlyArray<HealthMetric>
+
 interface MetricInfo {
   readonly label: string
   readonly unit: string
@@ -78,6 +91,20 @@ export const localDay = (time: number): string => {
   const day = String(date.getDate()).padStart(2, "0")
 
   return `${date.getFullYear()}-${month}-${day}`
+}
+
+/** Every calendar day on the phone from one time to another, both included, oldest first. */
+export const localDaysFrom = (start: number, end: number): ReadonlyArray<string> => {
+  const days: Array<string> = []
+  const date = new Date(start)
+  date.setHours(12, 0, 0, 0)
+
+  while (localDay(date.getTime()) <= localDay(end)) {
+    days.push(localDay(date.getTime()))
+    date.setDate(date.getDate() + 1)
+  }
+
+  return days
 }
 
 export interface TimeSpan {
@@ -130,7 +157,6 @@ export interface MetricSummary {
 const USUAL_WINDOW_DAYS = 28
 const MIN_USUAL_DAYS = 3
 
-const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
 
 /** The latest value of each metric next to what is usual for this person, in the order of HEALTH_METRICS. */
 export const summariseHealth = (readings: ReadonlyArray<HealthReading>): ReadonlyArray<MetricSummary> =>

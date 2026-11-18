@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Pressable, View } from "react-native"
 import { localDay } from "~/domain/health"
-import { describeDay, nutritionDays, nutritionRange, shiftDay, WEEK_DAYS, type FoodEntry } from "~/domain/nutrition"
+import { shiftDay } from "~/domain/days"
+import { describeDay, nutritionDays, nutritionRange, WEEK_DAYS, type FoodEntry } from "~/domain/nutrition"
 import type { CallOutput } from "~/server/calls"
 import { describeError } from "@/api/client"
 import { BackLink, Card, Display, Eyebrow, Loading, Screen, SectionTitle, Text } from "@/components/ui"
@@ -96,7 +97,7 @@ function FoodDay({ day, data, editing, onEdit, onShow }: FoodDayProps) {
       <Text className="pt-2 text-sm text-faint">Or tell your coach what you ate, and it estimates and logs it for you.</Text>
 
       <SectionTitle>Eaten</SectionTitle>
-      <FoodList entries={entries} editingId={editing?.id ?? null} onEdit={onEdit} />
+      <FoodList entries={entries} editingId={editing?.id ?? null} onEdit={onEdit} onStopEditing={() => onEdit(null)} />
 
       <SectionTitle>Week</SectionTitle>
       <WeekBars days={days} selected={day} target={data.targets.calories} onSelect={onShow} />

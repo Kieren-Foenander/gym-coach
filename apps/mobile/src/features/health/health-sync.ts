@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { HEALTH_DAILY_VERSION } from "~/domain/health"
 import { AppState } from "react-native"
 import { describeError } from "@/api/client"
 import { call, getSession, onSessionChange } from "@/api/session"
@@ -29,6 +30,8 @@ interface Saved {
   readonly syncedAt: number | null
   /** What the last sync that found anything new brought in. */
   readonly lastImport: HealthImported | null
+  /** HEALTH_DAILY_VERSION as of the last sync. Missing from what was saved before there was one. */
+  readonly dailyVersion?: number
 }
 
 export interface HealthSyncState extends Saved {
@@ -63,7 +66,14 @@ const setState = (next: HealthSyncState) => {
   const owner = userId()
 
   if (owner !== null) {
-    const saved: Saved = { connected: next.connected, anchors: next.anchors, syncedAt: next.syncedAt, lastImport: next.lastImport }
+    const saved: Saved = {
+      connected: next.connected,
+      anchors: next.anchors,
+      syncedAt: next.syncedAt,
+      lastImport: next.lastImport,
+      dailyVersion: next.dailyVersion,
+    }
+
     storage.set(KEY_PREFIX + owner, JSON.stringify(saved))
   }
 
@@ -122,7 +132,7 @@ export const syncHealth = async (): Promise<void> => {
     // Reading a type that was never asked about would crash, which a new version reading something new could do.
     await requestHealthAccess()
 
-    const changes = await readHealthChanges(state.anchors, state.syncedAt)
+    const changes = await readHealthChanges(state.anchors, state.syncedAt, state.dailyVersion !== HEALTH_DAILY_VERSION)
     let imported: HealthImported = { measurements: 0, workouts: 0, days: 0 }
 
     for (const batch of healthBatches(changes)) {
@@ -145,6 +155,7 @@ export const syncHealth = async (): Promise<void> => {
       ...state,
       anchors: changes.anchors,
       syncedAt: startedAt,
+      dailyVersion: HEALTH_DAILY_VERSION,
       lastImport: foundSomething ? imported : state.lastImport,
       syncing: false,
     })

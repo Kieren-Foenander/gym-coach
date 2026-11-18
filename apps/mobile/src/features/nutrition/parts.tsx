@@ -163,11 +163,19 @@ interface FoodListProps {
   readonly entries: ReadonlyArray<FoodEntry>
   readonly editingId: number | null
   readonly onEdit: (entry: FoodEntry) => void
+  /** Closes the editor, for when the entry in it is removed. */
+  readonly onStopEditing: () => void
 }
 
 /** The day's entries. Tap one to change it. */
-export function FoodList({ entries, editingId, onEdit }: FoodListProps) {
+export function FoodList({ entries, editingId, onEdit, onStopEditing }: FoodListProps) {
   const { act, pending, error } = useAction()
+
+  const remove = (entry: FoodEntry) => {
+    if (entry.id === editingId) onStopEditing()
+
+    void act(() => call("deleteFood", { foodId: entry.id }))
+  }
 
   if (entries.length === 0) return <Empty>Nothing logged in the app for this day.</Empty>
 
@@ -200,7 +208,7 @@ export function FoodList({ entries, editingId, onEdit }: FoodListProps) {
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${entry.description}`}
                   disabled={pending}
-                  onPress={() => act(() => call("deleteFood", { foodId: entry.id }))}
+                  onPress={() => remove(entry)}
                   className="size-11 items-center justify-center"
                 >
                   <CloseIcon color={colors.faint} />

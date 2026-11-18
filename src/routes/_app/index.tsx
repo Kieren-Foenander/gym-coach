@@ -3,7 +3,7 @@ import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "~
 import { NutritionCard } from "~/components/nutrition"
 import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { localDay } from "~/domain/health"
-import { daysAround } from "~/domain/nutrition"
+import { daysAround } from "~/domain/days"
 import { summariseWeek } from "~/domain/week"
 import { isCardio } from "~/domain/catalog"
 import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"

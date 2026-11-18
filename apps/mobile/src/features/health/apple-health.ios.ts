@@ -1,5 +1,12 @@
 import Constants, { ExecutionEnvironment } from "expo-constants"
-import { HEALTH_BACKFILL_DAYS, localDay, sleepMinutesByDay, type HealthMetric } from "~/domain/health"
+import {
+  HEALTH_BACKFILL_DAYS,
+  HEALTH_TOTAL_METRICS,
+  localDay,
+  localDaysFrom,
+  sleepMinutesByDay,
+  type HealthMetric,
+} from "~/domain/health"
 import type { BodyRecord, DailyRecord, HealthAnchors, HealthChanges, WorkoutRecord } from "./types"
 
 /**
@@ -152,6 +159,7 @@ const readWorkouts = async (healthKit: HealthKit, anchor: string | undefined, fr
 
 const readDaily = async (healthKit: HealthKit, from: Date) => {
   const daily: Array<DailyRecord> = []
+  const days = localDaysFrom(from.getTime(), Date.now())
 
   for (const item of DAILY) {
     const buckets = await healthKit.queryStatisticsCollectionForQuantity(item.identifier, [item.statistic], from, { day: 1 }, {
@@ -167,6 +175,14 @@ const readDaily = async (healthKit: HealthKit, from: Date) => {
       const metric: HealthMetric = item.metric
       daily.push({ day: localDay(bucket.startDate.getTime()), metric, value: roundTo(quantity.quantity, 1) })
     }
+  }
+
+  // A day with no food logged is sent as 0, which clears it on the server: otherwise a day emptied
+  // in the food tracker would keep counting what was deleted.
+  for (const metric of HEALTH_TOTAL_METRICS) {
+    const found = new Set(daily.flatMap((reading) => (reading.metric === metric ? [reading.day] : [])))
+
+    for (const day of days) if (!found.has(day)) daily.push({ day, metric, value: 0 })
   }
 
   // A night that ended on the first day began the evening before.
@@ -190,14 +206,19 @@ const readDaily = async (healthKit: HealthKit, from: Date) => {
 
 /**
  * Everything new in Health since the last sync. `lastSyncedAt` is null for the first, which
- * reaches back HEALTH_BACKFILL_DAYS days.
+ * reaches back HEALTH_BACKFILL_DAYS days. `backfillDaily` reads the daily numbers that far back
+ * too, for when a new daily metric was added since the last sync.
  */
-export const readHealthChanges = async (anchors: HealthAnchors, lastSyncedAt: number | null): Promise<HealthChanges> => {
+export const readHealthChanges = async (
+  anchors: HealthAnchors,
+  lastSyncedAt: number | null,
+  backfillDaily: boolean,
+): Promise<HealthChanges> => {
   const healthKit = needHealthKit()
   const now = Date.now()
   const backfill = startOfDay(now - HEALTH_BACKFILL_DAYS * DAY_MS)
   // Daily numbers from a day before the last sync, and never less than the last week.
-  const dailyFrom = lastSyncedAt === null ? backfill : startOfDay(Math.max(backfill.getTime(), Math.min(now - 7 * DAY_MS, lastSyncedAt - DAY_MS)))
+  const dailyFrom = lastSyncedAt === null || backfillDaily ? backfill : startOfDay(Math.max(backfill.getTime(), Math.min(now - 7 * DAY_MS, lastSyncedAt - DAY_MS)))
 
   const body = await readBody(healthKit, anchors, backfill)
   const workouts = await readWorkouts(healthKit, anchors.workouts, backfill)

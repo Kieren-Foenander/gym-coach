@@ -174,11 +174,19 @@ interface FoodListProps {
   readonly entries: ReadonlyArray<FoodEntry>
   readonly editingId: number | null
   readonly onEdit: (entry: FoodEntry) => void
+  /** Closes the editor, for when the entry in it is removed. */
+  readonly onStopEditing: () => void
 }
 
 /** The day's entries. Tap one to change it. */
-export function FoodList({ entries, editingId, onEdit }: FoodListProps) {
+export function FoodList({ entries, editingId, onEdit, onStopEditing }: FoodListProps) {
   const { act, pending, error } = useAction()
+
+  const remove = (entry: FoodEntry) => {
+    if (entry.id === editingId) onStopEditing()
+
+    void act(() => deleteFood({ data: { foodId: entry.id } }))
+  }
 
   if (entries.length === 0) {
     return (
@@ -212,7 +220,7 @@ export function FoodList({ entries, editingId, onEdit }: FoodListProps) {
                 aria-label={`Remove ${entry.description}`}
                 className="flex size-11 shrink-0 items-center justify-center text-faint"
                 disabled={pending}
-                onClick={() => act(() => deleteFood({ data: { foodId: entry.id } }))}
+                onClick={() => remove(entry)}
               >
                 <CloseIcon className="size-4" />
               </button>

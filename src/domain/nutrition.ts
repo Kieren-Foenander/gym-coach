@@ -1,3 +1,4 @@
+import { daysAround, daysFrom, shiftDay, type DayRange } from "./days"
 import type { HealthMetric } from "./health"
 
 /**
@@ -93,49 +94,6 @@ export const isTotalsEmpty = (totals: Totals) => NUTRIENTS.every((nutrient) => t
 
 // ---------------------------------------------------------------- days
 
-const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-
-/** Whether text is a day that exists, as YYYY-MM-DD. Dates parse 30 February as 2 March, so it must come back the same. */
-export const isDay = (text: string): boolean => {
-  if (!DAY_PATTERN.test(text)) return false
-
-  const time = Date.parse(`${text}T00:00:00Z`)
-
-  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === text
-}
-
-/** The day `count` days after `day` (or before, when negative). Worked in UTC, so it never trips on a clock change. */
-export const shiftDay = (day: string, count: number): string => {
-  const date = new Date(`${day}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + count)
-
-  return date.toISOString().slice(0, 10)
-}
-
-/** How many days from one day to another; negative when `to` comes first. */
-export const daysBetween = (from: string, to: string): number =>
-  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
-
-/** Every day from `from` to `to`, both included, oldest first. */
-export const daysFrom = (from: string, to: string): ReadonlyArray<string> =>
-  Array.from({ length: Math.max(0, daysBetween(from, to) + 1) }, (_, index) => shiftDay(from, index))
-
-/** A span of days, both ends included. */
-export interface DayRange {
-  readonly from: string
-  readonly to: string
-}
-
-/**
- * The days that may be "today" somewhere when it is `time` in UTC. A server, which does not know the
- * user's time zone, asks for this span and leaves the device to pick its own day out of it.
- */
-export const daysAround = (time: number): DayRange => {
-  const utc = new Date(time).toISOString().slice(0, 10)
-
-  return { from: shiftDay(utc, -1), to: shiftDay(utc, 1) }
-}
-
 /** How many days the week view shows, ending at the day picked. */
 export const WEEK_DAYS = 7
 
@@ -158,6 +116,20 @@ interface HealthNutritionReading {
   readonly value: number
 }
 
+/** Rows grouped by their day, so each day's are found without scanning them all again. */
+export const groupByDay = <A extends { readonly day: string }>(rows: ReadonlyArray<A>): ReadonlyMap<string, ReadonlyArray<A>> => {
+  const days = new Map<string, Array<A>>()
+
+  for (const row of rows) {
+    const list = days.get(row.day)
+
+    if (list) list.push(row)
+    else days.set(row.day, [row])
+  }
+
+  return days
+}
+
 /**
  * Each day from `from` to `to` with what was logged here, what Health had, and the two together.
  * Oldest first, and every day is there, eaten on or not.
@@ -167,10 +139,13 @@ export const nutritionDays = (
   to: string,
   entries: ReadonlyArray<FoodEntry>,
   health: ReadonlyArray<HealthNutritionReading>,
-): ReadonlyArray<NutritionDay> =>
-  daysFrom(from, to).map((day) => {
-    const logged = totalFood(entries.filter((entry) => entry.day === day))
-    const readings = health.filter((reading) => reading.day === day)
+): ReadonlyArray<NutritionDay> => {
+  const entriesByDay = groupByDay(entries)
+  const readingsByDay = groupByDay(health)
+
+  return daysFrom(from, to).map((day) => {
+    const logged = totalFood(entriesByDay.get(day) ?? [])
+    const readings = readingsByDay.get(day) ?? []
 
     const fromHealth = (nutrient: Nutrient) =>
       readings.find((reading) => reading.metric === HEALTH_NUTRIENTS[nutrient])?.value ?? 0
@@ -191,6 +166,7 @@ export const nutritionDays = (
       total: hasHealth ? add(logged, healthTotals) : logged,
     }
   })
+}
 
 // ---------------------------------------------------------------- showing
 
@@ -262,13 +238,17 @@ export interface FoodInputValues {
   readonly fat: number | null
 }
 
-/** Reads a number typed on a phone keyboard, where the decimal key may produce a comma. Null when blank. */
-const readNumber = (text: string): number | null | "invalid" => {
+/**
+ * Reads a number typed in. A comma before exactly three digits separates thousands, as in
+ * "2,400"; any other comma is the decimal point some phone keyboards give, as in "45,5".
+ * Null when blank.
+ */
+export const readNumber = (text: string): number | null | "invalid" => {
   const trimmed = text.trim()
 
   if (trimmed === "") return null
 
-  const value = Number(trimmed.replace(",", "."))
+  const value = Number(/^\d{1,3}(,\d{3})+$/.test(trimmed) ? trimmed.replaceAll(",", "") : trimmed.replace(",", "."))
 
   return Number.isFinite(value) ? value : "invalid"
 }

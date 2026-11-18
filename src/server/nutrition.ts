@@ -1,11 +1,10 @@
 import { Clock, Effect } from "effect"
 import { SqlClient } from "effect/sql"
+import { daysBetween } from "~/domain/days"
 import {
-  daysBetween,
   HEALTH_NUTRIENTS,
   MAX_NUTRITION_DAYS,
   nutritionDays,
-  NUTRIENTS,
   type FoodEntry,
   type FoodSource,
   type NutritionTargets,
@@ -21,7 +20,8 @@ import { CurrentUser } from "./repo"
 
 const FOOD_COLUMNS = `id, day, description, calories, protein, carbs, fat, source, created_at`
 
-const HEALTH_METRICS = NUTRIENTS.map((nutrient) => HEALTH_NUTRIENTS[nutrient])
+/** The Health daily metrics that hold food, as opposed to sleep, steps and the rest. */
+const DIETARY_METRICS = Object.values(HEALTH_NUTRIENTS)
 
 const checkSpan = (from: string, to: string) => {
   const span = daysBetween(from, to)
@@ -84,14 +84,18 @@ export const getNutrition = Effect.fn("getNutrition")(function* (from: string, t
 
   yield* checkSpan(from, to)
 
-  const entries = yield* sql<FoodEntry>`
-    SELECT ${sql.unsafe(FOOD_COLUMNS)} FROM food_entries
-    WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to}
-    ORDER BY day, created_at, id`
-
-  const health = yield* sql<{ day: string; metric: string; value: number }>`
-    SELECT day, metric, value FROM health_daily
-    WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to} AND ${sql.in("metric", HEALTH_METRICS)}`
+  const { entries, health } = yield* Effect.all(
+    {
+      entries: sql<FoodEntry>`
+        SELECT ${sql.unsafe(FOOD_COLUMNS)} FROM food_entries
+        WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to}
+        ORDER BY day, created_at, id`,
+      health: sql<{ day: string; metric: string; value: number }>`
+        SELECT day, metric, value FROM health_daily
+        WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to} AND ${sql.in("metric", DIETARY_METRICS)}`,
+    },
+    { concurrency: 2 },
+  )
 
   const targets: NutritionTargets = { calories: user.calorieTarget, protein: user.proteinTarget }
 

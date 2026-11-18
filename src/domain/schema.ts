@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
-import { FOOD_LIMITS, isDay, TARGET_LIMITS } from "./nutrition"
+import { isDay } from "./days"
+import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
 import { MEASUREMENT_KINDS } from "./units"
 
 export { distanceUnit, MEASUREMENT_KINDS, measurementUnit } from "./units"

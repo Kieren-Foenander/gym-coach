@@ -4,7 +4,8 @@ import { useState } from "react"
 import { BackButton, Card, SectionTitle, useNow } from "~/components/ui"
 import { DayTotals, FoodEditor, FoodList, TargetsForm, WeekBars } from "~/components/nutrition"
 import { localDay } from "~/domain/health"
-import { describeDay, nutritionDays, nutritionRange, shiftDay, WEEK_DAYS, type FoodEntry } from "~/domain/nutrition"
+import { shiftDay } from "~/domain/days"
+import { describeDay, nutritionDays, nutritionRange, WEEK_DAYS, type FoodEntry } from "~/domain/nutrition"
 import { Day } from "~/domain/schema"
 import { getNutrition } from "~/functions/api"
 
@@ -38,7 +39,8 @@ function FoodDay({ today }: { readonly today: string }) {
   const data = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = useNavigate()
-  const day = search.day ?? today
+  // A day still to come (from an old link, say) shows today instead, so nothing is logged ahead.
+  const day = search.day !== undefined && search.day <= today ? search.day : today
   const [editing, setEditing] = useState<FoodEntry | null>(null)
   const weekFrom = shiftDay(day, 1 - WEEK_DAYS)
   // Worked out again here so a day outside what was loaded still shows, empty, while the next one loads.
@@ -88,7 +90,7 @@ function FoodDay({ today }: { readonly today: string }) {
       <p className="pt-2 text-sm text-faint">Or tell your coach what you ate, and it estimates and logs it for you.</p>
 
       <SectionTitle>Eaten</SectionTitle>
-      <FoodList entries={entries} editingId={editing?.id ?? null} onEdit={setEditing} />
+      <FoodList entries={entries} editingId={editing?.id ?? null} onEdit={setEditing} onStopEditing={() => setEditing(null)} />
 
       <SectionTitle>Week</SectionTitle>
       <WeekBars days={days} selected={day} target={data.targets.calories} onSelect={show} />

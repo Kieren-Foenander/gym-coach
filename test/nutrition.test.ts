@@ -1,21 +1,19 @@
 import { Exit, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 import { CallInputs } from "~/domain/calls"
-import { HEALTH_METRICS } from "~/domain/health"
+import { HEALTH_METRICS, HEALTH_TOTAL_METRICS, localDaysFrom } from "~/domain/health"
+import { daysAround, daysFrom, isDay, shiftDay } from "~/domain/days"
 import {
-  daysAround,
-  daysFrom,
   describeMacros,
   describeTarget,
   EMPTY_FOOD_FORM,
   foodFormFor,
   HEALTH_NUTRIENTS,
-  isDay,
   nutritionDays,
   nutritionRange,
   readFoodForm,
+  readNumber,
   readTarget,
-  shiftDay,
   targetProgress,
   totalFood,
   WEEK_DAYS,
@@ -118,8 +116,18 @@ describe("totals", () => {
     })
   })
 
-  it("reads each nutrient from a metric Health actually sends", () => {
+  it("reads each nutrient from a metric Health actually sends, and clears each when a day empties", () => {
     for (const metric of Object.values(HEALTH_NUTRIENTS)) expect(HEALTH_METRICS).toContain(metric)
+
+    expect([...HEALTH_TOTAL_METRICS].toSorted()).toEqual(Object.values(HEALTH_NUTRIENTS).toSorted())
+  })
+
+  it("lists the phone's days between two times, so a day with no food can be sent as 0", () => {
+    const start = new Date(2026, 10, 29, 22, 0).getTime()
+    const end = new Date(2026, 11, 2, 1, 0).getTime()
+
+    expect(localDaysFrom(start, end)).toEqual(["2026-11-29", "2026-11-30", "2026-12-01", "2026-12-02"])
+    expect(localDaysFrom(end, end)).toEqual(["2026-12-02"])
   })
 })
 
@@ -154,6 +162,16 @@ describe("targets", () => {
 })
 
 describe("the food form", () => {
+  it("reads a comma before three digits as thousands and any other comma as a decimal point", () => {
+    expect(readNumber("2,400")).toBe(2400)
+    expect(readNumber("12,500")).toBe(12500)
+    expect(readNumber("45,5")).toBe(45.5)
+    expect(readNumber("1,25")).toBe(1.25)
+    expect(readNumber("2400")).toBe(2400)
+    expect(readNumber("")).toBeNull()
+    expect(readNumber("1,2,3")).toBe("invalid")
+  })
+
   it("needs a description and calories, and leaves blank macros unknown", () => {
     expect(readFoodForm({ ...EMPTY_FOOD_FORM, description: "  Banana ", calories: "105" })).toEqual({
       ok: true,
