@@ -1,0 +1,15 @@
+{
+  "equipment": [{"type": "trap-bar"}],
+  "stance": {"width": 0.28, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.928], "bar": [0, -0.017000000000000015, 0.7214999999999999], "grip_width": 0.278, "grip": "thumb-forward", "elbows": [0.16, -0.6, -1], "clavicle": [0, 0]},
+    {"at": 0.44, "clavicle": [3, 24], "bar": [0, -0.017000000000000015, 0.7935]},
+    {"at": 0.52},
+    {"at": 0.94, "clavicle": [0, 0], "bar": [0, -0.017000000000000015, 0.7214999999999999]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 23], "handle_axis": {"direction": [0, 1, 0], "degrees": 20}},
+    {"at": 0.48, "elbow": [0, 24], "position": {"point": "handle", "z": [0.78, 0.8]}}
+  ]
+}

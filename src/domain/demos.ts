@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "trap-bar-shrug",
+    views: ["front", "back"],
+    cues: [
+      "Stand centered in the frame with your hands on the parallel handles.",
+      "Keep your arms long and lift your shoulders straight up.",
+      "Pause, then lower the frame under control.",
+    ],
+  },
+  {
+    slug: "trap-bar-deadlift",
+    views: ["front", "back"],
+    cues: [
+      "Stand inside the frame and grip the handles beside your shins.",
+      "Brace and push the floor away until your knees and hips are straight.",
+      "Hinge and bend your knees to set the plates down.",
+    ],
+  },
+  {
     slug: "ez-bar-curl",
     views: ["front"],
     cues: [
