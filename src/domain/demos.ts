@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "sumo-deadlift",
+    views: ["front", "back"],
+    cues: [
+      "Take a wide stance with your toes turned out and grip inside your knees.",
+      "Push the floor away while keeping the bar close.",
+      "Stand tall, then hinge and bend your knees to lower the bar.",
+    ],
+  },
+  {
     slug: "cross-body-hammer-curl",
     views: ["front"],
     cues: [
