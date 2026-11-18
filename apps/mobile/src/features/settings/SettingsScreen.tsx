@@ -1,5 +1,4 @@
 import * as Clipboard from "expo-clipboard"
-import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
 import { View } from "react-native"
 import { call, rememberUser, signOut, useSession } from "@/api/session"
@@ -70,30 +69,6 @@ export function SettingsScreen() {
         <Button variant="primary" disabled={pending || displayName.trim() === ""} onPress={save}>
           {saved && !pending ? "Saved" : "Save"}
         </Button>
-      </Card>
-
-      <SectionTitle>Credits</SectionTitle>
-      <Card>
-        <Text className="text-sm text-muted">
-          The muscles in the exercise demonstrations come from{" "}
-          <Text
-            accessibilityRole="link"
-            className="text-sm font-semibold text-accent"
-            onPress={() => void WebBrowser.openBrowserAsync("https://www.z-anatomy.com/")}
-          >
-            Z-Anatomy
-          </Text>
-          , the libre 3D atlas of anatomy, which builds on BodyParts3D by the Database Center for Life Science. The demonstration
-          videos are shared under the same licence,{" "}
-          <Text
-            accessibilityRole="link"
-            className="text-sm font-semibold text-accent"
-            onPress={() => void WebBrowser.openBrowserAsync("https://creativecommons.org/licenses/by-sa/4.0/")}
-          >
-            CC BY-SA 4.0
-          </Text>
-          .
-        </Text>
       </Card>
 
       <SectionTitle>Account</SectionTitle>

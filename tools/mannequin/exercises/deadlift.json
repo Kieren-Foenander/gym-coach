@@ -1,0 +1,24 @@
+{
+  "equipment": [{ "type": "barbell" }],
+  "stance": { "width": 0.28, "toe_out": 8 },
+  "camera": { "angle": 35 },
+  "touching": ["bar"],
+  "keys": [
+    { "at": 0, "shoulder_y": -0.163, "lean": 53, "head": -21, "bar": [0, -0.14, 0.225], "grip_width": 0.31, "grip": "pronated", "elbows": [0.3, -0.6, 0] },
+    { "at": 0.107, "shoulder_y": -0.168, "lean": 54, "head": -21, "bar": [0, -0.157, 0.321] },
+    { "at": 0.172, "shoulder_y": -0.166, "lean": 51.5, "head": -20, "bar": [0, -0.166, 0.451] },
+    { "at": 0.208, "shoulder_y": -0.162, "lean": 46.2, "head": -18, "bar": [0, -0.148, 0.512] },
+    { "at": 0.255, "shoulder_y": -0.156, "lean": 35.3, "head": -14, "bar": [0, -0.137, 0.591] },
+    { "at": 0.3, "shoulder_y": -0.118, "lean": 22.6, "head": -9, "bar": [0, -0.14, 0.666] },
+    { "at": 0.337, "shoulder_y": -0.057, "lean": 10.6, "head": -4, "bar": [0, -0.145, 0.713] },
+    { "at": 0.39, "shoulder_y": -0.005, "lean": 0, "head": 0, "bar": [0, -0.15, 0.745] },
+    { "at": 0.49 },
+    { "at": 0.5539, "shoulder_y": -0.057, "lean": 10.6, "head": -4, "bar": [0, -0.145, 0.713] },
+    { "at": 0.5985, "shoulder_y": -0.118, "lean": 22.6, "head": -9, "bar": [0, -0.14, 0.666] },
+    { "at": 0.6527, "shoulder_y": -0.156, "lean": 35.3, "head": -14, "bar": [0, -0.137, 0.591] },
+    { "at": 0.7093, "shoulder_y": -0.162, "lean": 46.2, "head": -18, "bar": [0, -0.148, 0.512] },
+    { "at": 0.7527, "shoulder_y": -0.166, "lean": 51.5, "head": -20, "bar": [0, -0.166, 0.451] },
+    { "at": 0.8311, "shoulder_y": -0.168, "lean": 54, "head": -21, "bar": [0, -0.157, 0.321] },
+    { "at": 0.96, "shoulder_y": -0.163, "lean": 53, "head": -21, "bar": [0, -0.14, 0.225] }
+  ]
+}
