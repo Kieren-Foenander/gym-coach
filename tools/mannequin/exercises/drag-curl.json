@@ -1,0 +1,15 @@
+{
+  "equipment": [{"type": "barbell"}],
+  "stance": {"width": 0.28, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.928], "bar": [0, -0.16, 0.754], "grip_width": 0.236, "grip": "supinated", "elbows": [0.16, -0.6, -1], "clavicle": [0, 0]},
+    {"at": 0.44, "bar": [0, -0.171, 1.1], "elbows": [0.18, -1, 0]},
+    {"at": 0.52},
+    {"at": 0.94, "bar": [0, -0.16, 0.754], "elbows": [0.16, -0.6, -1]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 32], "handle_axis": {"direction": [1, 0, 0], "degrees": 20}},
+    {"at": 0.48, "elbow": [80, 165], "position": {"point": "handle", "z": [1.0750000000000002, 1.125]}}
+  ]
+}

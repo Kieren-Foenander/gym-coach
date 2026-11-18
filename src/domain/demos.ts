@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "barbell-curl",
+    views: ["front"],
+    cues: [
+      "Hold the bar with palms forward and your arms long.",
+      "Bend your elbows to bring the bar toward your shoulders.",
+      "Lower along the same arc while keeping your torso still.",
+    ],
+  },
+  {
+    slug: "drag-curl",
+    views: ["front"],
+    cues: [
+      "Take an underhand grip with the bar in front of your thighs.",
+      "Draw your elbows back as you curl the bar close to your body.",
+      "Lower slowly and let your elbows return to your sides.",
+    ],
+  },
+  {
+    slug: "alternating-dumbbell-curl",
+    views: ["front"],
+    cues: [
+      "Stand tall with a dumbbell in each hand and palms forward.",
+      "Curl one weight while the other arm stays long.",
+      "Lower fully before curling with the other arm.",
+    ],
+  },
+  {
     slug: "paused-squat",
     views: ["front", "back"],
     cues: [
