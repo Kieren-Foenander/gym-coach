@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-fly",
+    views: ["front"],
+    cues: [
+      "Lie back with the weights over your chest and your palms facing each other.",
+      "Open your arms in a wide arc with a soft bend at the elbows.",
+      "Bring the dumbbells back over your chest along the same arc.",
+    ],
+  },
+  {
+    slug: "dumbbell-squeeze-press",
+    views: ["front"],
+    cues: [
+      "Lie back and hold the dumbbells together over your chest.",
+      "Keep pressing the weights together as you lower them to your chest.",
+      "Drive both weights up while maintaining contact.",
+    ],
+  },
+  {
     slug: "standing-dumbbell-shoulder-press",
     views: ["front"],
     cues: [
