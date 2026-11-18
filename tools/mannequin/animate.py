@@ -36,6 +36,11 @@ GRIP = {side: tuple(rig[f"grip.{side}"]) for side in ("Left", "Right")}
 LANDMARKS = {name: tuple(value) for name, value in rig["landmarks"].items()}
 
 
+# The chest bar target includes shaft radius and 4 mm of clearance.
+s, f, u = LANDMARKS["chest"]
+LANDMARKS["sternum"] = (s, f - .018, u)
+
+
 # ---------------------------------------------------------------- spec
 
 
@@ -820,7 +825,7 @@ def held_point(side, key, torso):
 def bar_centre(target, torso):
     if isinstance(target, list):
         return Vector(target)
-    return torso.point(LANDMARKS[target["at"]]) + torso.point(target.get("offset", (0, 0, 0))) - torso.origin
+    return torso.point(LANDMARKS[target["at"]]) + torso.point(target.get("offset", (0, 0, 0))) - torso.origin + Vector(target.get("world_offset", (0, 0, 0)))
 
 
 class Problems:
@@ -1159,8 +1164,8 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch"}
-        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch"}:
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
@@ -1188,6 +1193,14 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, co
             tool = barbell.root if barbell else dumbbells.roots.get(side) if dumbbells else None
             if contact_load:
                 tool = contact_load.roots[side if contact_load.paired else "both"]
+            if "surface_gap" in check:
+                expected = check["surface_gap"]
+                if contact_load is None:
+                    raise ValueError("A surface gap checkpoint requires a face-held weight")
+                landmark = Torso().point(LANDMARKS[expected["landmark"]])
+                local = tool.matrix_world.inverted() @ landmark
+                gap = contact_load.distance(np.array([local]))[0]
+                bounds("load to " + expected["landmark"], max(0, gap), [0, expected["max_m"]], "m")
             if "head_pitch" in check:
                 head_delta = world_rotation("Head") @ REST["Head"].transposed()
                 forward = head_delta @ Vector((0, -1, 0))

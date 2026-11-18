@@ -130,8 +130,8 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     slug: "goblet-squat",
     views: ["front"],
     cues: [
-      "Cup the upper end of a dumbbell against your chest.",
-      "Bend your hips and knees together and keep your heels planted.",
+      "Cup the upper head of a vertical dumbbell against your sternum.",
+      "Keep your heels planted and lower your elbows between your knees.",
       "Push through both feet to stand tall.",
     ],
   },
@@ -166,8 +166,8 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     slug: "plate-front-raise",
     views: ["front"],
     cues: [
-      "Pinch the upper rim of the plate with both hands.",
-      "Raise it in front of you to shoulder height.",
+      "Hold the plate at three and nine o’clock, centred in front of your thighs.",
+      "Raise it to shoulder height with its face pointing forward.",
       "Lower slowly with a soft bend in your elbows.",
     ],
   },

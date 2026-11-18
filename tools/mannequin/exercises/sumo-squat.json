@@ -12,6 +12,7 @@
   "contact": {"wrist": [0.11235, 0.06443, 0.04753], "along": [-0.25376, -0.96727, 0], "palm": [-0.7868, 0.20642, 0.58167]},
   "checkpoints": [
     {"at": 0, "side": "Left", "position": {"point": "Hips", "z": [0.868, 0.898]}},
-    {"at": 0.42, "side": "Left", "position": {"point": "Hips", "z": [0.473, 0.503]}}
+    {"at": 0.42, "side": "Left", "position": {"point": "Hips", "z": [0.473, 0.503]}},
+    {"handle_axis": {"direction": [0, 0, 1], "degrees": 5}, "position": {"point": "handle", "relative_to": "Hips", "x": [-0.005, 0.005]}}
   ]
 }
