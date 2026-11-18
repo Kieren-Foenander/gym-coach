@@ -136,14 +136,16 @@ function ConnectCoach({ serverUrl }: { readonly serverUrl: string }) {
     staleTime: Infinity,
   })
 
-  // Until the server answers, assume the live app, whose name is the plain one.
+  // A server too old to answer is the live app, whose name is the plain one. Until it answers, the
+  // button waits, so a test copy is never added under the live name.
   const stage = deployment.data?.stage ?? null
   const name = connectorName(stage)
   const address = serverUrl ? coachAddress(serverUrl) : ""
+  const named = deployment.isSuccess || deployment.isError
   const [copied, setCopied] = useState(false)
   const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
   const app = coachApp(appId)
-  const action = address ? coachAction(app, address, name) : null
+  const action = address && named ? coachAction(app, address, name) : null
   const note = coachNote(app, name)
 
   const copy = async () => {
