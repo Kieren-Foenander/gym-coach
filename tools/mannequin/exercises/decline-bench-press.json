@@ -1,0 +1,16 @@
+{
+  "equipment": [{"type": "barbell"}, {"type": "bench", "at": [0, 0.1, 0.505], "angle": -15}],
+  "stance": {"width": 0.45, "y": -0.37, "toe_out": 12},
+  "camera": {"angle": 65, "elevation": 16},
+  "touching": ["bench"],
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.63], "lean": -105, "spine": 0, "bar": {"at": "shoulders", "offset": [0, 0.544782, -0.145974]}, "grip_width": 0.305, "grip": "pronated", "elbows": [0.7, -0.4, -0.45], "head": 0},
+    {"at": 0.44, "bar": {"at": "chest", "offset": [0, 0.008, -0.035]}},
+    {"at": 0.52},
+    {"at": 0.94, "bar": {"at": "shoulders", "offset": [0, 0.544782, -0.145974]}}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 19]},
+    {"at": 0.48, "elbow": [60, 155]}
+  ]
+}

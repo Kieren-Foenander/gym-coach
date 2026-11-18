@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "incline-bench-press",
+    views: ["front"],
+    cues: [
+      "Lie back on the incline bench with your feet planted.",
+      "Lower the bar toward your upper chest.",
+      "Press the bar back over your shoulders.",
+    ],
+  },
+  {
+    slug: "incline-dumbbell-press",
+    views: ["front"],
+    cues: [
+      "Lie back on the incline bench with your feet planted.",
+      "Lower the dumbbells beside your upper chest.",
+      "Press the dumbbells back over your shoulders.",
+    ],
+  },
+  {
+    slug: "decline-bench-press",
+    views: ["front"],
+    cues: [
+      "Lie back on the decline bench with your feet planted.",
+      "Lower the bar toward your lower chest.",
+      "Press the bar back over your shoulders.",
+    ],
+  },
+  {
+    slug: "decline-dumbbell-press",
+    views: ["front"],
+    cues: [
+      "Lie back on the decline bench with your feet planted.",
+      "Lower the dumbbells beside your lower chest.",
+      "Press the dumbbells back over your shoulders.",
+    ],
+  },
+  {
     slug: "split-squat",
     views: ["front", "back"],
     cues: [
