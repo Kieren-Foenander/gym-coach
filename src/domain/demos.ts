@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "kettlebell-row",
+    views: ["front", "back"],
+    cues: [
+      "Hinge at the hips with a bell hanging beneath each shoulder.",
+      "Pull your elbows back to draw the handles alongside your waist.",
+      "Lower both bells and keep your torso still.",
+    ],
+  },
+  {
     slug: "trap-bar-shrug",
     views: ["front", "back"],
     cues: [

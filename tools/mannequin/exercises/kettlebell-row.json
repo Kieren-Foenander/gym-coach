@@ -1,0 +1,15 @@
+{
+  "equipment": [{"type": "kettlebells"}],
+  "stance": {"width": 0.28, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.17, 0.82], "lean": 57, "head": -12, "bar": [0, -0.19, 0.449], "grip_width": 0.32, "grip": "pronated", "elbows": [0.2, -1, -0.4]},
+    {"at": 0.44, "bar": [0, -0.08, 0.8], "grip_width": 0.3},
+    {"at": 0.52},
+    {"at": 0.95, "bar": [0, -0.19, 0.449], "grip_width": 0.32}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 25], "handle_axis": {"direction": [1, 0, 0], "degrees": 20}},
+    {"at": 0.48, "elbow": [115, 162], "position": {"point": "handle", "z": [0.77, 0.83]}}
+  ]
+}
