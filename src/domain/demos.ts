@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "behind-the-neck-press",
+    views: ["front"],
+    cues: [
+      "Take a wide overhand grip with the bar behind your head.",
+      "Press straight up as the bar clears your head.",
+      "Lower under control to a comfortable depth.",
+    ],
+  },
+  {
+    slug: "z-press",
+    views: ["front"],
+    cues: [
+      "Sit tall on the floor with your legs extended.",
+      "Press the bar overhead while keeping your torso upright.",
+      "Lower it to your shoulders under control.",
+    ],
+  },
+  {
     slug: "neck-curl",
     views: ["front"],
     cues: [
