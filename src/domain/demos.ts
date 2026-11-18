@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "standing-dumbbell-shoulder-press",
+    views: ["front"],
+    cues: [
+      "Stand tall with a dumbbell beside each shoulder.",
+      "Press both weights overhead while keeping your ribs down.",
+      "Lower them under control to shoulder height.",
+    ],
+  },
+  {
+    slug: "dumbbell-shoulder-press",
+    views: ["front"],
+    cues: [
+      "Sit tall on the bench with your feet planted.",
+      "Press the dumbbells up from shoulder height.",
+      "Bring them back down with your forearms under the weights.",
+    ],
+  },
+  {
+    slug: "seated-barbell-press",
+    views: ["front"],
+    cues: [
+      "Sit tall and grip the bar just outside shoulder width.",
+      "Move your chin back as you press the bar past your face.",
+      "Lower to your upper chest with your feet planted.",
+    ],
+  },
+  {
+    slug: "push-press",
+    views: ["front", "back"],
+    cues: [
+      "Stand with the bar at your shoulders and brace.",
+      "Dip at the knees, then drive through your feet to send the bar up.",
+      "Finish overhead and lower the bar back to your shoulders.",
+    ],
+  },
+  {
     slug: "romanian-deadlift",
     views: ["front", "back"],
     cues: [
