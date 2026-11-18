@@ -1,0 +1,60 @@
+# Weekly update pull requests, so fast-moving tooling (oxlint, tsrs, TypeScript, Vite, Vitest, Alchemy) doesn't fall behind.
+# Each group becomes one pull request, and CI checks it like any other.
+# Packages pinned to a prerelease (tsrs, Alchemy betas) get newer prereleases, because Dependabot follows the channel you're on.
+version: 2
+
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      oxc:
+        patterns: ["oxlint", "@oxlint/*", "oxfmt", "tsrs", "oxlint-tsgolint"]
+      typescript:
+        patterns: ["typescript", "@types/*"]
+      alchemy:
+        patterns: ["alchemy", "@alchemy.run/*"]
+      effect:
+        patterns: ["effect", "@effect/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      build-and-test:
+        patterns: ["vite", "vitest", "@vitejs/*", "tailwindcss", "@tailwindcss/*"]
+      everything-else:
+        update-types: [minor, patch]
+
+  - package-ecosystem: bun
+    directory: /apps/mobile
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Expo decides which versions of these work together. Move them with an Expo SDK upgrade (`bunx expo install --fix`), not one by one.
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@types/react"
+    groups:
+      typescript:
+        patterns: ["typescript", "@types/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      everything-else:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

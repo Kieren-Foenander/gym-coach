@@ -100,7 +100,11 @@ const authorize = async (request: Request, env: OAuthEnv): Promise<Response> => 
     if (request.method === "POST") {
       if (!user) return html("Signed out", `<h1>You were signed out</h1><p>Start connecting again from your AI app.</p>`, { status: 401 })
       const form = await request.formData()
-      const handle = String(form.get("handle"))
+      const handle = form.get("handle")
+
+      if (handle === null || handle instanceof File) {
+        return html("Something went wrong", `<h1>Something went wrong</h1><p>Start connecting again from your AI app.</p>`, { status: 400 })
+      }
 
       if (form.get("decision") !== "approve") {
         const denied = await oauth.denyConsent(request, handle)
