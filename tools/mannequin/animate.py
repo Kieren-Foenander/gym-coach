@@ -240,7 +240,8 @@ def pose_legs(spec, key, pelvis):
             ankle += Vector((0, y, clearance)) + turned @ (pitch @ pivot - pivot)
         thigh, shin = segment(f"{side}UpLeg", f"{side}Leg", f"{side}Foot")
         hip = head(f"{side}UpLeg")
-        knee, gap = bend(hip, ankle, thigh, shin, turned @ forward)
+        knee_pole = spec.get("stance", {}).get("knee_direction", {}).get(side)
+        knee, gap = bend(hip, ankle, thigh, shin, turned @ Vector(knee_pole) if knee_pole else turned @ forward)
         swing(f"{side}UpLeg", knee - hip)
         swing(f"{side}Leg", ankle - head(f"{side}Leg"))
         place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
@@ -563,11 +564,38 @@ class Kettlebells(Dumbbells):
 
 
 class Bench:
-    def __init__(self, at, length=1.2):
+    def __init__(self, at, length=1.2, angle=None, support="back"):
         self.top, self.length = Vector(at), length
         pad = material("pad", PAD, 0.0, 0.7)
         frame = material("frame", IRON, 0.6, 0.4)
         x, y, z = self.top
+        self.chest_support = support == "chest"
+        self.pads = []
+        self.surfaces = []
+        if angle is not None:
+            # The specified top is the seat/back hinge. The back rises toward
+            # +Y for a positive angle, or toward -Y on a prone bench.
+            if support not in ("back", "chest") or not -30 <= angle <= 80 or length <= .40:
+                raise ValueError("Invalid adjustable bench setup")
+            prone = self.chest_support
+            direction = -1 if prone else 1
+            rotation = Matrix.Rotation(math.radians(direction * angle), 3, "X")
+            for extent, offset, rot in ((.32, -.165*direction, Matrix.Identity(3)),
+                                         (length-.32, (length-.32)*direction/2+.005*direction, rotation)):
+                top = self.top + rot @ Vector((0, offset, 0))
+                self.pads.append((np.array(top), np.array(rot), extent))
+                part = box("bench pad", (.30, extent, .08), top + rot @ Vector((0,0,-.04)),
+                           pad, rotation=rot.to_euler())
+                self.surfaces.append(self.surface(part))
+            support_y = min(.55, (length - .32) * math.cos(math.radians(angle)) - .045)
+            for offset in (-.20, support_y):
+                leg_y = y + direction*offset
+                height = z-.08 + (math.tan(math.radians(angle))*offset if offset>0 else 0)
+                box("bench post", (.065,.065,height), (x,leg_y,height/2), frame)
+                box("bench foot", (.46,.08,.04), (x,leg_y,.02), frame)
+            box("bench rail", (.065, support_y + .23, .06),
+                (x, y + direction*(support_y - .21)/2, .09), frame)
+            return
         box("bench pad", (0.3, length, 0.08), (x, y, z - 0.04), pad)
         box("bench spine", (0.08, length * 0.9, 0.06), (x, y, z - 0.11), frame)
         for end in (-1, 1):
@@ -575,8 +603,28 @@ class Bench:
             box("bench leg", (0.06, 0.06, z - 0.14), (x, leg_y, (z - 0.14) / 2), frame)
             box("bench foot", (0.42, 0.07, 0.04), (x, leg_y, 0.02), frame)
 
+    @staticmethod
+    def surface(part):
+        points = [part.matrix_world @ v.co for v in part.data.vertices]
+        return BVHTree.FromPolygons(points, [p.vertices[:] for p in part.data.polygons])
+
+    def check_apparatus(self, roots, frame, problems):
+        for root in roots:
+            for part in root.children:
+                moving = self.surface(part)
+                if any(pad.overlap(moving) for pad in self.surfaces):
+                    problems.add(frame, f"{part.name} intersects the bench pad", 1, "intersection")
+
     def gap(self, points):
         """The smallest height of the body above the pad's top; below 0 means it sinks into the pad."""
+        if self.pads:
+            gaps = []
+            for top, rotation, extent in self.pads:
+                local = (points - top) @ rotation
+                over = (np.abs(local[:,0]) < .15) & (np.abs(local[:,1]) < extent/2) & (local[:,2] > -.08)
+                if over.any():
+                    gaps.append(float(local[over,2].min()))
+            return min(gaps, default=math.inf)
         rel = points - np.array(self.top)
         over = (np.abs(rel[:, 0]) < 0.15) & (np.abs(rel[:, 1]) < self.length / 2) & (rel[:, 2] > -0.08)
         return float(rel[over, 2].min()) if over.any() else math.inf
@@ -1069,7 +1117,7 @@ def bake(spec, keys):
     dumbbells = Dumbbells() if "dumbbells" in equipment else None
     if "kettlebells" in equipment:
         dumbbells = Kettlebells()
-    bench = next((Bench(e["at"], e.get("length", 1.2)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
+    bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back")) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     problems = Problems()
     grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells else {}
     wrists = wrist_collision_points()
@@ -1259,6 +1307,17 @@ def bake(spec, keys):
             if inside:
                 problems.add(frame, "a dumbbell passes through the body", max(-gap, 0.001))
         if bench:
+            if bench.surfaces:
+                bench.check_apparatus([barbell.root] if barbell else dumbbells.roots.values() if dumbbells else [],
+                                      frame, problems)
+            if bench.chest_support:
+                # Sample the front midline between spine and shoulders, excluding the arms.
+                spine, shoulder = head("Spine2"), head("LeftArm")
+                chest = everything[(np.abs(everything[:, 0]) < .095) &
+                                   (everything[:, 1] < spine.y) & (everything[:, 1] > shoulder.y)]
+                contact_gap = bench.gap(chest)
+                if contact_gap > .02:
+                    problems.add(frame, "chest loses the supporting pad", contact_gap)
             gap = bench.gap(everything)
             closest["bench"] = min(closest["bench"], gap)
             if gap < -0.025:

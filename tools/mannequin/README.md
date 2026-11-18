@@ -258,3 +258,11 @@ Continuous checkpoints can limit `upper_arm_to_torso` in degrees and
 `fixed_elbow_m` in metres. For stepping movements, each key can specify
 `foot_left` or `foot_right` as forward/back displacement in world Y,
 vertical clearance in metres and heel lift in degrees about the toe joint.
+
+For an adjustable bench, set `angle` in degrees and place `at` at the hinge
+between the seat and backrest. Zero is flat, positive angles incline the back,
+and negative angles decline it. Use `support: "chest"` for a prone setup with
+the backrest rising toward the front of the figure. The checks measure depth
+normal to each pad, equipment intersections and chest contact on prone setups.
+For a rear foot raised on a bench, the stance can also specify a world-space
+`knee_direction` for either side to select the downward-bending knee solution.

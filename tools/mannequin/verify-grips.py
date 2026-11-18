@@ -150,3 +150,13 @@ for offset in ((0, 0, -bells.DROP), (.0585, 0, -.056), (0, 0, 0)):
     assert bells.intrusions(np.array([centre + Vector(offset)]))[0]
 assert not bells.intrusions(np.array([centre + Vector((0, 0, -.045))]))[0]
 print("SPECIALTY BAR AND KETTLEBELL REGRESSIONS PASSED")
+
+# Samples at opposite ends of a tilted pad must use its local surface normal.
+for support, angle in (("back", 0), ("back", 32), ("back", -15), ("chest", 50)):
+    bench = api["Bench"]([0, 0, .49], angle=angle, support=support)
+    top, rotation, _ = bench.pads[1]
+    for along in (-.20, .20):
+        for depth in (-.035, .012):
+            sample = top + rotation @ np.array([0, along, depth])
+            assert abs(bench.gap(np.array([sample])) - depth) < 1e-5
+print("ADJUSTABLE BENCH REGRESSIONS PASSED")
