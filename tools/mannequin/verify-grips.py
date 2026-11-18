@@ -170,3 +170,51 @@ bell = api["ContactLoad"]({"type": "vertical-dumbbell"})
 assert np.all(bell.distance(np.array([[.06, 0, .094], [0, 0, 0]])) < 0)
 assert bell.distance(np.array([[.06, 0, 0]]))[0] > .03
 print("FACE CONTACT REGRESSIONS PASSED")
+
+# Keep the two reviewed form errors detectable without rendering a video.
+api = fresh()
+plate = api["ContactLoad"]({"type": "plate", "axis": [0,-1,0]})
+root = plate.roots["both"]
+root.rotation_quaternion = api["Matrix"].Rotation(np.pi/2, 3, "X").to_quaternion()
+api["update"]()
+problem = api["Problems"]()
+normal = {"side": "Left", "handle_axis": {"direction": [0,-1,0], "degrees": 15, "directed": True}}
+api["check_movement"]([normal], 1, None, None, problem, {}, plate)
+assert problem.found, "A flat plate passed the forward-facing checkpoint"
+bell = api["ContactLoad"]({"type": "vertical-dumbbell"})
+sternum = api["Torso"]().point(api["LANDMARKS"]["sternum"])
+bell.roots["both"].location = sternum + Vector((0,-.22,-.094))
+api["update"]()
+problem = api["Problems"]()
+contact = {"side": "Left", "surface_gap": {"landmark": "sternum", "upper_head": True, "max_m": .03}}
+api["check_movement"]([contact], 1, None, None, problem, {}, bell)
+assert problem.found, "A dumbbell held away from the chest passed its contact checkpoint"
+print("PLATE NORMAL AND STERNUM CONTACT REGRESSIONS PASSED")
+
+# A turning shaft keeps its bearing at the anchor even when pitch, yaw and roll
+# change together. Probe the loaded plate separately from the narrow grip.
+mine = api["Landmine"]({"pivot": [0,-1.7,.09], "attachment": "cross"})
+mine_keys = api["load_keys"]({"keys": [
+    {"at": 0, "landmine_angles": [45, 0], "landmine_roll": 0},
+    {"at": .23, "landmine_angles": [32, 17], "landmine_roll": -55},
+    {"at": .73, "landmine_angles": [32, -17], "landmine_roll": 55},
+]})
+for phase in (0, .23, .73):
+    mine.pose(api["PoseSpan"](mine_keys, phase), 1)
+    plate_part = next(part for part, _, _ in mine.parts if part.name.startswith("weight plate"))
+    centre = plate_part.matrix_world.translation
+    assert abs((centre - mine.pivot).length - 1.69) < .00001
+    for test_point, collision in ((centre, True), (centre + Vector((0,0,1)), False)):
+        problem = api["Problems"]()
+        mine.check(np.array([test_point]), 1, problem, [])
+        assert bool(problem.found) == collision, list(problem.lines())
+print("LANDMINE PIVOT AND PLATE REGRESSIONS PASSED")
+
+station = api["PullStation"]({"type": "rack-pins", "height": .437})
+bar = api["Barbell"]()
+for z, misses in ((.451, False), (.47, True), (.42, True)):
+    bar.move(Vector((0,-.16,z)), 1)
+    problem = api["Problems"]()
+    station.check(np.array([[0,0,2]]), bar, 1, problem)
+    assert bool(problem.found) == misses, list(problem.lines())
+print("RACK PIN REGRESSIONS PASSED")

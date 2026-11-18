@@ -291,3 +291,30 @@ against the torso's upward axis, from −1 hanging down to +1 overhead.
 `radius` limits the correction around the shoulder in metres. The overhead
 extension uses a smaller radius to preserve the flexing elbow's cross section.
 Both the elbow-section and shoulder-stretch checks still run on every frame.
+
+### Anchors and supports
+
+A `landmine` takes a fixed world-space `pivot` and a grip attachment.
+`cross` supplies a press handle, `parallel` supplies the T-bar row handles,
+and `end` exposes one end grip. Keys animate pitch and yaw with
+`landmine_angles` and can roll the bar about its shaft with `landmine_roll`.
+The grip checks use each rendered handle's transform. The shaft, plate,
+handles and anchor have separate collision tests.
+
+A bench can carry an `arm_pad` with a centre and an angle. The two cushions
+support the upper arms during preacher curls. Each frame checks skin contact
+on both cushions, pad penetration and collisions between the weight and pads.
+`rack-pins` and `platform` use a height in metres. The rack pull starts with
+the shaft resting on both pins. For a deficit pull, each foot must stay on top
+of the platform.
+
+A `surface_gap` checkpoint measures from a torso landmark to the weight
+surface. A vertical dumbbell supports `upper_head: true` for a goblet hold.
+With `directed: true`, a handle-axis check also detects a reversed face normal.
+
+For a seated wrist curl, `wrist_rest` fixes the left wrist centre and mirrors
+it on the right. `hand_pitch` raises or lowers the knuckles around the shaft.
+`forearm_support: "thighs"` checks both forearms against the posed thigh
+surfaces. An overhead squat can specify `overhead_y` and `grip_width` to
+maintain lockout as shoulder height changes. Both forms use independent angle
+checkpoints on the baked pose.
