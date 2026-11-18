@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-row",
+    views: ["front", "back"],
+    cues: [
+      "Brace your free hand on the bench and hinge at the hips.",
+      "Pull the dumbbell toward your ribs with your elbow close.",
+      "Lower until your arm hangs beneath your shoulder.",
+    ],
+  },
+  {
     slug: "goblet-squat",
     views: ["front"],
     cues: [
