@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "romanian-deadlift",
+    views: ["front", "back"],
+    cues: [
+      "Start tall with the bar against your thighs and soften your knees.",
+      "Push your hips back and guide the bar close to your shins.",
+      "Bring your hips forward to stand tall again.",
+    ],
+  },
+  {
+    slug: "stiff-leg-deadlift",
+    views: ["front", "back"],
+    cues: [
+      "Stand with the bar at your thighs and a slight bend in your knees.",
+      "Keep that bend as you reach your hips back and lower the bar.",
+      "Keep your arms long as you extend your hips to stand.",
+    ],
+  },
+  {
+    slug: "dumbbell-romanian-deadlift",
+    views: ["front", "back"],
+    cues: [
+      "Stand tall with the dumbbells in front of your thighs.",
+      "Soften your knees and push your hips back as the weights descend.",
+      "Keep the weights close as you bring your hips forward.",
+    ],
+  },
+  {
     slug: "barbell-front-raise",
     views: ["front"],
     cues: [
