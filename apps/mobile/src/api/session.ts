@@ -143,6 +143,10 @@ export interface SignupStatus {
 export const fetchSignupStatus = (serverUrl: string) =>
   post<SignupStatus>({ serverUrl: normalizeServerUrl(serverUrl), token: null }, "account/signup-status", {})
 
+/** Which copy of the app the server is (prod, pr-21, dev_<user>). The AI coach card names the connector after it. */
+export const fetchDeployment = (serverUrl: string) =>
+  post<{ readonly stage: string | null }>({ serverUrl: normalizeServerUrl(serverUrl), token: null }, "deployment", {})
+
 export const signOut = async () => {
   if (state.status === "signedIn") {
     // Ending the session on the server is a courtesy. Signing out here must work with no signal too.

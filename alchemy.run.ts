@@ -37,10 +37,12 @@ const grants = (names: Names) =>
 // Optional. When set, people after the first account can sign up with this invite code. Empty means sign-up is closed.
 const signupCode = Config.Redacted("SIGNUP_CODE").pipe(Config.withDefault(Redacted.make("")))
 
-const bindings = (names: Names) => ({
+const bindings = (names: Names, stage: string) => ({
   DB: database(names),
   OAUTH_KV: grants(names),
   SIGNUP_CODE: signupCode,
+  // Which copy this is, so a test copy's MCP server and connector name say so (src/domain/coach-apps.ts).
+  STAGE: stage,
 })
 
 /** The bindings the Worker is given. src/env.d.ts makes them the type of `env`. */
@@ -63,7 +65,7 @@ export default Alchemy.Stack(
       // src/server.ts wraps the TanStack Start handler with the OAuth provider and the MCP server.
       main: "src/server.ts",
       compatibility: { date: "2026-11-01", flags: ["nodejs_compat", "global_fetch_strictly_public"] },
-      env: bindings(names),
+      env: bindings(names, stage),
     })
 
     const github = yield* GitHub.GitHubEnv

@@ -10,7 +10,24 @@
  * button copies the address and opens the page where it is pasted.
  */
 
-const CONNECTOR_NAME = "Gym"
+const LIVE_STAGE = "prod"
+
+/**
+ * What the connector is called in the AI app, and the MCP server's own name. The live app is Gym; every
+ * other copy says which one it is (Gym-dev, Gym-pr-21), so it can sit next to the live one, be asked for
+ * by name, and be found again to remove. Letters, digits and hyphens only: some apps refuse other characters.
+ */
+export const connectorName = (stage: string | null): string => {
+  if (!stage || stage === LIVE_STAGE) return "Gym"
+
+  const label = stage.startsWith("dev_") ? "dev" : stage
+  const safe = label.replace(/[^A-Za-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
+
+  return safe ? `Gym-${safe}` : "Gym-test"
+}
+
+/** Whether this copy is a test one, whose connector should be removed when the testing is done. */
+export const isTestStage = (stage: string | null): boolean => connectorName(stage) !== "Gym"
 
 export interface CoachApp {
   readonly id: string
@@ -18,12 +35,15 @@ export interface CoachApp {
   readonly name: string
   /** What the card's button does: open a dialog with the address filled in, or copy the address and open a page. */
   readonly setup:
-    | { readonly kind: "prefill"; readonly url: (address: string) => string }
+    | { readonly kind: "prefill"; readonly url: (address: string, name: string) => string }
     | { readonly kind: "open"; readonly url: string }
     | null
-  /** The steps up to and including pasting the address. Signing in and the first message are added by `coachSteps`. */
+  /**
+   * The steps up to and including pasting the address. NAME stands for the connector's name. Signing in and
+   * the first message are added by `coachSteps`.
+   */
   readonly steps: ReadonlyArray<string>
-  /** A limit worth knowing before starting, or another way to do it. */
+  /** A limit worth knowing before starting, or another way to do it. NAME stands for the connector's name. */
   readonly note: string | null
 }
 
@@ -33,10 +53,10 @@ export const COACH_APPS = [
     name: "Claude",
     setup: {
       kind: "prefill",
-      url: (address) =>
-        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(address)}`,
+      url: (address, name) =>
+        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(name)}&connectorUrl=${encodeURIComponent(address)}`,
     },
-    steps: ["Tap Add to Claude. It opens with Gym and its address filled in.", "Check the details and tap Add."],
+    steps: ["Tap Add to Claude. It opens with NAME and its address filled in.", "Check the details and tap Add."],
     note: "Or add it by hand: in Claude, open Settings, then Connectors, choose Add custom connector and paste the address.",
   },
   {
@@ -45,15 +65,15 @@ export const COACH_APPS = [
     setup: { kind: "open", url: "https://chatgpt.com/plugins" },
     steps: [
       "Tap Copy and open ChatGPT, then select the + button and Add custom MCP server.",
-      "Name it Gym, paste the address as the server URL and choose OAuth.",
+      "Name it NAME, paste the address as the server URL and choose OAuth.",
     ],
-    note: "Set it up on the web; it then works in the phone app too. In a chat, pick Gym from the + menu.",
+    note: "Set it up on the web; it then works in the phone app too. In a chat, pick NAME from the + menu.",
   },
   {
     id: "grok",
     name: "Grok",
     setup: { kind: "open", url: "https://grok.com/connectors" },
-    steps: ["Tap Copy and open Grok, then choose New Connector, then Custom.", "Name it Gym and paste the address."],
+    steps: ["Tap Copy and open Grok, then choose New Connector, then Custom.", "Name it NAME and paste the address."],
     note: null,
   },
   {
@@ -62,7 +82,7 @@ export const COACH_APPS = [
     setup: { kind: "open", url: "https://gemini.google.com" },
     steps: [
       "Tap Copy and open Gemini, then open Settings, then Connected apps, and choose Add a custom app.",
-      "Name it Gym and paste the address.",
+      "Name it NAME and paste the address.",
     ],
     note: "Custom apps are added on the web and work with personal Google accounts, not work or school ones.",
   },
@@ -73,7 +93,7 @@ export const COACH_APPS = [
     steps: [
       "Tap Copy and open Le Chat, then open the side panel, then Intelligence, then Connectors.",
       "Choose Add Connector, then Custom MCP Connector.",
-      "Name it Gym, paste the address and choose OAuth.",
+      "Name it NAME, paste the address and choose OAuth.",
     ],
     note: null,
   },
@@ -95,11 +115,15 @@ export const DEFAULT_COACH_APP: CoachAppId = "claude"
 
 export const coachApp = (id: CoachAppId): CoachApp => COACH_APPS.find((app) => app.id === id) ?? COACH_APPS[0]
 
+const withName = (text: string, name: string) => text.replaceAll("NAME", name)
+
+export const coachNote = (app: CoachApp, name: string): string | null => (app.note ? withName(app.note, name) : null)
+
 /** Every step for one app: its own setup, then signing in and a first message, which are the same everywhere. */
-export const coachSteps = (app: CoachApp): ReadonlyArray<string> => [
-  ...app.steps,
-  "Sign in to Gym when asked, and tap Allow.",
-  "In a chat, ask: “Look at my gym log and build me a plan.”",
+export const coachSteps = (app: CoachApp, name: string): ReadonlyArray<string> => [
+  ...app.steps.map((step) => withName(step, name)),
+  `Sign in to ${name} when asked, and tap Allow.`,
+  `In a chat, ask: “Look at my ${name === "Gym" ? "gym log" : `${name} log`} and build me a plan.”`,
 ]
 
 /** The card's main button: its label, where it goes, and whether it copies the address first. */
@@ -109,11 +133,11 @@ export interface CoachAction {
   readonly copiesAddress: boolean
 }
 
-export const coachAction = (app: CoachApp, address: string): CoachAction | null => {
+export const coachAction = (app: CoachApp, address: string, name: string): CoachAction | null => {
   if (app.setup === null) return null
 
   return app.setup.kind === "prefill"
-    ? { label: `Add to ${app.name}`, url: app.setup.url(address), copiesAddress: false }
+    ? { label: `Add to ${app.name}`, url: app.setup.url(address, name), copiesAddress: false }
     : { label: `Copy and open ${app.name}`, url: app.setup.url, copiesAddress: true }
 }
 

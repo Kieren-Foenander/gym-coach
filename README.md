@@ -90,6 +90,8 @@ The coach is a remote MCP server with OAuth at `https://<your-worker-url>/mcp`, 
 
 The app's Settings screen has the steps for Claude, ChatGPT, Grok, Gemini and Le Chat (`src/domain/coach-apps.ts`), and general ones for any other app.
 
+Every copy other than `prod` names its connector after its stage (`Gym-dev` for `bun run dev`, `Gym-pr-21` for a preview), and its MCP server tells the AI it is a test copy. Add it next to the live `Gym` connector, ask your AI to use `Gym-pr-21` by name, and remove that connector when you're done. An AI app can't reach `localhost`, so test the MCP server on a deployed stage.
+
 ## How weights change
 
 When you finish a workout, each exercise with automatic adjustment on is checked (`src/domain/progression.ts`):

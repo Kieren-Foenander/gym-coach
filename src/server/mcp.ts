@@ -3,6 +3,7 @@ import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import { HttpRouter, HttpServer } from "effect/http"
 import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
+import { connectorName, isTestStage } from "~/domain/coach-apps"
 import { EQUIPMENT, mergeLibrary, MUSCLES, searchLibrary } from "~/domain/catalog"
 import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
 import { daysAround, shiftDay } from "~/domain/days"
@@ -25,7 +26,7 @@ import * as Health from "./health"
 import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
-import { DbLive } from "./runtime"
+import { DbLive, stage } from "./runtime"
 
 const INSTRUCTIONS = `This server is the user's gym training log. You are acting as their strength coach.
 
@@ -479,10 +480,17 @@ export const GymHandlers = GymToolkit.toLayer(
 
 export const MCP_PATH = "/mcp"
 
+/**
+ * A test copy says so up front, so an agent connected to both it and the live app can tell them apart
+ * and the user can point it at the test one by name.
+ */
+const testCopyNote = (name: string, deployment: string) =>
+  `This is ${name}, a test copy of the app (stage ${deployment}) with its own database. It is not the user's real training log: use it only when the user asks for ${name} or the test version, and don't treat its data as theirs.\n\n`
+
 const McpLive = McpServer.layerHttp({
-  name: "Gym",
+  name: connectorName(stage()),
   version: "1.0.0",
-  instructions: INSTRUCTIONS,
+  instructions: (isTestStage(stage()) ? testCopyNote(connectorName(stage()), stage()) : "") + INSTRUCTIONS,
   path: MCP_PATH,
   // Newest first. The 2026 revision has no sessions; the older ones are kept for clients still using them.
   protocols: [McpProtocol.v2026_07_28, McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26],

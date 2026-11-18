@@ -1,14 +1,26 @@
+import { useQuery } from "@tanstack/react-query"
 import * as Clipboard from "expo-clipboard"
 import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
 import { Linking, Platform, View } from "react-native"
-import { call, rememberUser, signOut, useSession } from "@/api/session"
+import { call, fetchDeployment, rememberUser, signOut, useSession } from "@/api/session"
 import { Button, Card, Chip, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
 import { useAction } from "@/data/calls"
 import { useOutbox } from "@/data/outbox-store"
 import { AppleHealthCard } from "@/features/health/AppleHealthCard"
 import { useUser } from "@/features/user"
-import { coachAction, coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
+import {
+  coachAction,
+  coachAddress,
+  coachApp,
+  coachNote,
+  coachSteps,
+  COACH_APPS,
+  connectorName,
+  DEFAULT_COACH_APP,
+  isTestStage,
+  type CoachAppId,
+} from "~/domain/coach-apps"
 
 export function SettingsScreen() {
   const user = useUser()
@@ -37,7 +49,7 @@ export function SettingsScreen() {
       <PageTitle>Settings</PageTitle>
 
       <SectionTitle>AI coach</SectionTitle>
-      <ConnectCoach address={serverUrl ? coachAddress(serverUrl) : ""} />
+      <ConnectCoach serverUrl={serverUrl} />
 
       {Platform.OS === "ios" ? (
         <>
@@ -116,11 +128,23 @@ export function SettingsScreen() {
   )
 }
 
-function ConnectCoach({ address }: { readonly address: string }) {
+function ConnectCoach({ serverUrl }: { readonly serverUrl: string }) {
+  const deployment = useQuery({
+    queryKey: ["deployment", serverUrl],
+    queryFn: () => fetchDeployment(serverUrl),
+    enabled: serverUrl !== "",
+    staleTime: Infinity,
+  })
+
+  // Until the server answers, assume the live app, whose name is the plain one.
+  const stage = deployment.data?.stage ?? null
+  const name = connectorName(stage)
+  const address = serverUrl ? coachAddress(serverUrl) : ""
   const [copied, setCopied] = useState(false)
   const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
   const app = coachApp(appId)
-  const action = address ? coachAction(app, address) : null
+  const action = address ? coachAction(app, address, name) : null
+  const note = coachNote(app, name)
 
   const copy = async () => {
     await Clipboard.setStringAsync(address)
@@ -139,20 +163,26 @@ function ConnectCoach({ address }: { readonly address: string }) {
         Connect this log to the AI app you already pay for, so it can read your training, write your plan and adjust your
         weights. It works with any app that can add a custom MCP server.
       </Text>
+      {isTestStage(stage) ? (
+        <Text className="mb-4 rounded-2xl bg-amber-950/40 px-4 py-3 text-sm text-amber-300">
+          This is a test copy ({stage}), so its connector is called {name}. It can sit next to the live Gym one: ask your AI
+          to use {name} by name, and remove {name} in the AI app when you are done.
+        </Text>
+      ) : null}
       <View accessibilityLabel="Your AI app" className="flex-row flex-wrap gap-2 pb-4">
         {COACH_APPS.map((option) => (
           <Chip key={option.id} label={option.name} selected={option.id === appId} onPress={() => setAppId(option.id)} />
         ))}
       </View>
       <View className="gap-2 pb-4">
-        {coachSteps(app).map((step, index) => (
+        {coachSteps(app, name).map((step, index) => (
           <View key={step} className="flex-row gap-2">
             <Text className="w-5 font-semibold text-accent">{index + 1}.</Text>
             <Text className="flex-1 text-muted">{step}</Text>
           </View>
         ))}
       </View>
-      {app.note ? <Text className="pb-4 text-sm text-faint">{app.note}</Text> : null}
+      {note ? <Text className="pb-4 text-sm text-faint">{note}</Text> : null}
       {action ? (
         <Button variant="primary" className="mb-3" onPress={() => void runAction(action)}>
           {action.label}

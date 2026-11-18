@@ -13,10 +13,22 @@ import {
   TextInput,
   useAction,
 } from "~/components/ui"
-import { coachAction, coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
-import { signOut, updateProfile } from "~/functions/api"
+import {
+  coachAction,
+  coachAddress,
+  coachApp,
+  coachNote,
+  coachSteps,
+  COACH_APPS,
+  connectorName,
+  DEFAULT_COACH_APP,
+  isTestStage,
+  type CoachAppId,
+} from "~/domain/coach-apps"
+import { getDeployment, signOut, updateProfile } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/settings")({
+  loader: () => getDeployment(),
   component: SettingsPage,
 })
 
@@ -125,11 +137,14 @@ function SettingsPage() {
 }
 
 function ConnectCoach() {
+  const { stage } = Route.useLoaderData()
+  const name = connectorName(stage)
   const [address, setAddress] = useState("")
   const [copied, setCopied] = useState(false)
   const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
   const app = coachApp(appId)
-  const action = address ? coachAction(app, address) : null
+  const action = address ? coachAction(app, address, name) : null
+  const note = coachNote(app, name)
 
   useEffect(() => {
     setAddress(coachAddress(window.location.origin))
@@ -146,6 +161,12 @@ function ConnectCoach() {
         Connect this log to the AI app you already pay for, so it can read your training, write your plan and adjust
         your weights. It works with any app that can add a custom MCP server.
       </p>
+      {isTestStage(stage) ? (
+        <p className="mb-4 rounded-2xl bg-amber-950/40 px-4 py-3 text-sm text-amber-300">
+          This is a test copy ({stage}), so its connector is called {name}. It can sit next to the live Gym one: ask
+          your AI to use {name} by name, and remove {name} in the AI app when you are done.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2 pb-4" role="group" aria-label="Your AI app">
         {COACH_APPS.map((option) => (
           <button
@@ -162,11 +183,11 @@ function ConnectCoach() {
         ))}
       </div>
       <ol className="list-decimal space-y-2 pb-4 pl-5 text-muted marker:font-semibold marker:text-accent">
-        {coachSteps(app).map((step) => (
+        {coachSteps(app, name).map((step) => (
           <li key={step}>{step}</li>
         ))}
       </ol>
-      {app.note ? <p className="pb-4 text-sm text-faint">{app.note}</p> : null}
+      {note ? <p className="pb-4 text-sm text-faint">{note}</p> : null}
       {action ? (
         <a
           className={buttonClass("primary", "mb-3 w-full")}
