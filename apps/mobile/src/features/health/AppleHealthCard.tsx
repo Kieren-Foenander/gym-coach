@@ -10,6 +10,7 @@ const WHAT_COMES_IN = [
   "Runs, rides, swims and walks from your Apple Watch or other apps, logged as cardio",
   "Heart rate and calories for workouts you also tracked on your watch",
   "Sleep, resting heart rate, HRV, steps and VO2 max, for your coach to judge recovery",
+  "Calories, protein, carbs and fat from a food tracker such as MyFitnessPal, counted in your food log",
 ] as const
 
 const ago = (time: number, now: number) => {

@@ -1,5 +1,7 @@
 import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
+import { isDay } from "./days"
+import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
 import { MEASUREMENT_KINDS } from "./units"
 
 export { distanceUnit, MEASUREMENT_KINDS, measurementUnit } from "./units"
@@ -30,6 +32,9 @@ export const ProfilePatch = Schema.Struct({
   unit: Schema.optional(Unit),
   goal: Schema.optional(Text(2000)),
   trainingContext: Schema.optional(Text(4000)),
+  /** Daily targets for the food log. Null clears one. */
+  calorieTarget: Schema.optional(Schema.NullOr(Int(TARGET_LIMITS.calories.min, TARGET_LIMITS.calories.max))),
+  proteinTarget: Schema.optional(Schema.NullOr(Int(TARGET_LIMITS.protein.min, TARGET_LIMITS.protein.max))),
 })
 
 export type ProfilePatch = typeof ProfilePatch.Type
@@ -96,6 +101,31 @@ export const MeasurementInput = Schema.Struct({
 })
 
 export type MeasurementInput = typeof MeasurementInput.Type
+
+const DAY_PATTERN = Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/)
+const REAL_DAY = Schema.makeFilter((text: string) => isDay(text) || "Expected a real day as YYYY-MM-DD")
+
+/** A calendar day on the user's device, as YYYY-MM-DD. */
+export const Day = Schema.String.check(DAY_PATTERN, REAL_DAY)
+
+/**
+ * A day with a description for the coach. The description goes on before the checks, because
+ * one put on after a custom check is left out of the JSON Schema the MCP client is shown.
+ */
+export const describedDay = (description: string) => Schema.String.annotate({ description }).check(DAY_PATTERN, REAL_DAY)
+
+const Grams = Schema.optional(Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: FOOD_LIMITS.grams }))))
+
+/** One entry in the food log: a meal, a snack or a day's total. Macros are in grams and may be left out. */
+export const FoodInput = Schema.Struct({
+  description: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(FOOD_LIMITS.description)),
+  calories: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: FOOD_LIMITS.calories })),
+  protein: Grams,
+  carbs: Grams,
+  fat: Grams,
+})
+
+export type FoodInput = typeof FoodInput.Type
 
 export const Direction = Schema.Literals(["up", "down"])
 

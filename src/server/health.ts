@@ -173,8 +173,19 @@ export const importHealth = Effect.fn("importHealth")(function* (input: HealthIm
 
   const workouts = yield* importWorkouts(input.workouts ?? [])
   const daily = input.daily ?? []
+  // A 0 means nothing was recorded that day, such as food deleted again in a tracker, so the day's number goes.
+  const cleared = daily.filter((reading) => reading.value === 0)
+  const kept = daily.filter((reading) => reading.value !== 0)
 
-  for (const chunk of Arr.chunksOf(daily, DAILY_ROWS_PER_INSERT)) {
+  for (const metric of new Set(cleared.map((reading) => reading.metric))) {
+    const days = cleared.flatMap((reading) => (reading.metric === metric ? [reading.day] : []))
+
+    for (const chunk of Arr.chunksOf(days, IDS_PER_STATEMENT)) {
+      yield* sql`DELETE FROM health_daily WHERE user_id = ${user.id} AND metric = ${metric} AND ${sql.in("day", chunk)}`
+    }
+  }
+
+  for (const chunk of Arr.chunksOf(kept, DAILY_ROWS_PER_INSERT)) {
     const rows = Arr.map(chunk, (reading) => ({ user_id: user.id, day: reading.day, metric: reading.metric, value: reading.value }))
 
     yield* sql`INSERT INTO health_daily ${sql.insert(rows)}

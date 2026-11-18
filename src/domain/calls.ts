@@ -1,7 +1,9 @@
 import { Schema } from "effect"
 import {
+  Day,
   Direction,
   ExercisePrescription,
+  FoodInput,
   HealthImport,
   Id,
   MeasurementInput,
@@ -71,6 +73,13 @@ export const CallInputs = {
   // body
   logMeasurement: MeasurementInput,
   deleteMeasurement: Schema.Struct({ measurementId: Id }),
+
+  // food
+  /** The food log from one day to another, both included, with each day's totals. */
+  getNutrition: Schema.Struct({ from: Day, to: Day }),
+  logFood: Schema.Struct({ day: Day, food: FoodInput }),
+  updateFood: Schema.Struct({ foodId: Id, food: FoodInput }),
+  deleteFood: Schema.Struct({ foodId: Id }),
 
   // Apple Health, from the iPhone app
   importHealth: HealthImport,

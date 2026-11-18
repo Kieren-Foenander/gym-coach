@@ -97,3 +97,9 @@ When you finish a workout, each exercise with automatic adjustment on is checked
 - No target yet: the heaviest set of the first session becomes the target.
 
 Claude's changes go on top of that. Every change, from the rule or from Claude, is listed on the home screen with its reason.
+
+## Food
+
+The food log (Today, then Food) keeps it light: an entry is a meal or a day's total with calories and whichever of protein, carbs and fat you know. There is no food database. Tell Claude what you ate and it estimates the numbers and logs them, or type them in. Calorie and protein targets can be set on the Food screen or by Claude.
+
+If you track food in another app that writes to Apple Health (MyFitnessPal, Cronometer and so on), the iPhone app brings in each day's calories and macros and they count in the day's totals alongside anything logged here. Days are the device's calendar days (`src/domain/nutrition.ts`), because the server does not know your time zone.

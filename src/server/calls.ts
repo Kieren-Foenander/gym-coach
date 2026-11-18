@@ -7,6 +7,7 @@ import { demoFor, RENDERED_SLUGS } from "~/domain/demos"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import { Invalid, NotFound, type DomainError } from "./errors"
 import * as Health from "./health"
+import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser } from "./repo"
 
@@ -116,6 +117,12 @@ export const Calls = {
   // body
   logMeasurement: define(CallInputs.logMeasurement, (data) => Repo.logMeasurement(data)),
   deleteMeasurement: define(CallInputs.deleteMeasurement, (data) => Repo.deleteMeasurement(data.measurementId)),
+
+  // food
+  getNutrition: define(CallInputs.getNutrition, (data) => Nutrition.getNutrition(data.from, data.to)),
+  logFood: define(CallInputs.logFood, (data) => Nutrition.logFood(data.day, data.food, "user")),
+  updateFood: define(CallInputs.updateFood, (data) => Nutrition.updateFood(data.foodId, data.food)),
+  deleteFood: define(CallInputs.deleteFood, (data) => Nutrition.deleteFood(data.foodId)),
 
   // Apple Health
   importHealth: define(CallInputs.importHealth, (data) => Health.importHealth(data)),

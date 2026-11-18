@@ -8,7 +8,11 @@ export const requestHealthAccess = async (): Promise<void> => {
   throw new Error("Apple Health is only on iPhone.")
 }
 
-export const readHealthChanges = async (_anchors: HealthAnchors, _lastSyncedAt: number | null): Promise<HealthChanges> => ({
+export const readHealthChanges = async (
+  _anchors: HealthAnchors,
+  _lastSyncedAt: number | null,
+  _backfillDaily: boolean,
+): Promise<HealthChanges> => ({
   deleted: [],
   body: [],
   workouts: [],
