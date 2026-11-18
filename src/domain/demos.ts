@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "barbell-front-raise",
+    views: ["front"],
+    cues: [
+      "Hold the bar in front of your thighs with palms facing back.",
+      "With a slight elbow bend, lift the bar in an arc to shoulder height.",
+      "Lower the bar without leaning back or swinging.",
+    ],
+  },
+  {
+    slug: "reverse-fly",
+    views: ["front", "back"],
+    cues: [
+      "Hinge at your hips and let the dumbbells hang beneath your shoulders.",
+      "Keep a soft elbow bend and sweep your arms out to the sides.",
+      "Lower the weights together while holding your torso still.",
+    ],
+  },
+  {
     slug: "barbell-shrug",
     views: ["front", "back"],
     cues: [
