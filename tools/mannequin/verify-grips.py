@@ -48,11 +48,11 @@ assert not problems.found, list(problems.lines())
 surface = api["GripSurface"]("Left")
 point = Vector((.24, -.32, 1.1))
 axis = Vector((1, 0, 0))
-original = surface.object.matrix_world.copy()
+original = surface.skin.matrix_world.copy()
 for displacement, expected in ((.008, "penetrates"), (.15, "floats")):
     moved = original.copy()
     moved.translation += Vector((0, displacement, 0))
-    surface.object.matrix_world = moved
+    surface.skin.matrix_world = moved
     bpy.context.view_layer.update()
     problems = api["Problems"]()
     surface.check(1, point, axis, .014, problems)
@@ -74,3 +74,38 @@ for slug, direction in (("squat", (0, -1, 0)), ("bench-press", (0, -1, 0)),
             palm = api["world_rotation"](side + "Hand") @ api["palm_axis"](side)
             assert palm.dot(Vector(direction)) > 0, (slug, frame, side, palm)
     print("PALM ORIENTATION PASSED", slug)
+
+# Exercise the rendered geometry stack at a bent wrist. An accidental cage
+# index on a finger would move its skin even with perfect armature weights.
+api = fresh()
+spec = json.loads((animator.parent / "exercises/front-raise.json").read_text())
+peak = {**spec["keys"][0], **spec["keys"][1], "at": 0}
+spec.update(frames=1, keys=[peak, {"at": .5}])
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+skin = bpy.data.objects["skin"]
+skin.hide_set(False)
+api["detail"](True)
+bpy.context.view_layer.update()
+posed = skin.evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+for side in api["SIDES"]:
+    surface = api["GripSurface"](side)
+    marker = skin.vertex_groups["GripSurface." + side].index
+    selected = [v.index for v in skin.data.vertices if any(g.group == marker for g in v.groups)]
+    transform = surface.transform
+    error = max((posed.vertices[i].co - transform @ skin.data.vertices[i].co).length for i in selected)
+    assert error < .00001, (side, error)
+    print("RENDERED GRIP PASSED", side, "maximum error (m)", error)
+
+# A straight cavity can fit a shaft even when the apparatus is facing the wrong
+# way. Check the actual dumbbell root and palms in the hammer curl's low pose.
+api = fresh()
+spec = json.loads((animator.parent / "exercises/hammer-curl.json").read_text())
+spec.update(frames=1, keys=[spec["keys"][0], {"at": .5}])
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+for side, sign in api["SIDES"].items():
+    shaft = bpy.data.objects["dumbbell." + side].matrix_world.to_3x3().col[0].normalized()
+    palm = api["world_rotation"](side + "Hand") @ api["palm_axis"](side)
+    assert abs(shaft.y) > .95 and palm.x * sign < -.9, (side, shaft[:], palm[:])
+print("NEUTRAL DUMBBELL ORIENTATION PASSED")

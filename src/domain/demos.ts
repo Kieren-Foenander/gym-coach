@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "overhead-press",
+    views: ["front", "back"],
+    cues: [
+      "Stand tall with the bar at shoulder height and your feet planted.",
+      "Brace and draw your head back just enough to let the bar pass.",
+      "Straighten your arms overhead, then lower the bar along the same path.",
+    ],
+  },
+  {
+    slug: "barbell-row",
+    views: ["front", "back"],
+    cues: [
+      "Hinge at the hips with soft knees and let the bar hang below your shoulders.",
+      "Hold your torso still as you pull the bar toward your waist.",
+      "Lower under control until your arms hang long again.",
+    ],
+  },
+  {
+    slug: "hammer-curl",
+    views: ["front", "back"],
+    cues: [
+      "Stand with the dumbbells by your sides and your thumbs pointing forward.",
+      "Bend both elbows, keeping your upper arms close and your thumbs leading.",
+      "Lower the weights slowly with your palms still facing each other.",
+    ],
+  },
+  {
+    slug: "lateral-raise",
+    views: ["front", "back"],
+    cues: [
+      "Stand tall with a dumbbell in each hand and a slight bend in your elbows.",
+      "Lift your arms out and slightly forward to shoulder height.",
+      "Keep your torso still as you lower the weights to your sides.",
+    ],
+  },
+  {
     slug: "good-morning",
     views: ["front", "back"],
     cues: [

@@ -111,7 +111,7 @@ key spacing. Landmark positions are resolved in the current torso frame before b
 
 With a barbell, each key places the bar (`bar`, `grip_width`) and the arms reach for it. With
 `dumbbells`, each key sets the arms (`upper_arm`, `curl`) and a dumbbell goes in each fist, its
-handle running across the body. `exercises/deadlift.json` holds a bar on the floor with `bar` given
+handle running across the body for overhand or underhand grips. A neutral dumbbell starts with its handle pointing forward and turns with the elbow flexion plane during a curl. `exercises/deadlift.json` holds a bar on the floor with `bar` given
 as `[x, y, z]`; `exercises/dumbbell-curl.json` shows the dumbbell fields.
 
 Landmarks move with the torso, so a bar `{ "at": "chest" }` stays on the chest when the body
@@ -167,7 +167,8 @@ micrometre; changes in attachment or orientation invalidate it. The wrist angle 
 measured afresh.
 
 `render.sh --verify-rig` exercises moving grip widths with all three grips and checks that
-displaced fists fail. The elbow test reintroduces linear skinning and wrist roll at peak curl
+displaced grips fail. It also compares every rigid grip vertex with the evaluated render
+mesh at a bent wrist and checks the actual handle and palm orientations of a hammer curl. The elbow test reintroduces linear skinning and wrist roll at peak curl
 flexion. The shoulder test bakes the original narrow-grip squat, then puts full humeral twist
 back onto the deltoid at standing and depth. It requires the pec check to fail on both sides.
 The deadlift regression measures the baked bar speed through knee height on both passes, floor and lockout holds, bar drift, clearance to the leg surface, elbow angle and the
@@ -197,16 +198,18 @@ Muscle regions were first drawn on a figure with different proportions; each poi
 is mapped onto that figure between the knees, hip joints, neck and crown before they are
 applied.
 
-The hands are **closed fists that never change shape**, so a grip can never deform badly.
-Each comes from the same MakeHuman man: individual phalanx targets close all four fingers
-around a shared virtual shaft, and the thumb opposes at its base, then bends across the index
-and middle fingers. The build subdivides and freezes the surface, seats contact patches on a
-28 mm cylinder, closes the wrist cut, and remeshes at 0.8 mm to remove folded skin overlaps. It
-then relaxes the surface and cuts the final cylindrical cavity with 0.15 mm nominal clearance,
-using Blender's manifold boolean solver (the exact solver runs out of memory on this mesh).
-The build rejects open or inverted surfaces. Each finished fist is rigidly parented to its hand
-bone and uses the body's silver material. A dark fabric wrap, sized from the forearm and the
-fist's cut end, covers each wrist and bends between the hand and forearm.
+Each closed fist comes from the same MakeHuman man. Individual phalanx targets close
+the fingers around a 28 mm shaft. The build freezes and remeshes this surface at 0.8 mm,
+relaxes the skin and cuts a cylindrical cavity with 0.15 mm nominal clearance.
+It opens a loop proximal to the palm and stitches it into the subdivided forearm,
+sampling each transition loop from the original wrist surface. The transition
+retains the proximal forearm, forearm roll and hand weights and blends to the rigid palm. The fingers and palm
+are fully weighted to the hand bone. The result is one continuous rendering mesh.
+The grip checker extracts its marked triangles and verifies their rigid weights.
+Floor, bench and equipment clearance checks include the skinned wrist transition.
+The rest of the render surface follows the posed, subdivided collision cage by vertex index.
+As the humerus rises, a local corrective smoothing modifier distributes shoulder
+strain across the surrounding skin before the deformation checks and subdivision.
 
 The solver aligns the elbow hinge to the flexion plane and limits upper-arm twist to 35
 degrees relative to swing, with the same excess-twist correction around the proximal forearm.

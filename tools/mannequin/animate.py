@@ -387,7 +387,7 @@ class Barbell:
 
 
 class Dumbbells:
-    """A dumbbell in each hand. The handle runs across the body, through the middle of the fist."""
+    """A dumbbell in each hand, with independently oriented shafts and collision volumes."""
 
     HANDLE = Barbell.SHAFT  # the fists' grip cavity is sized for the barbell's shaft
     INNER = 0.065  # half the handle's length between the heads
@@ -396,7 +396,7 @@ class Dumbbells:
     def __init__(self):
         steel = material("steel", STEEL, 0.9, 0.3)
         iron = material("iron", IRON, 0.3, 0.55)
-        self.roots, self.centres, self.axis = {}, {}, Vector((1, 0, 0))
+        self.roots, self.centres, self.axes = {}, {}, {}
         for side in SIDES:
             root = bpy.data.objects.new(f"dumbbell.{side}", None)
             root.rotation_mode = "QUATERNION"
@@ -408,7 +408,7 @@ class Dumbbells:
 
     def move(self, side, centre, axis, frame):
         root = self.roots[side]
-        self.centres[side], self.axis = centre, axis
+        self.centres[side], self.axes[side] = centre, axis
         root.location = centre
         root.rotation_quaternion = Vector((1, 0, 0)).rotation_difference(axis)
         root.keyframe_insert("location", frame=frame)
@@ -417,8 +417,8 @@ class Dumbbells:
     def intrusions(self, points):
         """Body points inside a handle or a head, and the body's closest approach to either dumbbell."""
         inside, closest = 0, math.inf
-        axis = np.array(self.axis)
-        for centre in self.centres.values():
+        for side, centre in self.centres.items():
+            axis = np.array(self.axes[side])
             rel = points - np.array(centre)
             along = np.abs(rel @ axis)
             radial = np.linalg.norm(rel - np.outer(rel @ axis, axis), axis=1)
@@ -430,7 +430,7 @@ class Dumbbells:
         return inside, closest
 
     def corners(self):
-        return [c + self.axis * s * (self.INNER + self.DEPTH) + Vector((0, 0, z)) for c in self.centres.values() for s in (-1, 1) for z in (-self.HEAD, self.HEAD)]
+        return [c + self.axes[side] * s * (self.INNER + self.DEPTH) + Vector((0, 0, z)) for side,c in self.centres.items() for s in (-1, 1) for z in (-self.HEAD, self.HEAD)]
 
 
 class Bench:
@@ -457,7 +457,7 @@ class Bench:
 
 
 def light_up(muscles):
-    for mesh in (body,):
+    for mesh in (body, bpy.data.objects["skin"]):
         count = len(mesh.data.vertices)
         glow = np.zeros(count)
         for level, groups in ((1.0, muscles.get("primary", [])), (0.4, muscles.get("secondary", []))):
@@ -515,7 +515,8 @@ def held_point(side, key, torso):
     elbow = head(f"{side}Arm") + down * upper
     ahead = (torso.forward - down * torso.forward.dot(down)).normalized()
     curl = math.radians(key["curl"])
-    return elbow + (down * math.cos(curl) + ahead * math.sin(curl)) * (fore + GRIP[side][0])
+    axis = ahead * math.cos(curl) - down * math.sin(curl)
+    return axis, elbow + (down * math.cos(curl) + ahead * math.sin(curl)) * (fore + GRIP[side][0])
 
 
 def bar_centre(target, torso):
@@ -678,31 +679,47 @@ class ShoulderShape:
 
 
 class GripSurface:
-    """Check the actual frozen, rendered skin, independently of the IK grip target.
+    """Check the rigid subset of the continuous skin, independently of the IK grip target.
 
-    Geometry lives in object coordinates; transform the shaft into those coordinates on
-    every frame. This also detects a broken bone parent or an incorrectly rotated fist.
+    Transform the shaft into rest space on every frame using the same hand bone
+    and rigid weights as the rendered mesh.
     """
     def __init__(self, side):
         self.side = side
-        self.object = bpy.data.objects[f"fist.{side}"]
-        if self.object.data.shape_keys or any(m.show_render for m in self.object.modifiers):
-            raise RuntimeError(f"{side} fist must be a frozen mesh without deforming modifiers")
-        self.cache = {}
-        mesh = self.object.data
+        self.skin = bpy.data.objects["skin"]
+        self.bone = bones[side + "Hand"]
+        mesh = self.skin.data
+        marker = self.skin.vertex_groups["GripSurface." + side].index
+        hand = self.skin.vertex_groups[side + "Hand"].index
+        deform = {g.index for g in self.skin.vertex_groups if g.name in bones}
+        indices = []
+        for vertex in mesh.vertices:
+            weights = {g.group: g.weight for g in vertex.groups}
+            if marker in weights:
+                if {g:w for g,w in weights.items() if g in deform and w} != {hand:1.0}:
+                    raise RuntimeError(f"{side} grip surface must be rigid")
+                indices.append(vertex.index)
         mesh.calc_loop_triangles()
-        vertices = np.array([v.co[:] for v in mesh.vertices])
-        triangles = np.array([t.vertices[:] for t in mesh.loop_triangles])
-        self.points = vertices
-        self.triangles = triangles
-        self.surface = BVHTree.FromPolygons([v.co for v in mesh.vertices], [p.vertices[:] for p in mesh.polygons])
-        self.axis = Vector(self.object["grip_axis"])
-        self.origin = Vector(self.object["grip_origin"])
-        self.sections = self.object["grip_sections"]
+        triangles = np.empty(3 * len(mesh.loop_triangles), dtype=np.int32)
+        mesh.loop_triangles.foreach_get("vertices", triangles)
+        lookup = np.full(len(mesh.vertices), -1, dtype=np.int32)
+        lookup[indices] = np.arange(len(indices))
+        triangles = lookup[triangles.reshape(-1,3)]
+        self.triangles = triangles[np.all(triangles >= 0, axis=1)]
+        self.points = np.array([mesh.vertices[i].co[:] for i in indices])
+        self.surface = BVHTree.FromPolygons(self.points.tolist(), self.triangles.tolist(), all_triangles=True)
+        self.axis = Vector(self.skin["grip_axis." + side])
+        self.origin = Vector(self.skin["grip_origin." + side])
+        self.sections = self.skin["grip_sections." + side]
+        self.cache = {}
         self.metrics = {"penetration_mm": 0, "gap_mm": 0, "wrist_degrees": 0, "coverage_degrees": 360}
 
+    @property
+    def transform(self):
+        return self.skin.matrix_world @ self.bone.matrix @ self.bone.bone.matrix_local.inverted()
+
     def check(self, frame, centre, axis, radius, problems):
-        inverse = self.object.matrix_world.inverted()
+        inverse = self.transform.inverted()
         centre = inverse @ centre
         axis = (inverse.to_3x3() @ axis).normalized()
         # Cache only an unchanged rigid shaft/skin relationship, to one micrometre.
@@ -770,18 +787,6 @@ class GripSurface:
                 problems.add(frame, f"{self.side} digit {index+1} floats off the bar", min(gap,.04))
 
 
-FIST_POINTS = {}
-
-
-def fist_points(fist):
-    """A fist's points in its own coordinates; it never changes shape, so they are read once."""
-    if fist.name not in FIST_POINTS:
-        points = np.zeros(len(fist.data.vertices) * 3)
-        fist.data.vertices.foreach_get("co", points)
-        FIST_POINTS[fist.name] = points.reshape(-1, 3)
-    return FIST_POINTS[fist.name]
-
-
 def tucked(side, torso, problems, frame):
     """An elbow can't go in behind the back: it would have to pass through the body."""
     elbow = head(f"{side}ForeArm") - head(f"{side}Arm")
@@ -797,6 +802,51 @@ def detail(on):
             modifier.levels = modifier.render_levels if on else 0
 
 
+def wrist_collision_points():
+    """Skin the actual transition vertices with the same weights as the render mesh.
+
+    The topology checks use the MakeHuman cage. Its forearms end at the stitch,
+    so equipment, floor and bench checks also need the flexible wrist surface.
+    """
+    skin = bpy.data.objects["skin"]
+    cage = np.empty(len(skin.data.vertices), dtype=np.int32)
+    skin.data.attributes["cage_point"].data.foreach_get("value", cage)
+    markers = {skin.vertex_groups["GripSurface." + side].index for side in SIDES}
+    vertices = [skin.data.vertices[int(i)] for i in np.flatnonzero(cage == 0)]
+    wrist = [v for v in vertices if not any(g.group in markers for g in v.groups)]
+    mesh = bpy.data.meshes.new("wrist collision points")
+    mesh.from_pydata([v.co[:] for v in wrist], [], [])
+    samples = bpy.data.objects.new(mesh.name, mesh)
+    scene.collection.objects.link(samples)
+    groups = {}
+    for i, vertex in enumerate(wrist):
+        for weight in vertex.groups:
+            name = skin.vertex_groups[weight.group].name
+            if name not in groups:
+                groups[name] = samples.vertex_groups.new(name=name)
+            groups[name].add([i], weight.weight, "REPLACE")
+    modifier = samples.modifiers.new("wrist skin", "ARMATURE")
+    modifier.object = rig
+    modifier.use_deform_preserve_volume = True
+    return samples
+
+
+def shoulder_corrective(side):
+    """Spread high-elevation deltoid and armpit strain over the shoulder girdle."""
+    joint = rig.data.bones[side + "Arm"].head_local
+    group = body.vertex_groups.new(name=side + " shoulder corrective")
+    for vertex in body.data.vertices:
+        distance = (vertex.co - joint).length
+        if distance < .27:
+            group.add([vertex.index], min(1, (.27-distance)/.06), "REPLACE")
+    mod = body.modifiers.new(group.name, "CORRECTIVE_SMOOTH")
+    mod.vertex_group = group.name
+    mod.smooth_type = "LENGTH_WEIGHTED"
+    mod.factor = 1
+    body.modifiers.move(len(body.modifiers)-1, 1)
+    return mod
+
+
 def bake(spec, keys):
     frames = spec.get("frames", 96)
     FOREARM.clear()
@@ -810,10 +860,13 @@ def bake(spec, keys):
     bench = next((Bench(e["at"], e.get("length", 1.2)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     problems = Problems()
     grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells else {}
+    wrists = wrist_collision_points()
+    wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
     contact = SkinContact()
     shoulders = [ShoulderShape(side) for side in SIDES]
     pose_clavicles = any("clavicle" in key for key in keys)
+    correctives = {}
     tracked = [f"{side}{bone}" for side in SIDES for bone in ("ForeArm", "Hand", "Leg", "Foot")]
     previous, first = {}, {}
     samples, closest = [], {"bar": math.inf, "bench": math.inf, "dumbbells": math.inf}
@@ -822,6 +875,8 @@ def bake(spec, keys):
                                  if obj.name.startswith("bench ") for corner in obj.bound_box]))
     for frame in range(1, frames + 1):
         scene.frame_set(frame)
+        for mod in correctives.values():
+            mod.show_viewport = False
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
         key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "yaw") if field in a}
@@ -859,32 +914,48 @@ def bake(spec, keys):
                 if miss > 0.01:
                     problems.add(frame, f"{side} hand misses the bar", miss)
                 grips[side].check(frame, grip_point, Vector((1, 0, 0)), barbell.SHAFT, problems)
-                fist = grips[side].object
-                outer = max(abs((fist.matrix_world @ Vector(corner)).x - centre[0]) for corner in fist.bound_box)
+                surface = grips[side]
+                transform = surface.transform
+                outer = abs(surface.points @ np.array(transform.to_3x3().row[0]) + transform.translation.x - centre[0]).max()
                 if outer > barbell.INNER:
                     problems.add(frame, f"{side} fist reaches the bar collar", outer - barbell.INNER)
                 tucked(side, torso, problems, frame)
         if dumbbells:
             arms = {field: span.sample(field) for field in ("upper_arm", "curl")}
             elbows = span.sample("elbows", [0.1, -0.3, -1])
-            axis = torso.left
             for side, sign in SIDES.items():
-                grip_point = held_point(side, arms, torso)
+                forward_axis, grip_point = held_point(side, arms, torso)
+                axis = forward_axis if a.get("grip") == "neutral" else torso.left
                 gap = pose_arm(side, grip_point, torso.direction(elbows, sign), a.get("grip", "supinated"), torso, axis)
                 gaps.append((f"{side} hand", gap))
                 grips[side].check(frame, grip_point, axis, Dumbbells.HANDLE, problems)
                 # The handle's middle goes in the middle of the fist, so neither head touches the hand.
-                fist = grips[side].object
-                # Measure the fist's own surface: the corners of its box overstate a turned hand.
-                local = fist_points(fist)
-                to_axis = np.array(fist.matrix_world.to_3x3().transposed() @ axis)
-                offset = np.array(fist.matrix_world.translation - grip_point).dot(np.array(axis))
+                surface = grips[side]
+                local = surface.points
+                transform = surface.transform
+                to_axis = np.array(transform.to_3x3().transposed() @ axis)
+                offset = (transform.translation - grip_point).dot(axis)
                 across = local @ to_axis + offset
                 middle = (across.min() + across.max()) / 2
                 dumbbells.move(side, grip_point + axis * middle, axis, frame)
                 if (across.max() - across.min()) / 2 > Dumbbells.INNER:
                     problems.add(frame, f"{side} fist is wider than the dumbbell handle", (across.max() - across.min()) / 2 - Dumbbells.INNER)
                 tucked(side, torso, problems, frame)
+        for side in SIDES:
+            upper = (head(side + "ForeArm") - head(side + "Arm")).normalized()
+            elevation = upper.dot(torso.up)
+            # Ease the correction in as the upper arm approaches horizontal.
+            strength = max(0, min(1, (elevation + .22) / .85))
+            if strength or side in correctives:
+                if side not in correctives:
+                    mod = correctives[side] = shoulder_corrective(side)
+                    if frame > 1:
+                        mod.iterations = 0
+                        mod.keyframe_insert("iterations", frame=frame-1)
+                mod = correctives[side]
+                mod.show_viewport = True
+                mod.iterations = round(85 * strength * strength)
+                mod.keyframe_insert("iterations", frame=frame)
         for bone in bones:
             bone.keyframe_insert("rotation_quaternion", frame=frame)
             bone.keyframe_insert("location", frame=frame)
@@ -905,6 +976,10 @@ def bake(spec, keys):
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
         samples.append(everything[::50])
+        posed_wrists = wrists.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        posed_wrists.data.vertices.foreach_get("co", wrist_points.ravel())
+        everything = np.vstack((everything, wrist_points))
+        hands = np.concatenate((hands, np.zeros(len(wrist_points), dtype=bool)))
         low = everything[:, 2].min()
         if low < -0.012:
             problems.add(frame, "the body goes through the floor", -low)
@@ -934,6 +1009,7 @@ def bake(spec, keys):
         print("SHOULDER CHECKS", patch.side, {k: round(float(v), 3) for k, v in patch.worst.items()})
     for side, surface in grips.items():
         print("GRIP CHECKS", side, json.dumps({k: round(v, 2) for k, v in surface.metrics.items()}))
+    bpy.data.objects.remove(wrists, do_unlink=True)
     scene.frame_start, scene.frame_end = 1, frames
     return problems, np.vstack(samples), closest
 
@@ -959,6 +1035,7 @@ def main():
     if "--check-only" in sys.argv:
         return
     frame_camera(spec, view, angle, samples)
+    bpy.data.objects["skin"].hide_set(False)
     detail(True)
     scene.eevee.taa_render_samples = 24
     if focus:
