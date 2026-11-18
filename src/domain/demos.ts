@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-pullover",
+    views: ["front"],
+    cues: [
+      "Lie back and cup one end of the dumbbell above your chest.",
+      "Keep a soft elbow bend as you lower the weight behind your head.",
+      "Bring the dumbbell back over your chest along the same arc.",
+    ],
+  },
+  {
     slug: "sumo-deadlift",
     views: ["front", "back"],
     cues: [

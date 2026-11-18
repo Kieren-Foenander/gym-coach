@@ -1,0 +1,25 @@
+{
+  "equipment": [{"type": "vertical-dumbbell"}, {"type": "bench", "at": [0, 0.35, 0.45]}],
+  "stance": {"width": 0.42, "y": -0.38, "toe_out": 10},
+  "camera": {"angle": 50, "elevation": 40},
+  "touching": ["bench"],
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.585], "lean": -90, "spine": -6, "elbows": [0.22, 0.6, 0.2], "load": [0, 0.25249, 0.9659], "load_pitch": 15},
+    {"at": 0.11, "load_pitch": 26.7, "load": [0, 0.39842, 0.95663]},
+    {"at": 0.19, "load_pitch": 40.35, "load": [0, 0.56285, 0.90267]},
+    {"at": 0.26, "load_pitch": 55.3, "load": [0, 0.71648, 0.79691]},
+    {"at": 0.33, "load_pitch": 68.95, "load": [0, 0.81699, 0.66914]},
+    {"at": 0.43, "load_pitch": 80, "load": [0, 0.86316, 0.55384]},
+    {"at": 0.52, "load_pitch": 80, "load": [0, 0.86316, 0.55384]},
+    {"at": 0.62, "load_pitch": 68.95, "load": [0, 0.81699, 0.66914]},
+    {"at": 0.7, "load_pitch": 55.3, "load": [0, 0.71648, 0.79691]},
+    {"at": 0.76, "load_pitch": 40.35, "load": [0, 0.56285, 0.90267]},
+    {"at": 0.85, "load_pitch": 26.7, "load": [0, 0.39842, 0.95663]},
+    {"at": 0.95, "load_pitch": 15, "load": [0, 0.25249, 0.9659]}
+  ],
+  "checkpoints": [
+    {"elbow": [6, 55]}
+  ],
+  "hands": {"Left": "cup", "Right": "cup"},
+  "contact": {"wrist": [0.11235, 0.06443, 0.04753], "along": [-0.25376, -0.96727, 0], "palm": [-0.7868, 0.20642, 0.58167]}
+}
