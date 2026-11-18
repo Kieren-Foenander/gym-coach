@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "ez-bar-curl",
+    views: ["front"],
+    cues: [
+      "Grip the angled sections of the bar with palms up.",
+      "Curl the bar toward your shoulders without leaning back.",
+      "Lower under control until your arms are long.",
+    ],
+  },
+  {
+    slug: "reverse-curl",
+    views: ["front"],
+    cues: [
+      "Hold the angled grips with your palms down.",
+      "Bend your elbows and lift the bar while keeping your wrists steady.",
+      "Lower until your arms are long.",
+    ],
+  },
+  {
+    slug: "skull-crusher",
+    views: ["front"],
+    cues: [
+      "Lie on the bench with the angled grips above you.",
+      "Bend your elbows to lower the bar toward your forehead.",
+      "Extend your elbows and bring the bar back up.",
+    ],
+  },
+  {
     slug: "dumbbell-skull-crusher",
     views: ["front"],
     cues: [
