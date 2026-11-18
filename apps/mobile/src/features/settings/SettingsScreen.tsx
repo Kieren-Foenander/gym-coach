@@ -3,18 +3,12 @@ import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
 import { Platform, View } from "react-native"
 import { call, rememberUser, signOut, useSession } from "@/api/session"
-import { Button, Card, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
+import { Button, Card, Chip, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
 import { useAction } from "@/data/calls"
 import { useOutbox } from "@/data/outbox-store"
 import { AppleHealthCard } from "@/features/health/AppleHealthCard"
 import { useUser } from "@/features/user"
-
-const COACH_STEPS = [
-  "In Claude, open Settings, then Connectors, and choose Add custom connector.",
-  "Name it Gym and paste the address below.",
-  "Sign in when asked, and tap Allow.",
-  "In a chat, ask: “Look at my gym log and build me a plan.”",
-] as const
+import { coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
 
 export function SettingsScreen() {
   const user = useUser()
@@ -43,7 +37,7 @@ export function SettingsScreen() {
       <PageTitle>Settings</PageTitle>
 
       <SectionTitle>AI coach</SectionTitle>
-      <ConnectCoach address={`${serverUrl}/mcp`} />
+      <ConnectCoach address={serverUrl ? coachAddress(serverUrl) : ""} />
 
       {Platform.OS === "ios" ? (
         <>
@@ -124,6 +118,9 @@ export function SettingsScreen() {
 
 function ConnectCoach({ address }: { readonly address: string }) {
   const [copied, setCopied] = useState(false)
+  const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
+  const app = coachApp(appId)
+  const { setupUrl } = app
 
   const copy = async () => {
     await Clipboard.setStringAsync(address)
@@ -133,25 +130,43 @@ function ConnectCoach({ address }: { readonly address: string }) {
   return (
     <Card>
       <Text className="pb-3">
-        Connect this log to Claude so it can read your training, write your plan and adjust your weights. It runs on your Claude
-        subscription.
+        Connect this log to the AI app you already pay for, so it can read your training, write your plan and adjust your
+        weights. It works with any app that can add a custom MCP server.
       </Text>
+      <View accessibilityLabel="Your AI app" className="flex-row flex-wrap gap-2 pb-4">
+        {COACH_APPS.map((option) => (
+          <Chip key={option.id} label={option.name} selected={option.id === appId} onPress={() => setAppId(option.id)} />
+        ))}
+      </View>
       <View className="gap-2 pb-4">
-        {COACH_STEPS.map((step, index) => (
+        {coachSteps(app).map((step, index) => (
           <View key={step} className="flex-row gap-2">
             <Text className="w-5 font-semibold text-accent">{index + 1}.</Text>
             <Text className="flex-1 text-muted">{step}</Text>
           </View>
         ))}
       </View>
+      {app.note ? <Text className="pb-4 text-sm text-faint">{app.note}</Text> : null}
       <View className="flex-row items-center gap-2">
         <View className="flex-1 rounded-2xl bg-ink px-4 py-3.5">
           <Text selectable numberOfLines={1} className="text-sm">
             {address}
           </Text>
         </View>
-        <Button onPress={copy}>{copied ? "Copied" : "Copy"}</Button>
+        <Button onPress={copy} disabled={!address}>
+          {copied ? "Copied" : "Copy"}
+        </Button>
       </View>
+      {setupUrl ? (
+        <Button
+          variant="ghost"
+          className="mt-3"
+          labelClassName="text-accent"
+          onPress={() => void WebBrowser.openBrowserAsync(setupUrl)}
+        >
+          {`Open ${app.name}`}
+        </Button>
+      ) : null}
     </Card>
   )
 }

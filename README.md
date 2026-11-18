@@ -4,7 +4,7 @@
 
 A training log for your phone, with a connection for an AI coach.
 
-You log sets in the app. The app adjusts target weights with a simple built-in rule. Claude connects through an MCP server on the same Worker, reads your history, and writes or changes your plan. The AI runs on your Claude subscription, so there are no API costs.
+You log sets in the app. The app adjusts target weights with a simple built-in rule. An AI app (Claude, ChatGPT, Grok, Gemini, Le Chat or any other that takes a remote MCP server) connects through an MCP server on the same Worker, reads your history, and writes or changes your plan. The AI runs on the subscription you already have, so there are no API costs.
 
 ## Stack
 
@@ -79,14 +79,16 @@ Open the deployed URL in Safari, tap Share, then Add to Home Screen.
 
 Build each feature for both the web app and the native app in the same pull request, unless it can only work on one of them. [CLAUDE.md](CLAUDE.md) lists the steps and the exceptions.
 
-## Connect Claude
+## Connect your AI app
 
-1. In Claude: Settings, Connectors, Add custom connector.
+The coach is a remote MCP server with OAuth at `https://<your-worker-url>/mcp`, so it works with any AI app that can add a custom MCP server or connector. In Claude:
+
+1. Settings, Connectors, Add custom connector.
 2. Paste `https://<your-worker-url>/mcp`.
 3. Sign in to the app when asked and tap Allow.
 4. Ask something like "Look at my gym log and build me a plan."
 
-The same steps are in the app under Settings.
+The app's Settings screen has the steps for Claude, ChatGPT, Grok, Gemini and Le Chat (`src/domain/coach-apps.ts`), and general ones for any other app.
 
 ## How weights change
 
