@@ -35,7 +35,7 @@ bun run dev
 
 The first account needs no invite. To let more people sign up locally, copy `.env.example` to `.env`.
 
-`bun run check` runs lint, typecheck and tests.
+`bun run check` runs lint, typecheck and tests. Lint is type-aware: oxlint uses [tsrs](https://github.com/oxc-project/tsrs) for the type information, while `tsc` stays the type checker.
 
 ### Seed data
 

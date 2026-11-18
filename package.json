@@ -10,9 +10,9 @@
     "destroy": "alchemy destroy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "check": "oxlint && tsc --noEmit && vitest run"
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "check": "oxlint --type-aware && tsc --noEmit && vitest run"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.4",
@@ -30,14 +30,15 @@
     "@cloudflare/workers-types": "5.20261115.1",
     "@effect/platform-bun": "4.1.4",
     "@effect/platform-node": "4.1.4",
-    "@oxlint/plugins": "1.93.0",
+    "@oxlint/plugins": "1.94.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "alchemy": "2.0.0-beta.87",
-    "oxlint": "1.93.0",
+    "oxlint": "1.94.0",
     "tailwindcss": "^4.3.5",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"

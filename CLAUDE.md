@@ -21,3 +21,15 @@ Changes to the MCP server (`src/server/mcp.ts`) affect neither client's screens,
 ## Test data
 
 When a database needs realistic training history (local dev, a preview stage, a screenshot, a test that needs many workouts), use `seed/training-history.json` and load it with `tools/seed/load.ts`, as the README describes. Don't make up workouts by hand. Tests can read the file directly, as `test/seed.test.ts` does.
+
+## Keep tooling up to date, in its own pull request
+
+The tooling here ships fast (oxlint, tsrs, TypeScript, Vite, Vitest, Alchemy), so keep it current. Dependabot (`.github/dependabot.yml`) opens grouped update pull requests every Monday. On top of that, when you start other work:
+
+1. Run `bun outdated` at the root and in `apps/mobile`, and look for open Dependabot pull requests (`gh pr list --author app/dependabot`).
+2. If tooling is behind and no open pull request covers it, update it on its own branch from `master` and open a separate pull request. Don't mix version bumps into a feature pull request.
+3. Keep prereleases (tsrs, Alchemy betas) on exact versions. Read the release notes of anything that is still pre-1.0 or a beta before bumping it.
+4. In `apps/mobile`, move Expo, React and React Native packages only with an Expo SDK upgrade (`bunx expo install --fix`), never one by one.
+5. Run `bun run check` at the root and in `apps/mobile` before opening the pull request.
+
+tsrs is used for oxlint's type-aware lint only; `tsc` stays the type checker until tsrs ships a stable release for the TypeScript version this project uses. When that happens, assess switching `typecheck` to `tsrs --noEmit`.
