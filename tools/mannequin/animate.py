@@ -231,12 +231,21 @@ def pose_legs(spec, key, pelvis):
     forward = Matrix.Rotation(math.radians(key.get("yaw", 0)), 3, "Z") @ Vector((0, -1, 0))
     for side, (ankle, yaw) in ankles(spec, key).items():
         turned = Matrix.Rotation(math.radians(yaw), 3, "Z")
+        pitch = Matrix.Identity(3)
+        stride = key.get("foot_" + side.lower())
+        if stride is not None:
+            y, clearance, heel = stride
+            pitch = Matrix.Rotation(math.radians(heel), 3, "X")
+            pivot = rig.data.bones[side + "Foot"].head_local - rig.data.bones[side + "ToeBase"].head_local
+            ankle += Vector((0, y, clearance)) + turned @ (pitch @ pivot - pivot)
         thigh, shin = segment(f"{side}UpLeg", f"{side}Leg", f"{side}Foot")
         hip = head(f"{side}UpLeg")
         knee, gap = bend(hip, ankle, thigh, shin, turned @ forward)
         swing(f"{side}UpLeg", knee - hip)
         swing(f"{side}Leg", ankle - head(f"{side}Leg"))
-        place(f"{side}Foot", turned @ REST[f"{side}Foot"])
+        place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
+        if stride is not None:
+            place(side + "ToeBase", turned @ REST[side + "ToeBase"])
         gaps.append((f"{side} ankle", gap))
     return gaps
 
@@ -390,6 +399,66 @@ class Barbell:
         return int(in_shaft.sum()), int(in_plate.sum()), float((radial[~hand_mask & (x < self.INNER)] - self.SHAFT).min())
 
 
+class BentBar(Barbell):
+    """Rigid bars made from straight tube spans. Grip and contact use the rendered spans."""
+
+    def __init__(self, kind):
+        steel = material("steel", STEEL, .9, .3)
+        iron = material("iron", IRON, .3, .55)
+        self.root = bpy.data.objects.new(kind, None)
+        scene.collection.objects.link(self.root)
+        self.centre = Vector()
+        self.spans, self.handles = [], {}
+
+        def tube(a, b, radius, handle=None):
+            start, end = Vector(a), Vector(b)
+            direction = end - start
+            part = cylinder("handle" if handle else "tube", radius, direction.length, 0, steel, self.root)
+            part.location = (start + end) / 2
+            part.rotation_euler = direction.to_track_quat("Z", "Y").to_euler()
+            self.spans.append((np.array(start), np.array(direction.normalized()), direction.length, radius, handle))
+            if handle:
+                self.handles[handle] = part
+
+        self.INNER = .46 if kind == "ez-bar" else .53
+        for side, sign in SIDES.items():
+            if kind == "ez-bar":
+                points = [(0, -.035, 0), (sign*.12, -.035, 0), (sign*.34, .057, 0),
+                          (sign*.40, 0, 0), (sign*self.INNER, 0, 0)]
+                for i, (a, b) in enumerate(zip(points, points[1:])):
+                    tube(a, b, self.SHAFT, side if i == 1 else None)
+            else:
+                points = [(0, -.34, 0), (sign*.37, -.19, 0), (sign*.37, .19, 0), (0, .34, 0)]
+                for a, b in zip(points, points[1:]):
+                    tube(a, b, .018)
+                for y in [-.19, .19]:
+                    tube((sign*.37,y,0), (sign*.278,y,0), .014)
+                tube((sign*.278,.19,0), (sign*.278,-.19,0), self.SHAFT, side)
+                tube((sign*.37,0,0), (sign*self.INNER,0,0), .021)
+            cylinder("collar", .03, .04, sign*(self.INNER+.02), steel, self.root)
+            cylinder("sleeve", .025, .24, sign*(self.INNER+.16), steel, self.root)
+            cylinder("plate", self.PLATE, .055, sign*(self.INNER+.08), iron, self.root)
+
+    def grip(self, side):
+        part = self.handles[side]
+        axis = part.rotation_euler.to_matrix().col[2].normalized()
+        if axis.x < -.01:
+            axis.negate()
+        return self.centre + part.location, axis
+
+    def intrusions(self, points, hand_mask):
+        rel = points - np.array(self.centre)
+        inside, closest = 0, math.inf
+        for start, axis, length, radius, handle in self.spans:
+            offset = rel[~hand_mask] - start if handle else rel - start
+            distance = np.clip(offset @ axis, 0, length)
+            gap = np.linalg.norm(offset - np.outer(distance, axis), axis=1) - radius
+            inside += int((gap < -.002).sum())
+            closest = min(closest, float(gap.min()))
+        plate = (np.hypot(rel[:,1], rel[:,2]) < self.PLATE) & (np.abs(np.abs(rel[:,0])-self.INNER-.08) < .0275)
+        return inside, int(plate.sum()), closest
+
+
 class Dumbbells:
     """A dumbbell in each hand, with independently oriented shafts and collision volumes."""
 
@@ -435,6 +504,62 @@ class Dumbbells:
 
     def corners(self):
         return [c + self.axes[side] * s * (self.INNER + self.DEPTH) + Vector((0, 0, z)) for side,c in self.centres.items() for s in (-1, 1) for z in (-self.HEAD, self.HEAD)]
+
+
+class Kettlebells(Dumbbells):
+    """An upright bell per hand for hanging pulls, with a straight grip and a flared bail."""
+
+    INNER, RADIUS, DROP = .072, .079, .163
+
+    def __init__(self):
+        iron = material("cast iron", IRON, .35, .48)
+        self.roots, self.centres, self.axes = {}, {}, {}
+        self.legs = []
+        for side in SIDES:
+            root = bpy.data.objects.new("kettlebell." + side, None)
+            root.rotation_mode = "QUATERNION"
+            scene.collection.objects.link(root)
+            cylinder("bell grip", self.HANDLE, self.INNER * 2, 0, iron, root)
+            for sign in (-1, 1):
+                a = Vector((sign*self.INNER, 0, 0))
+                b = Vector((sign*.045, 0, -.112))
+                delta = b - a
+                part = cylinder("bell bail", self.HANDLE, delta.length, 0, iron, root)
+                part.location = (a + b) / 2
+                part.rotation_euler = delta.to_track_quat("Z", "Y").to_euler()
+                if side == "Left":
+                    self.legs.append((np.array(a), np.array(delta.normalized()), delta.length))
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=self.RADIUS, location=(0, 0, -self.DROP))
+            globe = bpy.context.object
+            globe.name = "bell body"
+            globe.parent = root
+            globe.data.materials.append(iron)
+            bpy.ops.object.shade_smooth()
+            self.roots[side] = root
+
+    def move(self, side, centre, axis, frame):
+        if abs(axis.z) > 1e-4:
+            raise ValueError("A hanging kettlebell requires a horizontal grip")
+        super().move(side, centre, axis, frame)
+
+    def intrusions(self, points):
+        inside, closest = 0, math.inf
+        for side, centre in self.centres.items():
+            local = (points - np.array(centre)) @ np.array(self.roots[side].rotation_quaternion.to_matrix())
+            distances = [np.linalg.norm(local - [0, 0, -self.DROP], axis=1) - self.RADIUS]
+            for a, axis, length in self.legs + [(np.array([-self.INNER,0,0]), np.array([1,0,0]), 2*self.INNER)]:
+                rel = local - a
+                t = np.clip(rel @ axis, 0, length)
+                distances.append(np.linalg.norm(rel - np.outer(t, axis), axis=1) - self.HANDLE)
+            gap = np.minimum.reduce(distances)
+            inside += int((gap < -.002).sum())
+            closest = min(closest, float(gap.min()))
+        return inside, closest
+
+    def corners(self):
+        return [centre + Vector((x, y, z)) for centre in self.centres.values()
+                for x in (-.09,.09) for y in (-self.RADIUS,self.RADIUS)
+                for z in (-self.DROP-self.RADIUS,self.HANDLE)]
 
 
 class Bench:
@@ -517,7 +642,8 @@ def held_point(side, key, torso):
     upper, fore = segment(f"{side}Arm", f"{side}ForeArm", f"{side}Hand")
     down = torso.direction(key["upper_arm"], sign)
     elbow = head(f"{side}Arm") + down * upper
-    ahead = (torso.forward - down * torso.forward.dot(down)).normalized()
+    toward = torso.direction(key["flex_toward"], sign) if "flex_toward" in key else torso.forward
+    ahead = (toward - down * toward.dot(down)).normalized()
     curl = math.radians(key["curl"])
     axis = ahead * math.cos(curl) - down * math.sin(curl)
     return axis, elbow + (down * math.cos(curl) + ahead * math.sin(curl)) * (fore + GRIP[side][0])
@@ -900,6 +1026,8 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
             if "position" in check:
                 expected = check["position"]
                 point = tool.matrix_world.translation if expected["point"] == "handle" else joint(expected["point"])
+                if expected["point"] == "handle" and isinstance(barbell, BentBar):
+                    point = barbell.handles[side].matrix_world.translation
                 if "relative_to" in expected:
                     point = point - joint(expected["relative_to"])
                 for axis in ("x", "y", "z"):
@@ -918,6 +1046,8 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
                     cosine = actual.dot(direction)
                 else:
                     actual = tool.matrix_world.to_3x3().col[0].normalized()
+                    if isinstance(barbell, BentBar):
+                        actual = barbell.handles[side].matrix_world.to_3x3().col[2].normalized()
                     cosine = abs(actual.dot(direction))
                 angle = math.degrees(math.acos(max(-1, min(1, cosine))))
                 bounds(field + " deviation", angle, [0, target["degrees"]], "degrees")
@@ -929,11 +1059,16 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "dumbbells", "bench"}
-    if unknown or len(equipment) != len(set(equipment)) or {"barbell", "dumbbells"} <= set(equipment):
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "bench"}
+    if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = Barbell() if "barbell" in equipment else None
+    for kind in ("ez-bar", "trap-bar"):
+        if kind in equipment:
+            barbell = BentBar(kind)
     dumbbells = Dumbbells() if "dumbbells" in equipment else None
+    if "kettlebells" in equipment:
+        dumbbells = Kettlebells()
     bench = next((Bench(e["at"], e.get("length", 1.2)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     problems = Problems()
     grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells else {}
@@ -974,10 +1109,15 @@ def bake(spec, keys):
                 turn_back = Matrix.Rotation(sign * retract, 3, torso.up)
                 turn_up = Matrix.Rotation(sign * elevate, 3, torso.forward)
                 swing(name, turn_back @ turn_up @ direction)
+        for field in ("foot_left", "foot_right"):
+            if field in a:
+                key[field] = span.sample(field)
         gaps = pose_legs(spec, {**a, **key}, pelvis)
         if barbell:
             if "upper_arm" in a:
                 arms = {field: span.sample(field) for field in ("upper_arm", "curl")}
+                if "flex_toward" in a:
+                    arms["flex_toward"] = span.sample("flex_toward")
                 _, target = held_point("Left", arms, torso)
                 centre = Vector((0, target.y, target.z))
             else:
@@ -987,7 +1127,10 @@ def bake(spec, keys):
             elbows = span.sample("elbows", [0.4, -0.6, -0.5])
             for side, sign in SIDES.items():
                 grip_point = Vector(centre) + Vector((sign * width, 0, 0))
-                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), a.get("grip", "pronated"), torso)
+                axis = Vector((1, 0, 0))
+                if isinstance(barbell, BentBar):
+                    grip_point, axis = barbell.grip(side)
+                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), a.get("grip", "pronated"), torso, axis)
                 gaps.append((f"{side} hand", gap))
                 # The bar has to sit in the palm, where the fingers can close round it.
                 hand = world_rotation(f"{side}Hand")
@@ -995,10 +1138,19 @@ def bake(spec, keys):
                 miss = (held - grip_point).length
                 if miss > 0.01:
                     problems.add(frame, f"{side} hand misses the bar", miss)
-                grips[side].check(frame, grip_point, Vector((1, 0, 0)), barbell.SHAFT, problems)
+                grips[side].check(frame, grip_point, axis, barbell.SHAFT, problems)
                 surface = grips[side]
                 transform = surface.transform
                 outer = abs(surface.points @ np.array(transform.to_3x3().row[0]) + transform.translation.x - centre[0]).max()
+                if isinstance(barbell, BentBar):
+                    # The wrist can clear the outer collar while the fist overlaps a bend.
+                    handle = barbell.handles[side]
+                    to_axis = np.array(transform.to_3x3().transposed() @ axis)
+                    offset = (transform.translation - grip_point).dot(axis)
+                    half_span = max(v.co.z for v in handle.data.vertices)
+                    excess = np.abs(surface.points @ to_axis + offset).max() - half_span
+                    if excess > 0:
+                        problems.add(frame, f"{side} fist extends past the straight grip", excess)
                 if outer > barbell.INNER:
                     problems.add(frame, f"{side} fist reaches the bar collar", outer - barbell.INNER)
                 tucked(side, torso, problems, frame)
@@ -1014,8 +1166,12 @@ def bake(spec, keys):
                     forward_axis = torso.forward
                 else:
                     arms = {field: arm_span.sample(field) for field in ("upper_arm", "curl")}
+                    if "flex_toward" in arm_key:
+                        arms["flex_toward"] = arm_span.sample("flex_toward")
                     forward_axis, grip_point = held_point(side, arms, torso)
                 axis = forward_axis if arm_key.get("grip") == "neutral" else torso.left
+                if "handle_direction" in arm_key:
+                    axis = torso.direction(arm_span.sample("handle_direction"), sign)
                 grip = arm_key.get("grip", "supinated")
                 orientation = "thumb-forward" if grip == "neutral" else grip
                 pole = torso.direction(elbows, sign)
@@ -1040,8 +1196,8 @@ def bake(spec, keys):
                 across = local @ to_axis + offset
                 middle = (across.min() + across.max()) / 2
                 dumbbells.move(side, grip_point + axis * middle, axis, frame)
-                if (across.max() - across.min()) / 2 > Dumbbells.INNER:
-                    problems.add(frame, f"{side} fist is wider than the dumbbell handle", (across.max() - across.min()) / 2 - Dumbbells.INNER)
+                if (across.max() - across.min()) / 2 > dumbbells.INNER:
+                    problems.add(frame, f"{side} fist is wider than the dumbbell handle", (across.max() - across.min()) / 2 - dumbbells.INNER)
                 tucked(side, torso, problems, frame)
         for side in SIDES:
             upper = (head(side + "ForeArm") - head(side + "Arm")).normalized()
@@ -1094,7 +1250,10 @@ def bake(spec, keys):
             if shaft or plate:
                 problems.add(frame, f"the bar passes through the body ({'plate' if plate else 'shaft'})", -gap)
         if dumbbells:
-            samples.append(np.array(dumbbells.corners()))
+            corners = np.array(dumbbells.corners())
+            samples.append(corners)
+            if isinstance(dumbbells, Kettlebells) and corners[:, 2].min() < -.002:
+                problems.add(frame, "a kettlebell crosses the floor", -corners[:, 2].min())
             inside, gap = dumbbells.intrusions(everything)
             closest["dumbbells"] = min(closest["dumbbells"], gap)
             if inside:

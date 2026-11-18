@@ -39,7 +39,7 @@ MPFB assets, remove the corresponding directory under `gym-trainer/scenes` to re
 
 ### Extending equipment
 
-The supported equipment types are `barbell`, `dumbbells` and `bench`. Unsupported types fail
+The supported equipment types are `barbell`, `dumbbells`, `bench`, `ez-bar`, `trap-bar` and `kettlebells`. Unsupported types fail
 before rendering. Keep exercise JSON focused on the setup and movement. Put geometry, handle
 axes, travel limits and contact checks in the shared equipment implementation. Existing bar
 and dumbbell classes provide examples of grip targets and collision measurements.
@@ -248,3 +248,13 @@ the midpoint and spacing of the two separate grips. A barbell can also use
 `upper_arm` and `curl` for an elbow-driven or shoulder-driven arc with a fixed
 grip width. For alternating dumbbell work, `arm_phase` maps a side to a fraction
 of a cycle to add when sampling that arm's movement.
+
+EZ bars and trap bars use the equipment types `ez-bar` and `trap-bar`.
+Their modeled straight grip sections determine the hand positions and shaft axes.
+The `kettlebells` type supports hanging pulls with level handles.
+For dumbbell arcs, `fixed_upper_arm` preserves the authored elbow position and
+`flex_toward` chooses the torso-relative direction of elbow flexion.
+Continuous checkpoints can limit `upper_arm_to_torso` in degrees and
+`fixed_elbow_m` in metres. For stepping movements, each key can specify
+`foot_left` or `foot_right` as forward/back displacement in world Y,
+vertical clearance in metres and heel lift in degrees about the toe joint.

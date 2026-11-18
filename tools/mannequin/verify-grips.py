@@ -8,6 +8,7 @@ from pathlib import Path
 import runpy
 
 import bpy
+import numpy as np
 from mathutils import Vector
 
 scene_path = bpy.data.filepath
@@ -122,3 +123,30 @@ api["check_movement"]([bad], 1, None, equipment, problems)
 for name in ("elbow flexion", "Hand z", "handle_axis deviation"):
     assert any(name in issue for issue in problems.found), (name, problems.found)
 print("MOVEMENT CHECKPOINT REGRESSIONS PASSED")
+
+# Check bent equipment in its local frame. The trap bar must leave the
+# lifter's stance empty while still catching a shin crossing the perimeter.
+for kind in ("ez-bar", "trap-bar"):
+    bar = api["BentBar"](kind)
+    centre = Vector((0, .12, .72))
+    bar.move(centre, 1)
+    bpy.context.view_layer.update()
+    for side in api["SIDES"]:
+        point, axis = bar.grip(side)
+        handle = bar.handles[side]
+        assert (handle.matrix_world.translation - point).length < 1e-5
+        assert abs(axis.dot(handle.matrix_world.to_3x3().col[2].normalized())) > .9999
+        count, _, _ = bar.intrusions(np.array([point]), np.array([False]))
+        assert count, (kind, side)
+    if kind == "trap-bar":
+        count, plates, _ = bar.intrusions(np.array([centre]), np.array([False]))
+        assert not count and not plates
+        count, _, _ = bar.intrusions(np.array([centre + Vector((.37, 0, 0))]), np.array([False]))
+        assert count
+bells = api["Kettlebells"]()
+centre = Vector((.31, 0, .65))
+bells.move("Left", centre, Vector((1, 0, 0)), 1)
+for offset in ((0, 0, -bells.DROP), (.0585, 0, -.056), (0, 0, 0)):
+    assert bells.intrusions(np.array([centre + Vector(offset)]))[0]
+assert not bells.intrusions(np.array([centre + Vector((0, 0, -.045))]))[0]
+print("SPECIALTY BAR AND KETTLEBELL REGRESSIONS PASSED")
