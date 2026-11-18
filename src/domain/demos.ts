@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "underhand-barbell-row",
+    views: ["front", "back"],
+    cues: [
+      "Take an underhand grip and hinge until the bar hangs below your shoulders.",
+      "Pull your elbows back and bring the bar toward your waist.",
+      "Lower the bar under control and hold your torso angle.",
+    ],
+  },
+  {
     slug: "triceps-kickback",
     views: ["front"],
     cues: [
