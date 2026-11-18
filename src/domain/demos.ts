@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "overhead-dumbbell-triceps-extension",
+    views: ["back", "front"],
+    cues: [
+      "Cup the top of the dumbbell with both hands overhead.",
+      "Bend your elbows to lower the weight behind your head.",
+      "Extend your elbows to bring the weight back up.",
+    ],
+  },
+  {
     slug: "upright-row",
     views: ["front"],
     cues: [
