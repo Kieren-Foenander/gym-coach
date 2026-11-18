@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "bulgarian-split-squat",
+    views: ["front", "back"],
+    cues: [
+      "Rest the ball of your rear foot on the bench and plant your front foot.",
+      "Bend your front knee and lower your rear knee toward the floor.",
+      "Drive through your front foot to stand back up.",
+    ],
+  },
+  {
+    slug: "step-up",
+    views: ["front"],
+    cues: [
+      "Place your whole front foot on the bench with a dumbbell at each side.",
+      "Drive through the elevated foot until your front knee and hip straighten.",
+      "Lower the trailing foot to the floor under control.",
+    ],
+  },
+  {
     slug: "y-raise",
     views: ["front", "back"],
     cues: [
