@@ -249,6 +249,10 @@ def palm_axis(side):
 def palm_facing(grip, forearm, pole, torso, sign, bar):
     """Orient an overhand grip around the handle using its leftward axis."""
     across = (pole - forearm * pole.dot(forearm)).normalized()
+    if grip == "thumb-forward":
+        # Neutral dumbbells have a directed shaft: the thumb end turns with
+        # elbow flexion. Its handedness stays constant through arm abduction.
+        return -sign * bar.cross(forearm)
     if grip == "pronated":
         return bar.cross(forearm) * (1 if bar.dot(torso.left) >= 0 else -1)
     if grip == "supinated":
@@ -847,8 +851,73 @@ def shoulder_corrective(side):
     return mod
 
 
+def movement_checkpoints(spec, frames):
+    """Dispatch independent movement expectations at the closest baked frame."""
+    scheduled = {}
+    for check in spec.get("checkpoints", []):
+        phase = check.get("at")
+        if phase is not None and not 0 <= phase < 1:
+            raise ValueError("Checkpoint phase must be in [0, 1)")
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm"}:
+            raise ValueError(f"Invalid movement checkpoint: {check}")
+        if check.get("side", "Left") not in SIDES:
+            raise ValueError(f"Unknown checkpoint side: {check['side']}")
+        times = range(1, frames + 1) if phase is None else [min(frames, 1 + round(phase * frames))]
+        for frame in times:
+            scheduled.setdefault(frame, []).append(check)
+    return scheduled
+
+
+def check_movement(checks, frame, barbell, dumbbells, problems):
+    """Measure actual joints and rendered apparatus transforms in world coordinates."""
+    for check in checks:
+        for side in ([check["side"]] if "side" in check else SIDES):
+            def joint(name):
+                return head(side + name if side + name in bones else name)
+
+            def bounds(label, value, limits, unit):
+                lo, hi = limits
+                if lo > hi:
+                    raise ValueError(f"Reversed bounds for {label}")
+                if not lo <= value <= hi:
+                    problems.add(frame, f"{side} {label} outside [{lo}, {hi}] {unit}",
+                                 max(lo-value, value-hi), "cm" if unit == "m" else unit)
+
+            tool = barbell.root if barbell else dumbbells.roots[side] if dumbbells else None
+            if "elbow" in check:
+                upper = joint("ForeArm") - joint("Arm")
+                fore = joint("Hand") - joint("ForeArm")
+                bounds("elbow flexion", math.degrees(upper.angle(fore)), check["elbow"], "degrees")
+            if "position" in check:
+                expected = check["position"]
+                point = tool.matrix_world.translation if expected["point"] == "handle" else joint(expected["point"])
+                if "relative_to" in expected:
+                    point = point - joint(expected["relative_to"])
+                for axis in ("x", "y", "z"):
+                    if axis in expected:
+                        bounds(f'{expected["point"]} {axis}', getattr(point, axis), expected[axis], "m")
+            for field in ("handle_axis", "palm"):
+                if field not in check:
+                    continue
+                target = check[field]
+                direction = Vector(target["direction"]).normalized()
+                if direction.length < .99:
+                    raise ValueError("Expected a nonzero checkpoint direction")
+                if field == "palm":
+                    direction.x *= SIDES[side]
+                    actual = world_rotation(side + "Hand") @ palm_axis(side)
+                    cosine = actual.dot(direction)
+                else:
+                    actual = tool.matrix_world.to_3x3().col[0].normalized()
+                    cosine = abs(actual.dot(direction))
+                angle = math.degrees(math.acos(max(-1, min(1, cosine))))
+                bounds(field + " deviation", angle, [0, target["degrees"]], "degrees")
+
+
 def bake(spec, keys):
     frames = spec.get("frames", 96)
+    checkpoints = movement_checkpoints(spec, frames)
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
@@ -899,7 +968,12 @@ def bake(spec, keys):
                 swing(name, turn_back @ turn_up @ direction)
         gaps = pose_legs(spec, {**a, **key}, pelvis)
         if barbell:
-            centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
+            if "upper_arm" in a:
+                arms = {field: span.sample(field) for field in ("upper_arm", "curl")}
+                _, target = held_point("Left", arms, torso)
+                centre = Vector((0, target.y, target.z))
+            else:
+                centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
             barbell.move(Vector(centre), frame)
             width = span.sample("grip_width", 0.25)
             elbows = span.sample("elbows", [0.4, -0.6, -0.5])
@@ -921,12 +995,22 @@ def bake(spec, keys):
                     problems.add(frame, f"{side} fist reaches the bar collar", outer - barbell.INNER)
                 tucked(side, torso, problems, frame)
         if dumbbells:
-            arms = {field: span.sample(field) for field in ("upper_arm", "curl")}
-            elbows = span.sample("elbows", [0.1, -0.3, -1])
             for side, sign in SIDES.items():
-                forward_axis, grip_point = held_point(side, arms, torso)
-                axis = forward_axis if a.get("grip") == "neutral" else torso.left
-                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), a.get("grip", "supinated"), torso, axis)
+                phase = spec.get("arm_phase", {}).get(side, 0)
+                arm_span = PoseSpan(keys, (frame - 1) / frames + phase) if phase else span
+                arm_key = arm_span.keys[1]
+                elbows = arm_span.sample("elbows", [0.1, -0.3, -1])
+                if "bar" in arm_key:
+                    centre = arm_span.sample("bar", resolve=lambda target: bar_centre(target, torso))
+                    grip_point = Vector(centre) + torso.left * sign * arm_span.sample("grip_width")
+                    forward_axis = torso.forward
+                else:
+                    arms = {field: arm_span.sample(field) for field in ("upper_arm", "curl")}
+                    forward_axis, grip_point = held_point(side, arms, torso)
+                axis = forward_axis if arm_key.get("grip") == "neutral" else torso.left
+                grip = arm_key.get("grip", "supinated")
+                orientation = "thumb-forward" if grip == "neutral" else grip
+                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), orientation, torso, axis)
                 gaps.append((f"{side} hand", gap))
                 grips[side].check(frame, grip_point, axis, Dumbbells.HANDLE, problems)
                 # The handle's middle goes in the middle of the fist, so neither head touches the hand.
@@ -960,6 +1044,8 @@ def bake(spec, keys):
             bone.keyframe_insert("rotation_quaternion", frame=frame)
             bone.keyframe_insert("location", frame=frame)
         update()
+
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.

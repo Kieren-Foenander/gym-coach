@@ -221,3 +221,30 @@ orientation follow the handle and wrist axes.
 frame, runs the checks, and renders with Eevee.
 
 MakeHuman's assets are CC0, so the renders need no credit.
+
+### Movement checkpoints
+
+A spec can declare independent expectations for the baked joints and rendered equipment.
+For example, a standing press can check the rack, lockout and horizontal shaft:
+
+```json
+"checkpoints": [
+  {"at": 0, "elbow": [140, 165]},
+  {"at": 0.48, "elbow": [0, 6], "position": {"point": "handle", "relative_to": "Arm", "z": [0.53, 0.65]}},
+  {"handle_axis": {"direction": [1, 0, 0], "degrees": 5}}
+]
+```
+
+Omit `at` to measure every frame. Otherwise it is a loop fraction from 0 up to 1,
+measured on the nearest frame. Each check applies to both sides unless `side` is
+`Left` or `Right`. Elbow flexion is zero when straight. A position can bound any
+combination of world x, y and z in metres, using the root of the apparatus (`handle`)
+or a joint name (`Hand`, `ForeArm`, `Hips`, etc.). The optional reference joint
+is subtracted before measuring. A handle axis is undirected. A `palm` direction
+uses the same format, is directed, and mirrors its x component for the right hand.
+
+For matched dumbbell presses and suspended pulls, `bar` and `grip_width` give
+the midpoint and spacing of the two separate grips. A barbell can also use
+`upper_arm` and `curl` for an elbow-driven or shoulder-driven arc with a fixed
+grip width. For alternating dumbbell work, `arm_phase` maps a side to a fraction
+of a cycle to add when sampling that arm's movement.

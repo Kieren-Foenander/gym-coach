@@ -102,6 +102,7 @@ for side in api["SIDES"]:
 api = fresh()
 spec = json.loads((animator.parent / "exercises/hammer-curl.json").read_text())
 spec.update(frames=1, keys=[spec["keys"][0], {"at": .5}])
+spec["checkpoints"] = [c for c in spec.get("checkpoints", []) if c.get("at", 0) == 0]
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert not problems.found, list(problems.lines())
 for side, sign in api["SIDES"].items():
@@ -109,3 +110,15 @@ for side, sign in api["SIDES"].items():
     palm = api["world_rotation"](side + "Hand") @ api["palm_axis"](side)
     assert abs(shaft.y) > .95 and palm.x * sign < -.9, (side, shaft[:], palm[:])
 print("NEUTRAL DUMBBELL ORIENTATION PASSED")
+
+# Contradict the measured starting pose in all three ways. A check reading
+# authored targets instead of the actual joints or apparatus could miss these.
+bad = {"at": 0, "elbow": [100, 120], "position": {"point": "Hand", "z": [1.8, 2]},
+       "handle_axis": {"direction": [1, 0, 0], "degrees": 10}}
+from types import SimpleNamespace
+equipment = SimpleNamespace(roots={side: bpy.data.objects["dumbbell." + side] for side in api["SIDES"]})
+problems = api["Problems"]()
+api["check_movement"]([bad], 1, None, equipment, problems)
+for name in ("elbow flexion", "Hand z", "handle_axis deviation"):
+    assert any(name in issue for issue in problems.found), (name, problems.found)
+print("MOVEMENT CHECKPOINT REGRESSIONS PASSED")

@@ -548,45 +548,69 @@ def continuous_skin(body, joints, rest_surface):
                 raise RuntimeError(f"{side} wrist sample missed the original skin")
             return hit
 
+        # The remeshed palm rim contains very short edges from the plane cut.
+        # Propagating those along the entire wrist creates long, nearly
+        # degenerate quads and a longitudinal streak under specular light.
+        # At the voxel-cut rim the frozen palm and MakeHuman wrist can differ
+        # by a fraction of a millimetre. Match both to the same dorsal surface,
+        # fading the rest-shape correction out before the fingers and cavity.
+        for vertex in copied.values():
+            depth = (vertex.co - wrist).dot(frame.col[1])
+            if depth < .036:
+                t = max(0, min(1, (depth - .016) / .020))
+                vertex.co = skin_point(vertex.co).lerp(vertex.co, t*t*(3-2*t))
+
+        def sample(loop, distances, station):
+            j = np.searchsorted(distances, station, side="right") - 1
+            fraction = (station - distances[j]) / (distances[j+1] - distances[j])
+            return loop[j], loop[(j+1) % len(loop)], fraction
+
+        def bridge(lower, upper, lo, hi):
+            i = j = 0
+            while i < len(lower) or j < len(upper):
+                points = [lower[i % len(lower)], upper[j % len(upper)]]
+                if j == len(upper) or (i < len(lower) and lo[i+1] <= hi[j+1]):
+                    i += 1
+                    points.append(lower[i % len(lower)])
+                else:
+                    j += 1
+                    points.append(upper[j % len(upper)])
+                mesh.faces.new(points).smooth = True
+
         u, v = lengths(arm), lengths(palm)
+        stations = np.linspace(0, 1, len(arm) + 1)
         rings = [[] for _ in range(9)]
-        pigment = mesh.verts.layers.float.get("muscle:Forearms")
-        for i, end in enumerate(palm):
-            j = min(len(arm)-1, np.searchsorted(u, v[i], side="right")-1)
-            a, b = arm[j], arm[(j+1) % len(arm)]
-            fraction = (v[i]-u[j])/(u[j+1]-u[j])
+        for station in stations[:-1]:
+            a, b, fraction = sample(arm, u, station)
+            c, d, distal = sample(palm, v, station)
             base = a.co.lerp(b.co, fraction)
+            end = c.co.lerp(d.co, distal)
             fore_offset = base - skin_point(base)
-            palm_offset = end.co - skin_point(end.co)
-            # The existing rim carries forearm, roll and hand weights. Carry all
-            # three into the wrist so pronation is continuous at the junction.
+            palm_offset = end - skin_point(end)
             groups = set(a[weights].keys()) | set(b[weights].keys()) | {hand}
             for step, ring in enumerate(rings, 1):
                 t = step / (len(rings) + 1)
                 blend = t * t * (3 - 2 * t)
-                position = skin_point(base.lerp(end.co, t)) + fore_offset.lerp(palm_offset, blend)
+                position = skin_point(base.lerp(end, t)) + fore_offset.lerp(palm_offset, blend)
                 point = mesh.verts.new(position)
                 for group in groups:
                     proximal = a[weights].get(group, 0)*(1-fraction) + b[weights].get(group, 0)*fraction
                     point[weights][group] = proximal * (1-blend) + (blend if group == hand else 0)
-                if pigment:
-                    point[pigment] = (a[pigment]*(1-fraction) + b[pigment]*fraction) * (1-blend)
                 ring.append(point)
-        mid = rings[0]
-        i = j = 0
-        while i < len(arm) or j < len(mid):
-            points = [arm[i % len(arm)], mid[j % len(mid)]]
-            if j == len(mid) or (i < len(arm) and u[i+1] <= v[j+1]):
-                i += 1
-                points.append(arm[i % len(arm)])
-            else:
-                j += 1
-                points.append(mid[j % len(mid)])
-            mesh.faces.new(points).smooth = True
-        for lower, upper in zip(rings, rings[1:] + [palm]):
+        bridge(arm, rings[0], u, stations)
+        for lower, upper in zip(rings, rings[1:]):
             for i in range(len(lower)):
                 j = (i+1) % len(lower)
                 mesh.faces.new([lower[i],lower[j],upper[j],upper[i]]).smooth = True
+        bridge(rings[-1], palm, stations, v)
+
+        # Use one continuous field across the cage, stitch and proximal palm.
+        pigment = mesh.verts.layers.float["muscle:Forearms"]
+        for vertex in mesh.verts:
+            offset = vertex.co - wrist
+            if offset.length < .15:
+                t = max(0, min(1, (.033 - offset.dot(frame.col[1])) / .15))
+                vertex[pigment] = t*t*(3-2*t)
         if any(not edge.is_manifold for ring in [arm, *rings, palm]
                for vertex in ring for edge in vertex.link_edges):
             raise RuntimeError(f"{side} wrist stitch is open")

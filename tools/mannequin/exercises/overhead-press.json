@@ -9,5 +9,9 @@
     {"at": 0.52},
     {"at": 0.74, "elbows": [0.8, 0.35, -1], "bar": [0, -0.19, 1.53], "lean": -4, "clavicle": [0, 6]},
     {"at": 0.95, "elbows": [0.4, 0.6, -1], "lean": -4, "bar": [0, -0.13, 1.38], "clavicle": [0, 4]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [140, 164], "handle_axis": {"direction": [1, 0, 0], "degrees": 20}},
+    {"at": 0.48, "elbow": [0, 6], "position": {"point": "handle", "z": [1.89, 1.92]}}
   ]
 }
