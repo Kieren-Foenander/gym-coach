@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP } from "~/domain/coach-apps"
+import { coachAction, coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP } from "~/domain/coach-apps"
+
+const address = "https://gym.example.com/mcp"
 
 describe("connecting an AI app to the coach", () => {
   it("offers each app once, starting with the default, and ends with a catch-all", () => {
@@ -9,23 +11,45 @@ describe("connecting an AI app to the coach", () => {
     expect(ids.at(-1)).toBe("other")
   })
 
-  it("tells every app where the address goes, then to sign in, then what to ask", () => {
+  it("ends every app's steps with signing in, then what to ask", () => {
     for (const app of COACH_APPS) {
       const steps = coachSteps(app)
-      expect(app.steps.at(-1)).toContain("address below")
       expect(steps.at(-2)).toContain("Sign in")
       expect(steps.at(-1)).toContain("build me a plan")
     }
   })
 
-  it("only links to secure pages", () => {
+  it("names the button in the first step when there is one", () => {
     for (const app of COACH_APPS) {
-      if (app.setupUrl !== null) expect(new URL(app.setupUrl).protocol).toBe("https:")
+      const action = coachAction(app, address)
+
+      if (action) expect(app.steps[0]).toContain(`Tap ${action.label}`)
     }
   })
 
-  it("finds an app by id", () => {
-    expect(coachApp("grok").name).toBe("Grok")
+  it("opens Claude's add-connector dialog with the name and address filled in", () => {
+    const action = coachAction(coachApp("claude"), "https://gym.example.com/mcp?a=1&b=2")
+    expect(action?.copiesAddress).toBe(false)
+    const url = new URL(action?.url ?? "")
+    expect(url.origin).toBe("https://claude.ai")
+    expect(url.searchParams.get("modal")).toBe("add-custom-connector")
+    expect(url.searchParams.get("connectorName")).toBe("Gym")
+    // The address is encoded, so its own query can't leak into the link's.
+    expect(url.searchParams.get("connectorUrl")).toBe("https://gym.example.com/mcp?a=1&b=2")
+  })
+
+  it("copies the address and opens the setup page for apps without a prefill link", () => {
+    const action = coachAction(coachApp("chatgpt"), address)
+    expect(action).toEqual({ label: "Copy and open ChatGPT", url: "https://chatgpt.com/plugins", copiesAddress: true })
+    expect(coachAction(coachApp("other"), address)).toBeNull()
+  })
+
+  it("only links to secure pages", () => {
+    for (const app of COACH_APPS) {
+      const action = coachAction(app, address)
+
+      if (action) expect(new URL(action.url).protocol).toBe("https:")
+    }
   })
 
   it("puts /mcp on the server's origin once, with or without a trailing slash", () => {

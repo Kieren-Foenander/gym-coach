@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useState, type FormEvent } from "react"
 import {
   Button,
+  buttonClass,
   Card,
   ErrorNote,
   Field,
@@ -12,7 +13,7 @@ import {
   TextInput,
   useAction,
 } from "~/components/ui"
-import { coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
+import { coachAction, coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
 import { signOut, updateProfile } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/settings")({
@@ -128,6 +129,7 @@ function ConnectCoach() {
   const [copied, setCopied] = useState(false)
   const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
   const app = coachApp(appId)
+  const action = address ? coachAction(app, address) : null
 
   useEffect(() => {
     setAddress(coachAddress(window.location.origin))
@@ -165,22 +167,26 @@ function ConnectCoach() {
         ))}
       </ol>
       {app.note ? <p className="pb-4 text-sm text-faint">{app.note}</p> : null}
+      {action ? (
+        <a
+          className={buttonClass("primary", "mb-3 w-full")}
+          href={action.url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => {
+            // Copy while this page still has focus; the link then opens the app in a new tab.
+            if (action.copiesAddress) void copy()
+          }}
+        >
+          {action.label}
+        </a>
+      ) : null}
       <div className="flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded-2xl bg-ink px-4 py-3.5 text-sm">{address}</code>
         <Button onClick={copy} disabled={!address}>
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      {app.setupUrl ? (
-        <a
-          className="mt-3 flex min-h-11 items-center justify-center font-semibold text-accent"
-          href={app.setupUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open {app.name}
-        </a>
-      ) : null}
     </Card>
   )
 }

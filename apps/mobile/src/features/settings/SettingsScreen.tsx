@@ -1,14 +1,14 @@
 import * as Clipboard from "expo-clipboard"
 import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
-import { Platform, View } from "react-native"
+import { Linking, Platform, View } from "react-native"
 import { call, rememberUser, signOut, useSession } from "@/api/session"
 import { Button, Card, Chip, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
 import { useAction } from "@/data/calls"
 import { useOutbox } from "@/data/outbox-store"
 import { AppleHealthCard } from "@/features/health/AppleHealthCard"
 import { useUser } from "@/features/user"
-import { coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
+import { coachAction, coachAddress, coachApp, coachSteps, COACH_APPS, DEFAULT_COACH_APP, type CoachAppId } from "~/domain/coach-apps"
 
 export function SettingsScreen() {
   const user = useUser()
@@ -120,11 +120,17 @@ function ConnectCoach({ address }: { readonly address: string }) {
   const [copied, setCopied] = useState(false)
   const [appId, setAppId] = useState<CoachAppId>(DEFAULT_COACH_APP)
   const app = coachApp(appId)
-  const { setupUrl } = app
+  const action = address ? coachAction(app, address) : null
 
   const copy = async () => {
     await Clipboard.setStringAsync(address)
     setCopied(true)
+  }
+
+  // The system browser, not an in-app one: it has the user's sign-in, and the AI's own app can take the link.
+  const runAction = async (next: NonNullable<typeof action>) => {
+    if (next.copiesAddress) await copy()
+    await Linking.openURL(next.url)
   }
 
   return (
@@ -147,6 +153,11 @@ function ConnectCoach({ address }: { readonly address: string }) {
         ))}
       </View>
       {app.note ? <Text className="pb-4 text-sm text-faint">{app.note}</Text> : null}
+      {action ? (
+        <Button variant="primary" className="mb-3" onPress={() => void runAction(action)}>
+          {action.label}
+        </Button>
+      ) : null}
       <View className="flex-row items-center gap-2">
         <View className="flex-1 rounded-2xl bg-ink px-4 py-3.5">
           <Text selectable numberOfLines={1} className="text-sm">
@@ -157,16 +168,6 @@ function ConnectCoach({ address }: { readonly address: string }) {
           {copied ? "Copied" : "Copy"}
         </Button>
       </View>
-      {setupUrl ? (
-        <Button
-          variant="ghost"
-          className="mt-3"
-          labelClassName="text-accent"
-          onPress={() => void WebBrowser.openBrowserAsync(setupUrl)}
-        >
-          {`Open ${app.name}`}
-        </Button>
-      ) : null}
     </Card>
   )
 }
