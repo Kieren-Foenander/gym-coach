@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "split-squat",
+    views: ["front", "back"],
+    cues: [
+      "Set a long staggered stance with the rear heel raised.",
+      "Bend both knees and lower your rear knee toward the floor.",
+      "Push through your front foot to rise, keeping your stance.",
+    ],
+  },
+  {
+    slug: "reverse-lunge",
+    views: ["front"],
+    cues: [
+      "Stand tall with a dumbbell at each side.",
+      "Step back onto the ball of one foot and lower your rear knee.",
+      "Push through the front foot and bring your feet back together.",
+    ],
+  },
+  {
+    slug: "forward-lunge",
+    views: ["front"],
+    cues: [
+      "Hold the dumbbells at your sides and take a long step forward.",
+      "Bend both knees while keeping the front foot planted.",
+      "Push back through the front foot to return to standing.",
+    ],
+  },
+  {
+    slug: "barbell-lunge",
+    views: ["front"],
+    cues: [
+      "Brace with the bar across your upper back.",
+      "Step forward and lower your rear knee toward the floor.",
+      "Drive through your front foot and step back to the start.",
+    ],
+  },
+  {
     slug: "kettlebell-row",
     views: ["front", "back"],
     cues: [
