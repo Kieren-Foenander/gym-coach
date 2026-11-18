@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cross-body-hammer-curl",
+    views: ["front"],
+    cues: [
+      "Stand tall with palms facing inward.",
+      "Curl one weight toward the opposite side of your chest.",
+      "Lower under control and switch arms.",
+    ],
+  },
+  {
     slug: "behind-the-neck-press",
     views: ["front"],
     cues: [
