@@ -858,8 +858,8 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm"}
-        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm"}:
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
@@ -869,7 +869,7 @@ def movement_checkpoints(spec, frames):
     return scheduled
 
 
-def check_movement(checks, frame, barbell, dumbbells, problems):
+def check_movement(checks, frame, barbell, dumbbells, problems, initial=None):
     """Measure actual joints and rendered apparatus transforms in world coordinates."""
     for check in checks:
         for side in ([check["side"]] if "side" in check else SIDES):
@@ -889,6 +889,14 @@ def check_movement(checks, frame, barbell, dumbbells, problems):
                 upper = joint("ForeArm") - joint("Arm")
                 fore = joint("Hand") - joint("ForeArm")
                 bounds("elbow flexion", math.degrees(upper.angle(fore)), check["elbow"], "degrees")
+            if "upper_arm_to_torso" in check:
+                upper = joint("ForeArm") - joint("Arm")
+                bounds("upper arm to torso", math.degrees(upper.angle(-Torso().up)),
+                       [0, check["upper_arm_to_torso"]], "degrees")
+            if "fixed_elbow_m" in check:
+                elbow = joint("ForeArm")
+                anchor = initial.setdefault(side + " elbow anchor", elbow.copy())
+                bounds("elbow drift", (elbow - anchor).length, [0, check["fixed_elbow_m"]], "m")
             if "position" in check:
                 expected = check["position"]
                 point = tool.matrix_world.translation if expected["point"] == "handle" else joint(expected["point"])
@@ -1010,7 +1018,17 @@ def bake(spec, keys):
                 axis = forward_axis if arm_key.get("grip") == "neutral" else torso.left
                 grip = arm_key.get("grip", "supinated")
                 orientation = "thumb-forward" if grip == "neutral" else grip
-                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), orientation, torso, axis)
+                pole = torso.direction(elbows, sign)
+                if arm_key.get("fixed_upper_arm"):
+                    # Construct the grip from the authored elbow and wrist, including the
+                    # palm offset. The IK solution then recovers the same stationary elbow.
+                    pole = torso.direction(arms["upper_arm"], sign)
+                    upper, fore = segment(side + "Arm", side + "ForeArm", side + "Hand")
+                    elbow = head(side + "Arm") + pole * upper
+                    lower = (grip_point - elbow).normalized()
+                    along, palm = hand_on_bar(lower, palm_facing(orientation, lower, pole, torso, sign, axis), axis)
+                    grip_point = elbow + lower * fore + along * GRIP[side][0] + palm * GRIP[side][1]
+                gap = pose_arm(side, grip_point, pole, orientation, torso, axis)
                 gaps.append((f"{side} hand", gap))
                 grips[side].check(frame, grip_point, axis, Dumbbells.HANDLE, problems)
                 # The handle's middle goes in the middle of the fist, so neither head touches the hand.
@@ -1045,7 +1063,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.

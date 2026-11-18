@@ -182,11 +182,11 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
   },
   {
     slug: "triceps-kickback",
-    views: ["front"],
+    views: ["back", "front"],
     cues: [
-      "Hinge forward and hold your upper arms alongside your torso.",
+      "Hinge until your torso is nearly level and lift your elbows alongside your ribs.",
       "Straighten your elbows to send the weights behind you.",
-      "Bend your elbows again while keeping your upper arms still.",
+      "Keep your elbows still as you lower your forearms to vertical.",
     ],
   },
   {
