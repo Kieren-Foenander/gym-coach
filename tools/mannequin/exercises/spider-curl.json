@@ -1,7 +1,7 @@
 {
   "equipment": [{"type": "ez-bar"}, {"type": "bench", "at": [0, 0.18, 0.308], "angle": 50, "support": "chest", "length": 0.92}],
   "stance": {"width": 0.94, "y": 0.4, "toe_out": 12},
-  "camera": {"angle": 65, "elevation": 16},
+  "camera": {"angle": 30, "elevation": 10},
   "keys": [
     {"at": 0, "pelvis": [0, 0, 0.72], "upper_arm": [0.08, 0.643, -0.766], "curl": 14, "grip": "supinated", "elbows": [0.08, 0.643, -0.766], "lean": 40, "spine": 0, "head": -14, "fixed_upper_arm": true},
     {"at": 0.44, "curl": 121},
