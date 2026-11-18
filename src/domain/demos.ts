@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "barbell-shrug",
+    views: ["front", "back"],
+    cues: [
+      "Hold the bar in front of your thighs with an overhand grip.",
+      "Keep your arms long and lift your shoulders toward your ears.",
+      "Pause briefly, then lower your shoulders under control.",
+    ],
+  },
+  {
     slug: "barbell-curl",
     views: ["front"],
     cues: [
