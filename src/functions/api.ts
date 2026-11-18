@@ -212,3 +212,21 @@ export const logMeasurement = createServerFn({ method: "POST" })
 export const deleteMeasurement = createServerFn({ method: "POST" })
   .validator(input(CallInputs.deleteMeasurement))
   .handler(({ data }) => authed(Calls.deleteMeasurement.run(data)))
+
+// ---------------------------------------------------------------- food
+
+export const getNutrition = createServerFn({ method: "GET" })
+  .validator(input(CallInputs.getNutrition))
+  .handler(({ data }) => authed(Calls.getNutrition.run(data)))
+
+export const logFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.logFood))
+  .handler(({ data }) => authed(Calls.logFood.run(data)))
+
+export const updateFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.updateFood))
+  .handler(({ data }) => authed(Calls.updateFood.run(data)))
+
+export const deleteFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.deleteFood))
+  .handler(({ data }) => authed(Calls.deleteFood.run(data)))

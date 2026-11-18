@@ -63,6 +63,11 @@ const DAILY = [
   { metric: "restingHeartRate", identifier: "HKQuantityTypeIdentifierRestingHeartRate", unit: "count/min", statistic: "discreteAverage" },
   { metric: "hrv", identifier: "HKQuantityTypeIdentifierHeartRateVariabilitySDNN", unit: "ms", statistic: "discreteAverage" },
   { metric: "vo2Max", identifier: "HKQuantityTypeIdentifierVO2Max", unit: "ml/(kg*min)", statistic: "discreteAverage" },
+  // Food, from a tracker such as MyFitnessPal or Cronometer that writes to Health.
+  { metric: "dietaryEnergy", identifier: "HKQuantityTypeIdentifierDietaryEnergyConsumed", unit: "kcal", statistic: "cumulativeSum" },
+  { metric: "dietaryProtein", identifier: "HKQuantityTypeIdentifierDietaryProtein", unit: "g", statistic: "cumulativeSum" },
+  { metric: "dietaryCarbs", identifier: "HKQuantityTypeIdentifierDietaryCarbohydrates", unit: "g", statistic: "cumulativeSum" },
+  { metric: "dietaryFat", identifier: "HKQuantityTypeIdentifierDietaryFatTotal", unit: "g", statistic: "cumulativeSum" },
 ] as const
 
 const SLEEP = "HKCategoryTypeIdentifierSleepAnalysis"

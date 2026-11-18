@@ -12,6 +12,7 @@ import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "@
 import { Button, Card, CARD_CLASS, Display, Divider, ErrorNote, Eyebrow, Loading, PageTitle, Screen, SectionTitle, Text } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
 import { RecoveryCard } from "@/features/health/RecoveryCard"
+import { NutritionCard } from "@/features/nutrition/NutritionCard"
 import { useUser } from "@/features/user"
 import { cn } from "@/lib/cn"
 import { useNow } from "@/lib/useNow"
@@ -124,6 +125,8 @@ export function TodayScreen() {
       )}
 
       <RecoveryCard now={now} />
+
+      <NutritionCard now={now} />
 
       {today.plan ? null : (
         <Hero eyebrow="Get started" title="No plan yet">

@@ -5,9 +5,12 @@ import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
 import { EQUIPMENT, mergeLibrary, MUSCLES, searchLibrary } from "~/domain/catalog"
 import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
+import { daysAround, NUTRIENT_INFO, shiftDay, TARGET_LIMITS } from "~/domain/nutrition"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
 import {
+  describedDay,
   ExercisePrescription,
+  FoodInput,
   Id,
   MeasurementInput,
   measurementUnit,
@@ -18,6 +21,7 @@ import {
 } from "~/domain/schema"
 import { Invalid, type DomainError } from "./errors"
 import * as Health from "./health"
+import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
 import { DbLive } from "./runtime"
@@ -33,6 +37,7 @@ How the app works:
 - The user can swap an exercise for one workout when equipment is taken. Those sets appear in history under the stand-in exercise and do not change the plan.
 - The user can also log bodyweight, body fat and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
 - If the user connected Apple Health in the iPhone app, bodyweight, body fat and waist arrive from it on their own, and so do cardio workouts (from an Apple Watch, say), which appear in history named after the exercise with the note "From Apple Health". get_health_metrics returns their daily sleep, resting heart rate, HRV, steps, active energy and VO2 max, and every workout Health recorded, including sports the log does not show. Use sleep and resting heart rate or HRV against their usual levels when judging recovery, and the other activity when judging total load. It returns nothing if Apple Health is not connected.
+- The user can keep a food log: each entry is a meal, a snack or a day's total with calories and, when known, protein, carbs and fat in grams. When the user tells you what they ate, estimate it and record it with log_food on their own calendar day; say what you estimated. get_nutrition returns each day's totals against their calorie and protein targets, which you can set with update_profile. Food from a tracker that writes to Apple Health (MyFitnessPal, Cronometer and so on) is counted in each day's totals as well, shown apart as "health", so do not log the same meals again. Judge intake against the bodyweight trend from get_body_measurements and the user's goal.
 - An "Open workout" follows no plan day: the user added exercises as they went.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
@@ -136,7 +141,7 @@ const RemovePlanExercise = Tool.make("remove_plan_exercise", {
 
 const UpdateProfile = Tool.make("update_profile", {
   description:
-    "Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept.",
+    `Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept. Also sets the daily calorie target (${TARGET_LIMITS.calories.min}-${TARGET_LIMITS.calories.max} kcal) and protein target (grams) for the food log; null clears one.`,
   parameters: ProfilePatch,
   success: Schema.Unknown,
   ...options,
@@ -190,9 +195,37 @@ const LogBodyMeasurement = Tool.make("log_body_measurement", {
   ...options,
 }).annotate(Tool.Destructive, false)
 
+const GetNutrition = Tool.make("get_nutrition", {
+  description:
+    "The food log: for each day with anything eaten, the totals (calories in kcal, protein, carbs and fat in grams), split into what was logged in the app and what came from Apple Health, and each entry logged in the app with its id. Also the user's daily calorie and protein targets. Newest day first.",
+  parameters: Schema.Struct({
+    days: Schema.optional(describe(Schema.Int, "How many days back to look. Default 14, at most 90.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
+const LogFood = Tool.make("log_food", {
+  description:
+    "Record a meal, snack or a whole day's eating that the user describes. Estimate calories, and protein, carbs and fat in grams, from what they said; leave out a macro you cannot judge. Tell the user what you estimated.",
+  parameters: Schema.Struct({
+    day: describedDay("The user's own calendar day it was eaten on, as YYYY-MM-DD. Ask if you are not sure of it."),
+    ...FoodInput.fields,
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, false)
+
+const DeleteFood = Tool.make("delete_food", {
+  description: "Remove an entry from the food log, such as one logged twice or with the wrong amounts. Get its id from get_nutrition.",
+  parameters: Schema.Struct({ foodId: Id }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, true)
+
 const GetHealthMetrics = Tool.make("get_health_metrics", {
   description:
-    "Daily numbers from Apple Health (sleep, resting heart rate, HRV, steps, active energy, VO2 max), newest day first, and every workout Health recorded with its heart rate and energy. Today's steps and active energy are still adding up. Empty if the user has not connected Apple Health.",
+    "Daily numbers from Apple Health (sleep, resting heart rate, HRV, steps, active energy, VO2 max, and calories and macros eaten when a food tracker writes them), newest day first, and every workout Health recorded with its heart rate and energy. Today's steps and active energy are still adding up. Empty if the user has not connected Apple Health.",
   parameters: Schema.Struct({
     days: Schema.optional(describe(Schema.Int, "How many days back to look. Default 14, at most 90.")),
   }),
@@ -201,6 +234,9 @@ const GetHealthMetrics = Tool.make("get_health_metrics", {
 }).annotate(Tool.Readonly, true)
 
 export const GymToolkit = Toolkit.make(
+  GetNutrition,
+  LogFood,
+  DeleteFood,
   GetHealthMetrics,
   GetBodyMeasurements,
   LogBodyMeasurement,
@@ -228,6 +264,8 @@ const profileOf = (user: User) => ({
   unit: user.unit,
   goal: user.goal,
   trainingContext: user.trainingContext,
+  calorieTarget: user.calorieTarget,
+  proteinTarget: user.proteinTarget,
 })
 
 export const GymHandlers = GymToolkit.toLayer(
@@ -375,6 +413,42 @@ export const GymHandlers = GymToolkit.toLayer(
           }),
         ),
       log_workout: (input) => run(Effect.map(Repo.logPastWorkout(input), (workoutId) => ({ workoutId }))),
+      get_nutrition: ({ days }) =>
+        run(
+          Effect.gen(function* () {
+            // The server does not know the user's time zone, so the span reaches a day past today in UTC.
+            const to = daysAround(yield* Clock.currentTimeMillis).to
+            const nutrition = yield* Nutrition.getNutrition(shiftDay(to, 1 - clamp(days, 14, 90)), to)
+
+            return {
+              units: Object.fromEntries(Object.entries(NUTRIENT_INFO).map(([nutrient, info]) => [nutrient, info.unit])),
+              targets: nutrition.targets,
+              days: nutrition.days
+                .filter((day) => day.total.calories > 0 || nutrition.entries.some((entry) => entry.day === day.day))
+                .toReversed()
+                .map((day) => ({
+                  day: day.day,
+                  total: day.total,
+                  logged: day.logged,
+                  health: day.health,
+                  entries: nutrition.entries
+                    .filter((entry) => entry.day === day.day)
+                    .map((entry) => ({
+                      id: entry.id,
+                      description: entry.description,
+                      calories: entry.calories,
+                      protein: entry.protein,
+                      carbs: entry.carbs,
+                      fat: entry.fat,
+                      loggedBy: entry.source === "ai" ? "coach" : "user",
+                    })),
+                })),
+            }
+          }),
+        ),
+      log_food: ({ day, ...food }) =>
+        run(Effect.map(Nutrition.logFood(day, food, "ai"), (entry) => ({ saved: true, id: entry.id }))),
+      delete_food: ({ foodId }) => run(Effect.as(Nutrition.deleteFood(foodId), { removed: true })),
       get_health_metrics: ({ days }) =>
         run(
           Effect.gen(function* () {

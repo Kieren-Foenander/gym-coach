@@ -17,6 +17,7 @@ import { AddToPlanSheet } from "@/features/exercises/AddToPlanSheet"
 import { LibraryExerciseScreen, OwnExerciseScreen } from "@/features/exercises/ExerciseDetailScreen"
 import { ExercisesScreen } from "@/features/exercises/ExercisesScreen"
 import { MuscleGroupScreen } from "@/features/exercises/MuscleGroupScreen"
+import { NutritionScreen } from "@/features/nutrition/NutritionScreen"
 import { HistoryScreen } from "@/features/history/HistoryScreen"
 import { AddPlanDaySheet, AddPlanExerciseSheet, EditPlanExerciseSheet, TemplatesSheet } from "@/features/plan/PlanSheets"
 import { PlanScreen } from "@/features/plan/PlanScreen"
@@ -40,6 +41,7 @@ export type AppStackParams = {
   readonly Tabs: NavigatorScreenParams<TabParams> | undefined
   readonly Workout: { readonly workoutId: number }
   readonly Calendar: undefined
+  readonly Nutrition: undefined
   readonly MuscleGroup: { readonly muscle: Muscle }
   readonly LibraryExercise: { readonly slug: string }
   readonly OwnExercise: { readonly exerciseId: number }
@@ -165,6 +167,7 @@ export function Navigation() {
             {/* A workout is left with its own buttons, so a stray swipe cannot drop you out of it mid-set. */}
             <AppStack.Screen name="Workout" component={WorkoutScreen} options={{ gestureEnabled: false }} />
             <AppStack.Screen name="Calendar" component={CalendarScreen} />
+            <AppStack.Screen name="Nutrition" component={NutritionScreen} />
             <AppStack.Screen name="MuscleGroup" component={MuscleGroupScreen} />
             <AppStack.Screen name="LibraryExercise" component={LibraryExerciseScreen} />
             <AppStack.Screen name="OwnExercise" component={OwnExerciseScreen} />

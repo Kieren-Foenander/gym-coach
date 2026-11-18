@@ -96,6 +96,18 @@ describe("cleanHealthChanges", () => {
     ])
   })
 
+  it("keeps what a food tracker wrote to Health, for the food log", () => {
+    const food: ReadonlyArray<DailyRecord> = [
+      { day: "2026-11-17", metric: "dietaryEnergy", value: 2350 },
+      { day: "2026-11-17", metric: "dietaryProtein", value: 165.4 },
+      { day: "2026-11-17", metric: "dietaryCarbs", value: 240 },
+      { day: "2026-11-17", metric: "dietaryFat", value: 70.2 },
+    ]
+
+    expect(cleanHealthChanges({ ...nothing, daily: food }).daily).toEqual(food)
+    expect(healthBatches({ ...nothing, daily: food })).toEqual([{ daily: food }])
+  })
+
   it("drops a workout of a type the server cannot store", () => {
     expect(cleanHealthChanges({ ...nothing, workouts: [{ ...workout(1), activity: 99_999 }] }).workouts).toEqual([])
   })

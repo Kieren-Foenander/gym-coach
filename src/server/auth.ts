@@ -52,7 +52,7 @@ export const verifyPassword = (password: string, stored: string) =>
     return constantTimeEqual(actual, fromHex(hash))
   })
 
-const USER_COLUMNS = `u.id, u.email, u.display_name, u.unit, u.goal, u.training_context`
+const USER_COLUMNS = `u.id, u.email, u.display_name, u.unit, u.goal, u.training_context, u.calorie_target, u.protein_target`
 
 const createSession = Effect.fn("createSession")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient

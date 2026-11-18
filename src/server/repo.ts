@@ -29,6 +29,9 @@ export interface User {
   readonly unit: Unit
   readonly goal: string
   readonly trainingContext: string
+  /** Daily targets for the food log, or null when none is set. */
+  readonly calorieTarget: number | null
+  readonly proteinTarget: number | null
 }
 
 export class CurrentUser extends Context.Service<CurrentUser, User>()("gym/CurrentUser") {}
@@ -172,10 +175,14 @@ export const updateProfile = Effect.fn("updateProfile")(function* (patch: Profil
     unit: patch.unit ?? user.unit,
     goal: patch.goal ?? user.goal,
     trainingContext: patch.trainingContext ?? user.trainingContext,
+    // Null clears a target, so only a target left out of the patch keeps its value.
+    calorieTarget: patch.calorieTarget === undefined ? user.calorieTarget : patch.calorieTarget,
+    proteinTarget: patch.proteinTarget === undefined ? user.proteinTarget : patch.proteinTarget,
   }
 
   yield* sql`UPDATE users SET display_name = ${next.displayName}, unit = ${next.unit}, goal = ${next.goal},
-    training_context = ${next.trainingContext} WHERE id = ${user.id}`
+    training_context = ${next.trainingContext}, calorie_target = ${next.calorieTarget},
+    protein_target = ${next.proteinTarget} WHERE id = ${user.id}`
 
   return { ...user, ...next } satisfies User
 })

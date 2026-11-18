@@ -36,7 +36,18 @@ export const HEALTH_VALUE_LIMITS = {
 
 // ---------------------------------------------------------------- daily metrics
 
-export const HEALTH_METRICS = ["sleep", "restingHeartRate", "hrv", "steps", "activeEnergy", "vo2Max"] as const
+export const HEALTH_METRICS = [
+  "sleep",
+  "restingHeartRate",
+  "hrv",
+  "steps",
+  "activeEnergy",
+  "vo2Max",
+  "dietaryEnergy",
+  "dietaryProtein",
+  "dietaryCarbs",
+  "dietaryFat",
+] as const
 
 export type HealthMetric = (typeof HEALTH_METRICS)[number]
 
@@ -54,6 +65,10 @@ export const HEALTH_METRIC_INFO = {
   steps: { label: "Steps", unit: "steps", meaning: "steps taken" },
   activeEnergy: { label: "Active energy", unit: "kcal", meaning: "active calories burned" },
   vo2Max: { label: "VO2 max", unit: "ml/kg/min", meaning: "Apple Watch's estimate of cardio fitness" },
+  dietaryEnergy: { label: "Calories eaten", unit: "kcal", meaning: "calories eaten, from a food tracker that writes to Apple Health" },
+  dietaryProtein: { label: "Protein", unit: "g", meaning: "protein eaten, from a food tracker that writes to Apple Health" },
+  dietaryCarbs: { label: "Carbs", unit: "g", meaning: "carbohydrate eaten, from a food tracker that writes to Apple Health" },
+  dietaryFat: { label: "Fat", unit: "g", meaning: "fat eaten, from a food tracker that writes to Apple Health" },
 } as const satisfies { readonly [K in HealthMetric]: MetricInfo }
 
 /** A calendar day on the phone, as YYYY-MM-DD. */

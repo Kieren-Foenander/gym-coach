@@ -73,7 +73,7 @@ const config: ExpoConfig = {
       "@kingstinct/react-native-healthkit",
       {
         NSHealthShareUsageDescription:
-          "Gym reads your bodyweight, body fat, waist, workouts, heart rate, sleep, steps and VO2 max to log them and to help your coach judge recovery.",
+          "Gym reads your bodyweight, body fat, waist, workouts, heart rate, sleep, steps, VO2 max and the food you track to log them and to help your coach judge recovery and eating.",
         NSHealthUpdateUsageDescription: false,
         background: false,
       },

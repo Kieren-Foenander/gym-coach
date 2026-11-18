@@ -1,14 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "~/components/icons"
+import { NutritionCard } from "~/components/nutrition"
 import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
+import { localDay } from "~/domain/health"
+import { daysAround } from "~/domain/nutrition"
 import { summariseWeek } from "~/domain/week"
 import { isCardio } from "~/domain/catalog"
 import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
-import { deleteCoachNote, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
+import { deleteCoachNote, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/")({
-  loader: () => getToday(),
+  loader: async () => {
+    // The days that may be today wherever the browser is; the screen picks its own.
+    const [today, nutrition] = await Promise.all([getToday(), getNutrition({ data: daysAround(Date.now()) })])
+
+    return { ...today, nutrition }
+  },
   component: TodayPage,
 })
 
@@ -17,7 +25,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 const longDay = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" })
 
 function TodayPage() {
-  const { today, activity } = Route.useLoaderData()
+  const { today, activity, nutrition } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const navigate = useNavigate()
   const now = useNow()
@@ -108,6 +116,11 @@ function TodayPage() {
           <p className="pt-2 text-sm text-faint">An open workout follows no plan. You add exercises as you go.</p>
         </>
       )}
+
+      <NutritionCard
+        day={now === null ? undefined : nutrition.days.find((item) => item.day === localDay(now))}
+        targets={nutrition.targets}
+      />
 
       {today.plan ? null : (
         <Hero eyebrow="Get started" title="No plan yet">
