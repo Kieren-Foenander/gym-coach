@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-skull-crusher",
+    views: ["front"],
+    cues: [
+      "Lie back with a dumbbell in each hand and your palms facing each other.",
+      "Bend your elbows to lower the weights beside your head.",
+      "Straighten your elbows to return the weights overhead.",
+    ],
+  },
+  {
+    slug: "jm-press",
+    views: ["front"],
+    cues: [
+      "Set a close grip and hold the bar over your upper chest.",
+      "Bend your elbows and guide the bar down toward your upper chest.",
+      "Extend your elbows to press the bar back up.",
+    ],
+  },
+  {
     slug: "dumbbell-fly",
     views: ["front"],
     cues: [
