@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "neck-curl",
+    views: ["front"],
+    cues: [
+      "Lie face up with your head just beyond the bench.",
+      "Steady the light plate against your forehead with both hands.",
+      "Tuck your chin gently and lower under control.",
+    ],
+  },
+  {
+    slug: "neck-extension",
+    views: ["front", "back"],
+    cues: [
+      "Support your chest on the pad with your head beyond its edge.",
+      "Steady the light plate on the back of your head.",
+      "Raise your head in line with your torso, then lower gently.",
+    ],
+  },
+  {
     slug: "dumbbell-row",
     views: ["front", "back"],
     cues: [
