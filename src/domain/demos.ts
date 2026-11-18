@@ -19,6 +19,60 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "paused-bench-press",
+    views: ["front"],
+    cues: [
+      "Plant your feet and set your shoulder blades against the bench.",
+      "Lower the bar to your chest and hold it still.",
+      "Press back up without bouncing the bar.",
+    ],
+  },
+  {
+    slug: "wide-grip-bench-press",
+    views: ["front"],
+    cues: [
+      "Set your hands wider than your usual bench grip.",
+      "Keep your shoulder blades against the pad as you lower to your chest.",
+      "Drive the bar up and slightly back over your shoulders.",
+    ],
+  },
+  {
+    slug: "close-grip-bench-press",
+    views: ["front"],
+    cues: [
+      "Take a shoulder-width grip and plant both feet.",
+      "Keep your elbows close as you lower to the lower chest.",
+      "Press the bar up until your arms are long.",
+    ],
+  },
+  {
+    slug: "dumbbell-bench-press",
+    views: ["front"],
+    cues: [
+      "Lie back with a dumbbell over each shoulder and plant your feet.",
+      "Lower the weights beside your chest with your elbows beneath your wrists.",
+      "Press both weights up together.",
+    ],
+  },
+  {
+    slug: "floor-press",
+    views: ["front"],
+    cues: [
+      "Lie on the floor with bent knees and hold the bar above your shoulders.",
+      "Lower until the backs of your upper arms settle on the floor.",
+      "Pause, then press the bar up without lifting your hips.",
+    ],
+  },
+  {
+    slug: "dumbbell-floor-press",
+    views: ["front"],
+    cues: [
+      "Lie on your back with a dumbbell over each shoulder.",
+      "Lower the weights until your upper arms meet the floor.",
+      "Keep your hips down and press both weights up together.",
+    ],
+  },
+  {
     slug: "underhand-barbell-row",
     views: ["front", "back"],
     cues: [
