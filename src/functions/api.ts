@@ -11,7 +11,7 @@ import { Calls } from "~/server/calls"
 import type { DomainError } from "~/server/errors"
 import type * as Repo from "~/server/repo"
 import { CurrentUser } from "~/server/repo"
-import { runtime, signupCode } from "~/server/runtime"
+import { runtime, signupCode, stage } from "~/server/runtime"
 
 /**
  * Every call the web app makes to the server. Each one validates its input with
@@ -77,6 +77,9 @@ export const getSession = createServerFn({ method: "GET" }).handler(() =>
     ),
   ),
 )
+
+/** Which copy of the app this is. The AI coach card names the connector after it. */
+export const getDeployment = createServerFn({ method: "GET" }).handler(() => ({ stage: stage() }))
 
 export const getSignupStatus = createServerFn({ method: "GET" }).handler(() => run(Auth.signupStatus(signupCode())))
 

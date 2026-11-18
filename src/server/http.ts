@@ -6,7 +6,7 @@ import * as Auth from "./auth"
 import { Calls, isCallName } from "./calls"
 import { Invalid, NotFound, type DomainError } from "./errors"
 import { CurrentUser } from "./repo"
-import { runtime, signupCode } from "./runtime"
+import { runtime, signupCode, stage } from "./runtime"
 
 /**
  * The JSON API the native app uses. Every request is a POST with a JSON body:
@@ -15,6 +15,7 @@ import { runtime, signupCode } from "./runtime"
  *   /api/v1/account/sign-up         makes an account, answers with a session token
  *   /api/v1/account/sign-in         answers with a session token
  *   /api/v1/account/sign-out        ends the session whose token was sent
+ *   /api/v1/deployment              which copy of the app this is: { stage }
  *   /api/v1/call/<name>             one of the calls in src/domain/calls.ts
  *
  * A call needs `Authorization: Bearer <token>`. Cookies are never read here, so a web page
@@ -70,6 +71,8 @@ const route = (request: Request, path: string) => {
   const body = readBody(request)
 
   if (path === "account/signup-status") return Effect.map(Auth.signupStatus(signupCode()), ok)
+
+  if (path === "deployment") return Effect.succeed(ok({ stage: stage() }))
 
   if (path === "account/sign-up") {
     return body.pipe(
