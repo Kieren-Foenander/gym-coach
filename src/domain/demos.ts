@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "incline-dumbbell-curl",
+    views: ["front"],
+    cues: [
+      "Rest your back against the inclined pad and let your arms hang.",
+      "Curl the weights while keeping your elbows beside your torso.",
+      "Lower until your arms are long.",
+    ],
+  },
+  {
+    slug: "spider-curl",
+    views: ["front"],
+    cues: [
+      "Rest your chest on the inclined pad and let the bar hang below your shoulders.",
+      "Curl the angled bar without lifting your chest.",
+      "Lower under control until your arms are long.",
+    ],
+  },
+  {
     slug: "incline-dumbbell-fly",
     views: ["front"],
     cues: [
