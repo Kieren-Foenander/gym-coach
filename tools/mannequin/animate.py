@@ -1167,6 +1167,30 @@ def bake(spec, keys):
                 if "flex_toward" in a:
                     arms["flex_toward"] = span.sample("flex_toward")
                 _, target = held_point("Left", arms, torso)
+                if a.get("fixed_upper_arm"):
+                    # The bar fixes the lateral coordinate of the grip. Swivel the
+                    # forearm about the stationary humerus to satisfy it at this bend.
+                    pole = torso.direction(arms["upper_arm"])
+                    upper, fore = segment("LeftArm", "LeftForeArm", "LeftHand")
+                    elbow = head("LeftArm") + pole * upper
+                    lower = (target - elbow).normalized()
+                    if isinstance(barbell, BentBar):
+                        offset, axis = barbell.grip("Left")
+                        offset -= barbell.centre
+                    else:
+                        offset = Vector((span.sample("grip_width"), 0, 0))
+                        axis = Vector((1, 0, 0))
+                    lo, hi = -1.1, 1.1
+                    for _ in range(24):
+                        twist = (lo + hi) / 2
+                        direction = Matrix.Rotation(twist, 3, pole) @ lower
+                        along, palm = hand_on_bar(direction, palm_facing(a["grip"], direction, pole, torso, 1, axis), axis)
+                        target = elbow + fore*direction + GRIP["Left"][0]*along + GRIP["Left"][1]*palm
+                        if target.x > offset.x:
+                            lo = twist
+                        else:
+                            hi = twist
+                    target -= offset
                 centre = Vector((0, target.y, target.z))
             else:
                 centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
