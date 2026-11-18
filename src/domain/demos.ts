@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "upright-row",
+    views: ["front"],
+    cues: [
+      "Stand tall with the bar in front of your thighs.",
+      "Lead with your elbows as you pull toward your lower chest.",
+      "Lower smoothly along the same path.",
+    ],
+  },
+  {
+    slug: "dumbbell-upright-row",
+    views: ["front"],
+    cues: [
+      "Stand tall with the dumbbells in front of your thighs.",
+      "Lead with your elbows as you pull toward your lower chest.",
+      "Lower smoothly along the same path.",
+    ],
+  },
+  {
     slug: "dumbbell-external-rotation",
     views: ["front"],
     cues: [
