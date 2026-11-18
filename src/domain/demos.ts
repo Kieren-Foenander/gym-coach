@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "incline-dumbbell-fly",
+    views: ["front"],
+    cues: [
+      "Lie back on the incline with palms facing each other.",
+      "Keep a soft bend in your elbows as you open your arms wide.",
+      "Sweep the weights back over your chest.",
+    ],
+  },
+  {
     slug: "incline-bench-press",
     views: ["front"],
     cues: [
