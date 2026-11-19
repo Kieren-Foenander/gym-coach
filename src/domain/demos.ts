@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-side-bend",
+    views: ["front"],
+    cues: [
+      "Stand tall with one dumbbell hanging at your side.",
+      "Bend sideways toward the weight with your hips still.",
+      "Return to upright slowly.",
+    ],
+  },
+  {
     slug: "kettlebell-press",
     views: ["front"],
     cues: [

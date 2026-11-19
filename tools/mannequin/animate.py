@@ -201,8 +201,11 @@ def pose_trunk(key):
     pelvis = yaw @ lean
     place("Hips", pelvis @ REST["Hips"], Vector(key.get("pelvis", (0, 0, 0))))
     left = pelvis @ Vector((1, 0, 0))
+    forward = pelvis @ Vector((0, -1, 0))
     for name in ("Spine", "Spine1", "Spine2"):
         turn(name, left, key.get("spine", 0) / 3)
+        if "side_bend" in key:
+            turn(name, forward, key["side_bend"] / 3)
     for name in ("Neck", "Head"):
         turn(name, left, key.get("head", 0) / 2)
     return pelvis
@@ -1568,7 +1571,7 @@ def bake(spec, keys):
             mod.show_viewport = False
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
-        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "yaw") if field in a}
+        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "yaw", "side_bend") if field in a}
         pelvis = pose_trunk(key)
         if "shoulder_y" in a:
             suspend_from_bar(span.sample("bar"), span.sample("grip_width", 0.25),
