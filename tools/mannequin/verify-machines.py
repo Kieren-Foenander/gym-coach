@@ -98,3 +98,13 @@ spec["equipment"][0]["shoulder_z"] += .05
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left shoulder pad contact" in problems.found, list(problems.lines())
 print("GUIDED SQUAT REGRESSIONS PASSED")
+
+spec = initial_pose("machine-lat-pulldown")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("machine-lat-pulldown")
+spec["equipment"][0]["restraints"]["pulldown thigh pad"]["face"][2] += .075
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "pulldown thigh pad loses skin contact" in problems.found, list(problems.lines())
+print("SELECTORIZED PULLDOWN REGRESSIONS PASSED")

@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Sit with your thighs under the restraint and reach up.",
+      "Pull your elbows down until the handles reach your shoulders.",
+      "Let your arms rise slowly under control.",
+    ],
+  },
+  {
+    slug: "machine-pullover",
+    views: ["front"],
+    cues: [
+      "Sit with your back against the pad and reach for the handles.",
+      "Sweep the handles down with a soft bend in your elbows.",
+      "Return slowly as your arms rise.",
+    ],
+  },
+  {
     slug: "machine-preacher-curl",
     views: ["front"],
     cues: [

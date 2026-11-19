@@ -1,0 +1,103 @@
+{
+  "equipment": [
+    {
+      "type": "selector-machine",
+      "pivot": [
+        0.64,
+        0.365,
+        1.26
+      ],
+      "grip_offset": [
+        -0.31,
+        -0.552,
+        0.171
+      ],
+      "travel": [
+        -2,
+        53
+      ],
+      "restraints": {
+        "pulldown thigh pad": {
+          "face": [
+            0,
+            -0.148,
+            0.615
+          ],
+          "size": [
+            0.39,
+            0.16
+          ],
+          "pitch": 180,
+          "split": true,
+          "mount": "hold-down"
+        }
+      }
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.09,
+        0.425
+      ],
+      "length": 0.46
+    }
+  ],
+  "stance": {
+    "width": 0.39,
+    "y": -0.24,
+    "toe_out": 15
+  },
+  "camera": {
+    "angle": 25
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.575
+      ],
+      "lean": 0,
+      "lever_angle": 0,
+      "elbows": [
+        0.75,
+        0.2,
+        -1
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "lever_angle": 47,
+      "elbows": [
+        0.55,
+        -0.15,
+        -1
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        0,
+        31
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        93,
+        152
+      ]
+    }
+  ]
+}
