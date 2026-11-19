@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "concentration-curl",
+    views: ["front"],
+    cues: [
+      "Sit wide and brace your upper arm against your inner thigh.",
+      "Curl the dumbbell without moving your elbow.",
+      "Lower it under control.",
+    ],
+  },
+  {
     slug: "hip-thrust",
     views: ["back"],
     cues: [
