@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "overhead-squat",
+    views: ["front"],
+    cues: [
+      "Lock the bar overhead with a wide grip.",
+      "Squat between your heels with your arms straight.",
+      "Stand up while keeping the bar over your midfoot.",
+    ],
+  },
+  {
     slug: "deficit-deadlift",
     views: ["back", "front"],
     cues: [
