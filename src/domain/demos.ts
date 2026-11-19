@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "single-leg-romanian-deadlift",
+    views: ["back"],
+    cues: [
+      "Stand on one leg with a soft bend in the knee.",
+      "Hinge as your free leg reaches back and the weights lower.",
+      "Keep your hips square as you stand.",
+    ],
+  },
+  {
     slug: "thruster",
     views: ["front"],
     cues: [
