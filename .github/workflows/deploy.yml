@@ -52,12 +52,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SIGNUP_CODE: ${{ secrets.SIGNUP_CODE }}
 
-  # Pull requests from forks get no secrets, so they get checks (ci.yml) but no preview.
+  # Pull requests from forks and from Dependabot get no secrets, so they get checks (ci.yml) but no preview.
+  # A skipped job counts as passed, so this required check does not hold them up.
   preview:
     name: Deploy preview
     if: >-
       github.event_name == 'pull_request' && github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
