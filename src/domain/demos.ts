@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "leg-curl",
+    views: ["front"],
+    cues: [
+      "Lie face down with the rollers above your heels.",
+      "Curl your heels toward your glutes while keeping your hips down.",
+      "Straighten your knees slowly.",
+    ],
+  },
+  {
     slug: "hack-squat",
     views: ["front"],
     cues: [
