@@ -32,7 +32,7 @@ const makePerson = async (baseURL: string): Promise<Person> => {
     body: JSON.stringify({ email, password: PASSWORD, displayName: "Tester", inviteCode: process.env.E2E_INVITE_CODE ?? E2E_INVITE_CODE }),
   })
 
-  expect(response.status, `Sign-up for ${email}`).toBe(200)
+  expect(response.status, `Sign-up for ${email}: ${await response.clone().text()}`).toBe(200)
 
   return { email, password: PASSWORD }
 }
