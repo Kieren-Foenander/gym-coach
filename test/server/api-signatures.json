@@ -1,0 +1,1574 @@
+{
+  "addPlanDay": {
+    "kinds": [
+      "number"
+    ]
+  },
+  "addPlanExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "addWorkoutExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "applyTemplate": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "deleteCoachNote": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "deleteFood": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "deleteMeasurement": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "deleteSet": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "discardWorkout": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "finishWorkout": {
+    "fields": {
+      "adjustments": {
+        "array": true
+      },
+      "discarded": {
+        "kinds": [
+          "boolean"
+        ]
+      }
+    }
+  },
+  "getCalendar": {
+    "array": true,
+    "items": {
+      "fields": {
+        "id": {
+          "kinds": [
+            "number"
+          ]
+        },
+        "name": {
+          "kinds": [
+            "string"
+          ]
+        },
+        "startedAt": {
+          "kinds": [
+            "number"
+          ]
+        }
+      }
+    }
+  },
+  "getDemos": {
+    "array": true,
+    "items": {
+      "fields": {
+        "cues": {
+          "array": true,
+          "items": {
+            "kinds": [
+              "string"
+            ]
+          }
+        },
+        "slug": {
+          "kinds": [
+            "string"
+          ]
+        },
+        "views": {
+          "array": true,
+          "items": {
+            "kinds": [
+              "string"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "getExerciseProgress": {
+    "fields": {
+      "plan": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "progress": {
+        "fields": {
+          "exercise": {
+            "fields": {
+              "id": {
+                "kinds": [
+                  "number"
+                ]
+              },
+              "name": {
+                "kinds": [
+                  "string"
+                ]
+              }
+            }
+          },
+          "points": {
+            "array": true,
+            "items": {
+              "fields": {
+                "date": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "distance": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "durationSeconds": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "estimatedOneRepMax": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "sets": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "topReps": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "topWeight": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "volume": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "workoutId": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "getExercises": {
+    "array": true,
+    "items": {
+      "fields": {
+        "id": {
+          "kinds": [
+            "number"
+          ]
+        },
+        "lastPerformedAt": {
+          "kinds": [
+            "number"
+          ]
+        },
+        "muscleGroup": {
+          "kinds": [
+            "string"
+          ]
+        },
+        "name": {
+          "kinds": [
+            "string"
+          ]
+        }
+      }
+    }
+  },
+  "getHealth": {
+    "fields": {
+      "daily": {
+        "array": true,
+        "items": {
+          "fields": {
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "metric": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "value": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "getHistory": {
+    "fields": {
+      "exercises": {
+        "array": true,
+        "items": {
+          "fields": {
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "lastPerformedAt": {
+              "kinds": [
+                "null",
+                "number"
+              ]
+            },
+            "muscleGroup": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "name": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "measurements": {
+        "array": true,
+        "items": {
+          "fields": {
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "kind": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "measuredAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "value": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      },
+      "workouts": {
+        "array": true,
+        "items": {
+          "fields": {
+            "finishedAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "name": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "notes": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "planDayId": {
+              "kinds": [
+                "null",
+                "number"
+              ]
+            },
+            "setCount": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "startedAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "volume": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "getLibraryExercise": {
+    "fields": {
+      "plan": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "progress": {
+        "fields": {
+          "exercise": {
+            "fields": {
+              "id": {
+                "kinds": [
+                  "number"
+                ]
+              },
+              "name": {
+                "kinds": [
+                  "string"
+                ]
+              }
+            }
+          },
+          "points": {
+            "array": true,
+            "items": {
+              "fields": {
+                "date": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "distance": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "durationSeconds": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "estimatedOneRepMax": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "sets": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "topReps": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "topWeight": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "volume": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "workoutId": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "getNutrition": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "fields": {
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "health": {
+              "kinds": [
+                "null"
+              ]
+            },
+            "logged": {
+              "fields": {
+                "calories": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "carbs": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "fat": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "protein": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            },
+            "total": {
+              "fields": {
+                "calories": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "carbs": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "fat": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "protein": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "entries": {
+        "array": true,
+        "items": {
+          "fields": {
+            "calories": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "carbs": {
+              "kinds": [
+                "null"
+              ]
+            },
+            "createdAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "description": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "fat": {
+              "kinds": [
+                "null"
+              ]
+            },
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "protein": {
+              "kinds": [
+                "null"
+              ]
+            },
+            "source": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "from": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "targets": {
+        "fields": {
+          "calories": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "protein": {
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "to": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "getPlan": {
+    "kinds": [
+      "null"
+    ],
+    "fields": {
+      "createdAt": {
+        "kinds": [
+          "null",
+          "number"
+        ]
+      },
+      "days": {
+        "kinds": [
+          "null"
+        ],
+        "array": true,
+        "items": {
+          "fields": {
+            "exercises": {
+              "array": true,
+              "items": {
+                "fields": {
+                  "autoProgress": {
+                    "kinds": [
+                      "boolean"
+                    ]
+                  },
+                  "exerciseId": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "exerciseName": {
+                    "kinds": [
+                      "string"
+                    ]
+                  },
+                  "id": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "increment": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "missStreak": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "muscleGroup": {
+                    "kinds": [
+                      "string"
+                    ]
+                  },
+                  "notes": {
+                    "kinds": [
+                      "string"
+                    ]
+                  },
+                  "planDayId": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "position": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "repMax": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "repMin": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "restSeconds": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "sets": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "targetWeight": {
+                    "kinds": [
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "name": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "position": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      },
+      "description": {
+        "kinds": [
+          "null",
+          "string"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "null",
+          "number"
+        ]
+      },
+      "name": {
+        "kinds": [
+          "null",
+          "string"
+        ]
+      },
+      "source": {
+        "kinds": [
+          "null",
+          "string"
+        ]
+      }
+    }
+  },
+  "getSession": {
+    "fields": {
+      "calorieTarget": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "displayName": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "email": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "goal": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "proteinTarget": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "trainingContext": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "unit": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "getToday": {
+    "fields": {
+      "activity": {
+        "array": true,
+        "items": {
+          "fields": {
+            "startedAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "volume": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      },
+      "today": {
+        "fields": {
+          "activeWorkout": {
+            "kinds": [
+              "null"
+            ],
+            "fields": {
+              "finishedAt": {
+                "kinds": [
+                  "null"
+                ]
+              },
+              "id": {
+                "kinds": [
+                  "null",
+                  "number"
+                ]
+              },
+              "name": {
+                "kinds": [
+                  "null",
+                  "string"
+                ]
+              },
+              "notes": {
+                "kinds": [
+                  "null",
+                  "string"
+                ]
+              },
+              "planDayId": {
+                "kinds": [
+                  "null",
+                  "number"
+                ]
+              },
+              "startedAt": {
+                "kinds": [
+                  "null",
+                  "number"
+                ]
+              }
+            }
+          },
+          "adjustments": {
+            "array": true,
+            "items": {
+              "fields": {
+                "createdAt": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "exerciseId": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "exerciseName": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "id": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "newWeight": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "oldWeight": {
+                  "kinds": [
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "source": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "workoutId": {
+                  "kinds": [
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "nextDayId": {
+            "kinds": [
+              "null",
+              "number"
+            ]
+          },
+          "notes": {
+            "array": true,
+            "items": {
+              "fields": {
+                "body": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "createdAt": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "id": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            }
+          },
+          "plan": {
+            "kinds": [
+              "null"
+            ],
+            "fields": {
+              "createdAt": {
+                "kinds": [
+                  "null",
+                  "number"
+                ]
+              },
+              "days": {
+                "kinds": [
+                  "null"
+                ],
+                "array": true,
+                "items": {
+                  "fields": {
+                    "exercises": {
+                      "array": true,
+                      "items": {
+                        "fields": {
+                          "autoProgress": {
+                            "kinds": [
+                              "boolean"
+                            ]
+                          },
+                          "exerciseId": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "exerciseName": {
+                            "kinds": [
+                              "string"
+                            ]
+                          },
+                          "id": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "increment": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "missStreak": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "muscleGroup": {
+                            "kinds": [
+                              "string"
+                            ]
+                          },
+                          "notes": {
+                            "kinds": [
+                              "string"
+                            ]
+                          },
+                          "planDayId": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "position": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "repMax": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "repMin": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "restSeconds": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "sets": {
+                            "kinds": [
+                              "number"
+                            ]
+                          },
+                          "targetWeight": {
+                            "kinds": [
+                              "null",
+                              "number"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "id": {
+                      "kinds": [
+                        "number"
+                      ]
+                    },
+                    "name": {
+                      "kinds": [
+                        "string"
+                      ]
+                    },
+                    "position": {
+                      "kinds": [
+                        "number"
+                      ]
+                    }
+                  }
+                }
+              },
+              "description": {
+                "kinds": [
+                  "null",
+                  "string"
+                ]
+              },
+              "id": {
+                "kinds": [
+                  "null",
+                  "number"
+                ]
+              },
+              "name": {
+                "kinds": [
+                  "null",
+                  "string"
+                ]
+              },
+              "source": {
+                "kinds": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          },
+          "recentWorkouts": {
+            "array": true,
+            "items": {
+              "fields": {
+                "finishedAt": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "id": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "name": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "notes": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "planDayId": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "setCount": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "startedAt": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "volume": {
+                  "kinds": [
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "getWorkout": {
+    "fields": {
+      "adjustments": {
+        "array": true
+      },
+      "exercises": {
+        "array": true,
+        "items": {
+          "fields": {
+            "exerciseId": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "exerciseName": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "previous": {
+              "array": true,
+              "items": {
+                "fields": {
+                  "distance": {
+                    "kinds": [
+                      "null"
+                    ]
+                  },
+                  "durationSeconds": {
+                    "kinds": [
+                      "null"
+                    ]
+                  },
+                  "reps": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "weight": {
+                    "kinds": [
+                      "number"
+                    ]
+                  }
+                }
+              }
+            },
+            "sets": {
+              "array": true,
+              "items": {
+                "fields": {
+                  "distance": {
+                    "kinds": [
+                      "null"
+                    ]
+                  },
+                  "durationSeconds": {
+                    "kinds": [
+                      "null"
+                    ]
+                  },
+                  "exerciseId": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "id": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "planExerciseId": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "reps": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "rpe": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "setNumber": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "weight": {
+                    "kinds": [
+                      "number"
+                    ]
+                  }
+                }
+              }
+            },
+            "swappedFrom": {
+              "kinds": [
+                "null",
+                "string"
+              ]
+            },
+            "target": {
+              "kinds": [
+                "null"
+              ],
+              "fields": {
+                "autoProgress": {
+                  "kinds": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "exerciseId": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "exerciseName": {
+                  "kinds": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "id": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "increment": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "missStreak": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "muscleGroup": {
+                  "kinds": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "notes": {
+                  "kinds": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "planDayId": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "position": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "repMax": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "repMin": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "restSeconds": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "sets": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "targetWeight": {
+                  "kinds": [
+                    "null",
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "health": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "records": {
+        "array": true
+      },
+      "workout": {
+        "fields": {
+          "finishedAt": {
+            "kinds": [
+              "null"
+            ]
+          },
+          "id": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "name": {
+            "kinds": [
+              "string"
+            ]
+          },
+          "notes": {
+            "kinds": [
+              "string"
+            ]
+          },
+          "planDayId": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "startedAt": {
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "importHealth": {
+    "fields": {
+      "days": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "logged": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "measurements": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "workouts": {
+        "kinds": [
+          "number"
+        ]
+      }
+    }
+  },
+  "logFood": {
+    "fields": {
+      "calories": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "carbs": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "createdAt": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "day": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "description": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "fat": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "protein": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "source": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "logMeasurement": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "logSet": {
+    "kinds": [
+      "number"
+    ]
+  },
+  "movePlanDay": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "movePlanExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "removePlanDay": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "removePlanExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "removeWorkoutExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "startOpenWorkout": {
+    "kinds": [
+      "number"
+    ]
+  },
+  "startWorkout": {
+    "kinds": [
+      "number"
+    ]
+  },
+  "swapExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "updateFood": {
+    "fields": {
+      "calories": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "carbs": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "createdAt": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "day": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "description": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "fat": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "protein": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "source": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "updatePlanExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "updateProfile": {
+    "fields": {
+      "calorieTarget": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "displayName": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "email": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "goal": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "proteinTarget": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "trainingContext": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "unit": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "updateSet": {
+    "kinds": [
+      "null"
+    ]
+  }
+}

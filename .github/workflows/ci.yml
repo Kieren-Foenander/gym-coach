@@ -1,6 +1,8 @@
 name: CI
 
-# Lint, typecheck and tests, for the web app and the native app. Runs on every pull request, and deploy.yml calls it before a production deploy.
+# Lint, typecheck and tests, for the web app, the server and the native app. Runs on every pull request, and
+# deploy.yml calls it before a production deploy. Both jobs are required checks on master: a pull request
+# cannot merge until they pass. The same checks run locally before every push (.githooks/pre-push).
 on:
   pull_request:
   workflow_call:
@@ -19,10 +21,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The whole history, so the migration check can compare with the base branch.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      # Deployed databases have already run every migration on master, so a pull request may only add new ones.
+      - name: Migrations are only added
+        if: github.event_name == 'pull_request'
+        run: bun tools/check-migrations.ts "origin/${{ github.base_ref }}"
       # Type-aware lint (oxlint with tsrs) also covers apps/mobile, so it needs that app's packages to resolve its types.
       - run: bun install --frozen-lockfile
         working-directory: apps/mobile
