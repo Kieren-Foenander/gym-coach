@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "zercher-squat",
+    views: ["front"],
+    cues: [
+      "Cradle the bar in your elbow creases.",
+      "Squat between your feet with your chest up.",
+      "Drive through your feet to stand.",
+    ],
+  },
+  {
     slug: "curtsy-lunge",
     views: ["front"],
     cues: [

@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "barbell", "plate_radius": 0.16}],
+  "stance": {"width": 0.43, "toe_out": 25},
+  "camera": {"angle": 45},
+  "elbow_cradle": {"wrist": [0.14, 0.035, 0.207], "along": [-0.22, 0.11, 1], "palm": [0, 1, 0]},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.922], "lean": 2, "elbows": [0.2, 0.48, -1], "bar": {"at": "shoulders", "offset": [0, 0.203, -0.19]}},
+    {"at": 0.44, "pelvis": [0, 0.15, 0.507], "lean": 26, "head": -12},
+    {"at": 0.53},
+    {"at": 0.94, "pelvis": [0, 0, 0.922], "lean": 2, "head": 0}
+  ],
+  "checkpoints": [
+    {"elbow": [91, 145], "handle_axis": {"direction": [1, 0, 0], "degrees": 2}},
+    {"at": 0.48, "position": {"point": "Hips", "z": [0.49, 0.51]}}
+  ],
+  "hands": {"Left": "cup", "Right": "cup"}
+}
