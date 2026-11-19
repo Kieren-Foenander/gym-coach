@@ -108,3 +108,14 @@ spec["equipment"][0]["restraints"]["pulldown thigh pad"]["face"][2] += .075
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "pulldown thigh pad loses skin contact" in problems.found, list(problems.lines())
 print("SELECTORIZED PULLDOWN REGRESSIONS PASSED")
+
+for slug in ("assisted-dip", "machine-dip", "machine-back-extension", "machine-lateral-raise"):
+    spec = initial_pose(slug)
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert not problems.found, (slug, list(problems.lines()))
+
+spec = initial_pose("assisted-dip")
+spec["keys"][0]["assist_height"] -= .07
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left knee platform contact" in problems.found, list(problems.lines())
+print("ASSISTANCE AND PADDED LEVER REGRESSIONS PASSED")

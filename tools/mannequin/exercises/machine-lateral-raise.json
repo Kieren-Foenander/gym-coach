@@ -1,0 +1,74 @@
+{
+  "equipment": [
+    {
+      "type": "lateral-station",
+      "travel": [
+        10,
+        87
+      ],
+      "pad_offset": 0.041
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.091,
+        0.426
+      ],
+      "length": 0.43
+    }
+  ],
+  "stance": {
+    "width": 0.38,
+    "y": -0.27,
+    "toe_out": 12
+  },
+  "camera": {
+    "angle": 27
+  },
+  "frames": 108,
+  "touching": [
+    "bench"
+  ],
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.058,
+        0.58
+      ],
+      "lean": -1,
+      "lever_angle": 13
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.47,
+      "lever_angle": 82
+    },
+    {
+      "at": 0.56
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        84,
+        96
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "ForeArm",
+        "relative_to": "Arm",
+        "z": [
+          -0.06,
+          0.015
+        ]
+      }
+    }
+  ]
+}

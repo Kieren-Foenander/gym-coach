@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-lateral-raise",
+    views: ["front"],
+    cues: [
+      "Set the pads against the outside of your elbows.",
+      "Raise your elbows to shoulder height with a steady wrist.",
+      "Lower the pads under control.",
+    ],
+  },
+  {
     slug: "machine-crunch",
     views: ["front"],
     cues: [
