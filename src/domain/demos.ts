@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "push-jerk",
+    views: ["front"],
+    cues: [
+      "Rack the bar on your shoulders and dip straight down.",
+      "Drive up and re-bend your knees to catch with arms straight.",
+      "Stand to finish before lowering the bar.",
+    ],
+  },
+  {
     slug: "renegade-row",
     views: ["back"],
     cues: [
