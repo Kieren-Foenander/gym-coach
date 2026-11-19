@@ -318,3 +318,15 @@ it on the right. `hand_pitch` raises or lowers the knuckles around the shaft.
 surfaces. An overhead squat can specify `overhead_y` and `grip_width` to
 maintain lockout as shoulder height changes. Both forms use independent angle
 checkpoints on the baked pose.
+
+A straight barbell rack can use `rack_contact` with an open hand shape on both
+sides. It takes the same `wrist`, `along` and `palm` fields as a face grip, in
+torso coordinates relative to the shaft centre. The closest point on the hand
+surface must stay within 2.5 mm of the shaft. The triangles may penetrate by
+at most 0.2 mm. Wrist and
+collar clearance checks still apply.
+
+A dumbbell spec can key `handle_direction` in torso coordinates. With
+`grip: "neutral"` this is the directed shaft toward the thumb end, mirrored
+for the opposite hand. Use an intermediate direction for a half-turn so
+the interpolated shaft never goes through a zero vector.

@@ -402,6 +402,31 @@ class Barbell:
         self.root.location = centre
         self.root.keyframe_insert("location", frame=frame)
 
+    def pose_open_hand(self, side, socket, pole, torso, surface, frame, problems):
+        sign = SIDES[side]
+        along = torso.direction(socket["along"], sign)
+        palm = torso.direction(socket["palm"], sign)
+        palm = (palm - along * palm.dot(along)).normalized()
+        wrist = self.centre + torso.point(socket["wrist"], sign) - torso.origin
+        target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+        gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
+        transform = surface.transform
+        posed = surface.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+        relative = posed - np.array(self.centre)
+        axis = Vector((1, 0, 0))
+        inverse = transform.inverted()
+        distance = surface.shaft_distance(inverse @ self.centre, inverse.to_3x3() @ axis) - self.SHAFT
+        outer = abs(relative[:, 0]).max()
+        if outer > self.INNER:
+            problems.add(frame, f"{side} hand reaches the bar collar", outer - self.INNER)
+        surface.record_contact(distance)
+        if distance < -.0002:
+            problems.add(frame, f"{side} hand intersects the shaft", -distance)
+        if distance > .0025:
+            problems.add(frame, f"{side} hand loses shaft contact", distance)
+        surface.check_wrist(frame, problems)
+        return gap
+
     def intrusions(self, points, hand_mask):
         """Body points inside the shaft (hands excluded: they wrap it) or inside a plate."""
         rel = points - np.array(self.centre)
@@ -1234,6 +1259,9 @@ class GripSurface:
             self.cache[key] = issues.found
         for what, (_, size, unit) in self.cache[key].items():
             problems.add(frame, what, size, unit)
+        self.check_wrist(frame, problems)
+
+    def check_wrist(self, frame, problems):
         forearm = world_rotation(f"{self.side}ForeArm").col[1]
         hand = world_rotation(f"{self.side}Hand").col[1]
         angle = math.degrees(forearm.angle(hand))
@@ -1241,8 +1269,7 @@ class GripSurface:
         if angle > 40:
             problems.add(frame, f"{self.side} wrist bend exceeds 40 degrees", angle, "degrees")
 
-    def geometry(self, centre, axis, radius, problems):
-        frame = 0
+    def shaft_distance(self, centre, axis):
         offset = self.points - np.array(centre)
         radial = offset - (offset @ np.array(axis))[:, None] * np.array(axis)
         # Exact distance from the shaft axis to every triangle, including its
@@ -1257,8 +1284,11 @@ class GripSurface:
             signs.append(np.cross(a,b) @ np.array(axis))
         signs = np.array(signs)
         enclosed = ((signs.min(axis=0) > 1e-12) | (signs.max(axis=0) < -1e-12))
-        minimum = 0 if enclosed.any() else np.min(distances)
-        penetration = radius - minimum
+        return 0 if enclosed.any() else np.min(distances)
+
+    def geometry(self, centre, axis, radius, problems):
+        frame = 0
+        penetration = radius - self.shaft_distance(centre, axis)
         self.metrics["penetration_mm"] = max(self.metrics["penetration_mm"], float(penetration)*1000)
         if penetration > .0002:
             problems.add(frame, f"{self.side} fist skin penetrates the bar", penetration)
@@ -1488,11 +1518,18 @@ def bake(spec, keys):
     support_side = spec.get("support", {}).get("side")
     if support_side and (not bench or bench.pads or not dumbbells or support_side in dumbbells.roots):
         raise ValueError("A support hand needs a free arm and a flat bench")
+    rack_contact = spec.get("rack_contact")
+    if rack_contact and type(barbell) is not Barbell:
+        raise ValueError("Open rack contact requires a straight barbell")
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
         if side == support_side and shape != "support":
             raise ValueError("Bench contact needs the open support hand")
-        if (barbell or dumbbells and side in dumbbells.roots or landmine and side in landmine.handles) and shape != "fist":
+        if rack_contact and shape == "fist":
+            raise ValueError("Rack contact requires open hands")
+        holds_handle = (barbell and not rack_contact or dumbbells and side in dumbbells.roots
+                        or landmine and side in landmine.handles)
+        if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
             raise ValueError("Face contact needs a pinch, cup or open hand")
@@ -1591,6 +1628,12 @@ def bake(spec, keys):
             width = a["wrist_rest"][0] if "wrist_rest" in a else span.sample("grip_width", 0.25)
             elbows = span.sample("elbows", [0.4, -0.6, -0.5])
             for side, sign in SIDES.items():
+                if rack_contact:
+                    pole = torso.direction(elbows, sign)
+                    gap = barbell.pose_open_hand(side, rack_contact, pole, torso, grips[side], frame, problems)
+                    gaps.append((f"{side} rack hand", gap))
+                    tucked(side, torso, problems, frame)
+                    continue
                 grip_point = Vector(centre) + Vector((sign * width, 0, 0))
                 axis = Vector((1, 0, 0))
                 if isinstance(barbell, BentBar):

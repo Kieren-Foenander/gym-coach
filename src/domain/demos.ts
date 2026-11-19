@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "arnold-press",
+    views: ["front"],
+    cues: [
+      "Start with the dumbbells at chin height, palms facing you.",
+      "Press overhead as you turn your palms forward.",
+      "Lower slowly and turn your palms back toward you.",
+    ],
+  },
+  {
+    slug: "front-squat",
+    views: ["front"],
+    cues: [
+      "Rest the bar across your front shoulders and lift your elbows.",
+      "Squat to parallel or deeper with your chest tall.",
+      "Push through your whole foot to stand.",
+    ],
+  },
+  {
     slug: "overhead-dumbbell-triceps-extension",
     views: ["back", "front"],
     cues: [
