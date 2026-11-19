@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "renegade-row",
+    views: ["back"],
+    cues: [
+      "Set up in a wide-foot plank on the dumbbells.",
+      "Row one dumbbell toward your ribs while keeping your hips square.",
+      "Set it down before switching sides.",
+    ],
+  },
+  {
     slug: "kettlebell-swing",
     views: ["front"],
     cues: [
