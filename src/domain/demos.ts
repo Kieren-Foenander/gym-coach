@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "kettlebell-press",
+    views: ["front"],
+    cues: [
+      "Start with the bells racked at your shoulders.",
+      "Press overhead with your ribs down.",
+      "Lower the bells smoothly to the rack.",
+    ],
+  },
+  {
+    slug: "tate-press",
+    views: ["front"],
+    cues: [
+      "Lie back with the dumbbells over your chest.",
+      "Let your elbows flare as the weights lower toward your chest.",
+      "Straighten your elbows to press the weights back up.",
+    ],
+  },
+  {
     slug: "farmers-carry",
     views: ["front"],
     cues: [

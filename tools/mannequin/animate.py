@@ -637,15 +637,15 @@ class Dumbbells:
 
 
 class Kettlebells(Dumbbells):
-    """An upright bell per hand for hanging pulls, with a straight grip and a flared bail."""
+    """Straight-grip kettlebells with a flared bail and rotation around the handle."""
 
     INNER, RADIUS, DROP = .072, .079, .163
 
-    def __init__(self):
+    def __init__(self, sides=SIDES):
         iron = material("cast iron", IRON, .35, .48)
         self.roots, self.centres, self.axes = {}, {}, {}
         self.legs = []
-        for side in SIDES:
+        for side in sides:
             root = bpy.data.objects.new("kettlebell." + side, None)
             root.rotation_mode = "QUATERNION"
             scene.collection.objects.link(root)
@@ -657,7 +657,7 @@ class Kettlebells(Dumbbells):
                 part = cylinder("bell bail", self.HANDLE, delta.length, 0, iron, root)
                 part.location = (a + b) / 2
                 part.rotation_euler = delta.to_track_quat("Z", "Y").to_euler()
-                if side == "Left":
+                if side == next(iter(sides)):
                     self.legs.append((np.array(a), np.array(delta.normalized()), delta.length))
             bpy.ops.mesh.primitive_uv_sphere_add(radius=self.RADIUS, location=(0, 0, -self.DROP))
             globe = bpy.context.object
@@ -667,10 +667,15 @@ class Kettlebells(Dumbbells):
             bpy.ops.object.shade_smooth()
             self.roots[side] = root
 
-    def move(self, side, centre, axis, frame):
+    def move(self, side, centre, axis, frame, roll=0):
         if abs(axis.z) > 1e-4:
-            raise ValueError("A hanging kettlebell requires a horizontal grip")
+            raise ValueError("A kettlebell requires a horizontal grip")
         super().move(side, centre, axis, frame)
+        if roll:
+            root = self.roots[side]
+            rotation = Matrix.Rotation(math.radians(roll), 3, axis).to_quaternion()
+            root.rotation_quaternion = rotation @ root.rotation_quaternion
+            root.keyframe_insert("rotation_quaternion", frame=frame)
 
     def intrusions(self, points):
         inside, closest = 0, math.inf
@@ -687,7 +692,8 @@ class Kettlebells(Dumbbells):
         return inside, closest
 
     def corners(self):
-        return [centre + Vector((x, y, z)) for centre in self.centres.values()
+        return [centre + self.roots[side].rotation_quaternion @ Vector((x, y, z))
+                for side, centre in self.centres.items()
                 for x in (-.09,.09) for y in (-self.RADIUS,self.RADIUS)
                 for z in (-self.DROP-self.RADIUS,self.HANDLE)]
 
@@ -1504,8 +1510,9 @@ def bake(spec, keys):
             barbell = Barbell(radius) if kind == "barbell" else BentBar(kind, radius)
     db_spec = next((e for e in spec.get("equipment", []) if e["type"] == "dumbbells"), None)
     dumbbells = Dumbbells([db_spec["side"]] if "side" in db_spec else SIDES) if db_spec else None
-    if "kettlebells" in equipment:
-        dumbbells = Kettlebells()
+    bell_spec = next((e for e in spec.get("equipment", []) if e["type"] == "kettlebells"), None)
+    if bell_spec:
+        dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES)
     bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back")) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     preacher = next((PreacherPad(e["arm_pad"]) for e in spec.get("equipment", []) if "arm_pad" in e), None)
     if preacher:
@@ -1751,7 +1758,11 @@ def bake(spec, keys):
                 offset = (transform.translation - grip_point).dot(axis)
                 across = local @ to_axis + offset
                 middle = (across.min() + across.max()) / 2
-                dumbbells.move(side, grip_point + axis * middle, axis, frame)
+                centre = grip_point + axis * middle
+                if bell_spec:
+                    dumbbells.move(side, centre, axis, frame, arm_span.sample("bell_roll", 0))
+                else:
+                    dumbbells.move(side, centre, axis, frame)
                 if (across.max() - across.min()) / 2 > dumbbells.INNER:
                     problems.add(frame, f"{side} fist is wider than the dumbbell handle", (across.max() - across.min()) / 2 - dumbbells.INNER)
                 tucked(side, torso, problems, frame)
