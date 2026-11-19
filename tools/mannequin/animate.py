@@ -644,7 +644,11 @@ class Kettlebells(Dumbbells):
 
     INNER, RADIUS, DROP = .072, .079, .163
 
-    def __init__(self, sides=SIDES):
+    def __init__(self, sides=SIDES, shared=False):
+        self.shared = shared
+        if shared:
+            self.INNER = .128
+            sides = ("Left",)
         iron = material("cast iron", IRON, .35, .48)
         self.roots, self.centres, self.axes = {}, {}, {}
         self.legs = []
@@ -669,6 +673,9 @@ class Kettlebells(Dumbbells):
             globe.data.materials.append(iron)
             bpy.ops.object.shade_smooth()
             self.roots[side] = root
+
+        if shared:
+            self.roots["Right"] = self.roots["Left"]
 
     def move(self, side, centre, axis, frame, roll=0):
         if abs(axis.z) > 1e-4:
@@ -697,7 +704,8 @@ class Kettlebells(Dumbbells):
     def corners(self):
         return [centre + self.roots[side].rotation_quaternion @ Vector((x, y, z))
                 for side, centre in self.centres.items()
-                for x in (-.09,.09) for y in (-self.RADIUS,self.RADIUS)
+                for x in (-max(.09, self.INNER + self.HANDLE), max(.09, self.INNER + self.HANDLE))
+                for y in (-self.RADIUS,self.RADIUS)
                 for z in (-self.DROP-self.RADIUS,self.HANDLE)]
 
 
@@ -1528,7 +1536,7 @@ def bake(spec, keys):
     dumbbells = Dumbbells([db_spec["side"]] if "side" in db_spec else SIDES) if db_spec else None
     bell_spec = next((e for e in spec.get("equipment", []) if e["type"] == "kettlebells"), None)
     if bell_spec:
-        dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES)
+        dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES, bell_spec.get("shared", False))
     bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back")) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     preacher = next((PreacherPad(e["arm_pad"]) for e in spec.get("equipment", []) if "arm_pad" in e), None)
     if preacher:
@@ -1804,11 +1812,18 @@ def bake(spec, keys):
                 across = local @ to_axis + offset
                 middle = (across.min() + across.max()) / 2
                 centre = grip_point + axis * middle
-                if bell_spec:
-                    dumbbells.move(side, centre, axis, frame, arm_span.sample("bell_roll", 0))
+                if bell_spec and dumbbells.shared:
+                    spacing = arm_span.sample("grip_width")
+                    if side == "Left":
+                        dumbbells.move(side, grip_point - axis * spacing, axis, frame, arm_span.sample("bell_roll", 0))
+                    grip_extent = np.abs(across + sign * spacing).max()
                 else:
-                    dumbbells.move(side, centre, axis, frame)
-                if (across.max() - across.min()) / 2 > dumbbells.INNER:
+                    if bell_spec:
+                        dumbbells.move(side, centre, axis, frame, arm_span.sample("bell_roll", 0))
+                    else:
+                        dumbbells.move(side, centre, axis, frame)
+                    grip_extent = (across.max() - across.min()) / 2
+                if grip_extent > dumbbells.INNER:
                     problems.add(frame, f"{side} fist is wider than the dumbbell handle", (across.max() - across.min()) / 2 - dumbbells.INNER)
                 tucked(side, torso, problems, frame)
         for side in SIDES:
