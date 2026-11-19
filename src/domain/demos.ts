@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "hip-abduction",
+    views: ["front"],
+    cues: [
+      "Sit tall with the pads against the outside of your thighs.",
+      "Press your knees outward without leaning back.",
+      "Bring your knees in slowly.",
+    ],
+  },
+  {
+    slug: "hip-adduction",
+    views: ["front"],
+    cues: [
+      "Sit tall with the pads against the inside of your thighs.",
+      "Bring your knees together while keeping your hips against the seat.",
+      "Let your knees open slowly.",
+    ],
+  },
+  {
     slug: "pec-deck",
     views: ["front"],
     cues: [

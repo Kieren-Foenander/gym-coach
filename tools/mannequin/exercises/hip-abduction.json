@@ -1,0 +1,85 @@
+{
+  "equipment": [
+    {
+      "type": "hip-machine",
+      "contact": "outer",
+      "pad_offset": 0.06,
+      "travel": [
+        5,
+        47
+      ],
+      "thigh_pitch": -5,
+      "backrest": {
+        "face": [
+          0,
+          0.179,
+          0.78
+        ],
+        "size": [
+          0.35,
+          0.49
+        ],
+        "pitch": 90,
+        "mount": "seat"
+      }
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.038,
+        0.51
+      ],
+      "length": 0.34
+    }
+  ],
+  "camera": {
+    "angle": 24,
+    "elevation": 20
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.06,
+        0.655
+      ],
+      "lean": -4,
+      "hip_angle": 7
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "hip_angle": 44
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.52,
+      "side": "Left",
+      "position": {
+        "point": "Leg",
+        "x": [
+          0.33,
+          0.46
+        ]
+      }
+    },
+    {
+      "knee": [
+        78,
+        117
+      ]
+    }
+  ],
+  "touching": [
+    "bench"
+  ]
+}

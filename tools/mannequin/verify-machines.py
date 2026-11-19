@@ -76,3 +76,14 @@ spec["equipment"][0]["pad_at"][2] += .06
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left calf load pad loses support" in problems.found, list(problems.lines())
 print("CALF STATION REGRESSIONS PASSED")
+
+for slug in ("hip-abduction", "hip-adduction"):
+    spec = initial_pose(slug)
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert not problems.found, (slug, list(problems.lines()))
+
+spec = initial_pose("hip-abduction")
+spec["equipment"][0]["pad_offset"] += .03
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left thigh loses hip machine pad" in problems.found, list(problems.lines())
+print("HIP STATION REGRESSIONS PASSED")

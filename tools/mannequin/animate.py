@@ -1221,6 +1221,117 @@ class CalfStation:
         samples.append(np.array(self.bounds))
 
 
+class HipMachine:
+    """A seat with a pair of yawing thigh pads and foot rests."""
+
+    def __init__(self, config):
+        self.contact_side = -1 if config["contact"] == "inner" else 1
+        self.pad_gap = config["pad_offset"]
+        self.travel = config["travel"]
+        self.thigh_pitch = math.radians(config.get("thigh_pitch", 0))
+        metal = material("hip station hardware", IRON, .55, .45)
+        padding = material("hip station pads", PAD, .05, .63)
+        self.back = SupportPad("hip machine backrest", config["backrest"], padding, metal)
+        self.parts = [(mount, False) for mount in self.back.mounts]
+        self.pads, self.rests, self.levers, self.posts, self.axes = {}, {}, {}, {}, {}
+        self.rest_links, self.rest_drops = {}, {}
+        self.handles = {}
+        self.pad_faces, self.rest_faces = {}, {}
+        for side, sign in SIDES.items():
+            grip = self.handles[side] = CableStation.part("hip machine seat grip", Barbell.SHAFT, metal)
+            target = self.grip_target(sign)
+            axis = Vector((0, 1, 0))
+            set_segment(grip, target - axis * .076, target + axis * .076, 1)
+            mount = box("hip machine grip mount", (.05, .051, .105),
+                        (target.x, target.y + .083, target.z - .041), metal)
+            self.parts.extend(((grip, True), (mount, False)))
+            self.pads[side] = box("hip machine thigh cushion", (.072, .15, .14), (0, 0, 0), padding)
+            self.rests[side] = box("hip machine foot rest", (.15, .22, .025), (0, 0, 0), metal)
+            self.levers[side] = CableStation.part("hip machine swing arm", .022, metal)
+            self.posts[side] = CableStation.part("hip machine pad post", .019, metal)
+            self.rest_links[side] = CableStation.part("hip machine foot rest support", .017, metal)
+            self.rest_drops[side] = CableStation.part("hip machine foot rest drop", .017, metal)
+            self.parts.extend((part, False) for part in
+                              (self.levers[side], self.posts[side], self.rest_links[side], self.rest_drops[side]))
+        height = .36
+        base = box("hip machine floor frame", (.59, .58, .045), (0, .02, .0225), metal)
+        column = box("hip machine bearing housing", (.25, .15, height), (0, .063, height / 2), metal)
+        self.parts.extend(((base, False), (column, False)))
+
+    @staticmethod
+    def grip_target(sign):
+        return Vector((sign * .315, .025, .559))
+
+    def pose(self, span, torso, frame, gaps, problems):
+        angle = span.sample("hip_angle")
+        lo, hi = self.travel
+        if not lo <= angle <= hi:
+            problems.add(frame, "hip machine exceeds pivot travel", max(lo - angle, angle - hi), "degrees")
+        for side, sign in SIDES.items():
+            pole = torso.direction([.48, -.12, -1], sign)
+            gap = pose_arm(side, self.grip_target(sign), pole, "thumb-forward", torso, Vector((0, 1, 0)))
+            gaps.append((side + " hip machine seat grip", gap))
+            yaw = Matrix.Rotation(math.radians(sign * angle), 3, "Z")
+            forward = yaw @ Vector((0, -1, 0))
+            outward = yaw @ Vector((sign, 0, 0))
+            thigh = math.cos(self.thigh_pitch) * forward + Vector((0, 0, math.sin(self.thigh_pitch)))
+            swing(side + "UpLeg", thigh)
+            knee = head(side + "Leg")
+            swing(side + "Leg", -.17 * forward + Vector((0, 0, -1)))
+            place(side + "Foot", yaw @ REST[side + "Foot"])
+            hip = head(side + "UpLeg")
+            axle = Vector((hip.x, hip.y, .245))
+            first = self.axes.setdefault(side, axle)
+            if (first - axle).length > .002:
+                problems.add(frame, "hip leaves the fixed machine axle", (first - axle).length)
+            normal = -self.contact_side * outward
+            face = knee - forward * .065 - normal * self.pad_gap + Vector((0, 0, .01))
+            pad = self.pads[side]
+            pad.location = face - normal * .036
+            pad.rotation_euler = yaw.to_euler()
+            foot = head(side + "Foot")
+            rest_face = foot + forward * .067 - Vector((0, 0, FLOOR_ANKLE))
+            rest = self.rests[side]
+            rest.location = rest_face - Vector((0, 0, .0125))
+            rest.rotation_euler = yaw.to_euler()
+            for part in (pad, rest):
+                for channel in ("location", "rotation_euler"):
+                    part.keyframe_insert(channel, frame=frame)
+            anchor = pad.location - normal * .015
+            pivot_end = Vector((anchor.x, anchor.y, axle.z))
+            set_segment(self.levers[side], axle, pivot_end, frame)
+            set_segment(self.posts[side], pivot_end, anchor, frame)
+            lower_joint = Vector((pivot_end.x, pivot_end.y, rest_face.z - .037))
+            set_segment(self.rest_drops[side], pivot_end, lower_joint, frame)
+            set_segment(self.rest_links[side], lower_joint, rest_face - Vector((0, 0, .024)), frame)
+            self.pad_faces[side] = face, normal, forward
+            self.rest_faces[side] = rest_face, outward, forward
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        self.back.check(points, frame, problems)
+        for side in SIDES:
+            face, normal, forward = self.pad_faces[side]
+            delta = points - np.array(face)
+            depth = delta @ np.array(normal)
+            patch = (np.abs(delta[:, 2]) < .07) & (np.abs(delta @ np.array(forward)) < .075)
+            patch &= np.abs(depth) < .065
+            gap = depth[patch].min(initial=1)
+            if gap > .008:
+                problems.add(frame, side + " thigh loses hip machine pad", gap)
+            if gap < -.006:
+                problems.add(frame, side + " hip machine pad penetrates skin", -gap)
+            face, outward, forward = self.rest_faces[side]
+            delta = points - np.array(face)
+            over = (np.abs(delta @ np.array(outward)) < .075) & (np.abs(delta @ np.array(forward)) < .11)
+            sole = delta[over, 2].min(initial=1)
+            if abs(sole) > .012:
+                problems.add(frame, side + " foot loses hip machine rest", abs(sole))
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part in (*self.pads.values(), *self.rests.values()) for corner in part.bound_box]))
+
+
 class LegRollerMachine:
     """A knee-height axle drives padded rollers through a fixed arc."""
 
@@ -2243,7 +2354,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -2266,6 +2377,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    hip_machine = next((HipMachine(e) for e in spec.get("equipment", []) if e["type"] == "hip-machine"), None)
     calf = next((CalfStation(e) for e in spec.get("equipment", []) if e["type"] == "calf-station"), None)
     sled = next((LegSled(e) for e in spec.get("equipment", []) if e["type"] == "leg-sled"), None)
     roller = next((LegRollerMachine(e) for e in spec.get("equipment", []) if e["type"] == "leg-roller"), None)
@@ -2291,7 +2403,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine)
+                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine or hip_machine)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -2299,7 +2411,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or calf and calf.handles else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or hip_machine or calf and calf.handles else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -2353,7 +2465,10 @@ def bake(spec, keys):
                 key[field] = span.sample(field)
         if sled:
             sled.pose(spec, span, key, frame, problems)
-        if roller:
+        if hip_machine:
+            gaps = []
+            hip_machine.pose(span, torso, frame, gaps, problems)
+        elif roller:
             roller.pose_legs(span, frame, problems)
             gaps = []
         else:
@@ -2608,7 +2723,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or calf)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or hip_machine or calf)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -2626,6 +2741,8 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if hip_machine:
+            hip_machine.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if calf:
             calf.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if sled:
