@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "assisted-dip",
+    views: ["front"],
+    cues: [
+      "Kneel on the assistance pad and hold both handles.",
+      "Bend your elbows to lower your chest.",
+      "Press through your hands to return to the top.",
+    ],
+  },
+  {
+    slug: "assisted-pull-up",
+    views: ["back"],
+    cues: [
+      "Kneel on the assistance pad and start with your arms long.",
+      "Pull your elbows down to bring your chin toward the grips.",
+      "Lower under control.",
+    ],
+  },
+  {
     slug: "reverse-pec-deck",
     views: ["back"],
     cues: [

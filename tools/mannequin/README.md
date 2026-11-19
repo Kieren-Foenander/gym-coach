@@ -432,3 +432,17 @@ Selectorized stations can use `pad_size: [width, length]` to size the
 chest or back pad, or omit `back_pad` when a separate preacher pad carries
 the upper arms. Optional `restraints` use the same contact-face geometry as
 the leg-machine pads. The pulldown uses a split thigh restraint.
+
+- An `assist-station` has fixed hand grips and a vertically guided knee pad.
+  The `assist_height` channel joins the torso movement and the knee support.
+- A `trunk-station` rotates a padded yoke on a fixed pelvis-height axle.
+  Its `support` selects the front or back of the torso and the `lean`
+  channel drives the lever. The pad contact check samples the torso skin.
+- A `lateral-station` rotates a padded support against each elbow and
+  carries its grip through the same arc. The `lever_angle` key is measured
+  in degrees upward from the hanging upper arm.
+- A roller with `side` moves just the working leg. A roller with
+  `hip_drive` rotates both legs together from fixed hip-height pivots.
+- A selectorized `grip_axis` is specified in the lever's local coordinates.
+  The shaft rotates with the lever and its actual transform drives the grip
+  check.

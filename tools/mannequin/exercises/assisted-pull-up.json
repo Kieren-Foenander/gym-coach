@@ -1,0 +1,99 @@
+{
+  "equipment": [
+    {
+      "type": "assist-station",
+      "grip": [
+        0.31,
+        -0.155,
+        1.845
+      ],
+      "grip_axis": [
+        1,
+        0,
+        0
+      ],
+      "pad_y": 0.07,
+      "travel": [
+        0.3,
+        0.9
+      ]
+    }
+  ],
+  "camera": {
+    "angle": 24,
+    "elevation": 12
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.03,
+        0.913
+      ],
+      "lean": 0,
+      "assist_height": 0.419,
+      "elbows": [
+        0.77,
+        -0.23,
+        -1
+      ],
+      "grip": "pronated",
+      "clavicle": [
+        0,
+        12
+      ]
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.47,
+      "pelvis": [
+        0,
+        0.03,
+        1.2169999999999999
+      ],
+      "assist_height": 0.723,
+      "elbows": [
+        0.67,
+        -0.36,
+        -1
+      ],
+      "clavicle": [
+        0,
+        1
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        0,
+        28
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        79,
+        145
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "Head",
+        "z": [
+          1.76,
+          1.94
+        ]
+      }
+    }
+  ]
+}
