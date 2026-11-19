@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "landmine", "pivot": [0, -1.905, 0.09], "attachment": "cross"}],
+  "stance": {"width": 0.48, "toe_out": 18},
+  "camera": {"angle": 23, "elevation": 12},
+  "keys": [
+    {"pelvis": [-0.0, 0, 0.899], "lean": 5, "elbows": [0.52, -0.42, -1], "yaw": -0.0, "landmine_angles": [45.0, 0.0], "at": 0, "grip": "pronated", "landmine_roll": -0.0},
+    {"at": 0.23, "landmine_angles": [33.0, 17.0], "yaw": -46.0, "landmine_roll": -58.0, "pelvis": [-0.075, 0, 0.885], "elbows": [0.52, -0.42, -1]},
+    {"at": 0.48, "landmine_angles": [45.0, 0.0], "yaw": -0.0, "landmine_roll": -0.0, "pelvis": [-0.0, 0, 0.899], "elbows": [0.52, -0.42, -1]},
+    {"at": 0.73, "landmine_angles": [33.0, -17.0], "yaw": 46.0, "landmine_roll": 58.0, "pelvis": [0.075, 0, 0.885], "elbows": [0.52, -0.42, -1]},
+    {"at": 0.96, "landmine_angles": [45.0, 0.0], "yaw": -0.0, "landmine_roll": -0.0, "pelvis": [-0.0, 0, 0.899], "elbows": [0.52, -0.42, -1]}
+  ],
+  "checkpoints": [
+    {"at": 0, "side": "Left", "position": {"point": "handle", "x": [0.07, 0.1], "z": [1.426, 1.456]}, "elbow": [34, 68]},
+    {"at": 0.23, "side": "Left", "position": {"point": "handle", "x": [-0.429, -0.399], "z": [1.176, 1.206]}, "elbow": [12, 62]},
+    {"at": 0.73, "side": "Left", "position": {"point": "handle", "x": [0.508, 0.538], "z": [1.055, 1.085]}, "elbow": [12, 62]}
+  ]
+}

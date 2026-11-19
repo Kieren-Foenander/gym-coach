@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "landmine-twist",
+    views: ["front"],
+    cues: [
+      "Hold the attachment out in front with both hands.",
+      "Turn your torso as the weight arcs toward one hip.",
+      "Guide it back through centre and repeat on the other side.",
+    ],
+  },
+  {
     slug: "landmine-press",
     views: ["front"],
     cues: [
