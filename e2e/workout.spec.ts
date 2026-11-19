@@ -8,6 +8,8 @@ const firstExercise = template.plan.days[0]!.exercises[0]!.exercise
 test("starts a plan, logs a set, finishes, and the day shows as trained @smoke", async ({ page }) => {
   await page.getByTestId(testIds.nav.tab("plan")).click()
   await page.getByTestId(testIds.plan.template(template.id)).click()
+  // The templates go once the plan is saved; going to Today before that would find no plan.
+  await expect(page.getByTestId(testIds.plan.template(template.id))).toHaveCount(0)
 
   await page.getByTestId(testIds.nav.tab("today")).click()
   await page.getByTestId(testIds.today.startNextWorkout).click()

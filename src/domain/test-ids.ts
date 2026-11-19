@@ -105,3 +105,6 @@ export const testIds = {
 
 /** What a day on the calendar or the week card shows, in its `data-state`. */
 export const DAY_STATES = { trained: "trained", rest: "rest" } as const
+
+/** Whether a form's changes have been saved, in its save button's `data-state`. */
+export const SAVE_STATES = { saved: "saved", unsaved: "unsaved" } as const

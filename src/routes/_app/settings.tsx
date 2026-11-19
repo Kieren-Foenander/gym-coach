@@ -25,7 +25,7 @@ import {
   isTestStage,
   type CoachAppId,
 } from "~/domain/coach-apps"
-import { testIds } from "~/domain/test-ids"
+import { SAVE_STATES, testIds } from "~/domain/test-ids"
 import { getDeployment, signOut, updateProfile } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/settings")({
@@ -101,7 +101,14 @@ function SettingsPage() {
             />
           </Field>
           <ErrorNote message={error} />
-          <Button type="submit" variant="primary" className="w-full" data-testid={testIds.settings.saveProfile} disabled={pending}>
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-full"
+            data-testid={testIds.settings.saveProfile}
+            data-state={saved && !pending ? SAVE_STATES.saved : SAVE_STATES.unsaved}
+            disabled={pending}
+          >
             {saved && !pending ? "Saved" : "Save"}
           </Button>
         </form>
