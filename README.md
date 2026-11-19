@@ -37,6 +37,20 @@ The first account needs no invite. To let more people sign up locally, copy `.en
 
 `bun run check` runs lint, typecheck and tests. Lint is type-aware: oxlint uses [tsrs](https://github.com/oxc-project/tsrs) for the type information, while `tsc` stays the type checker.
 
+### Checks before a change ships
+
+| Where | What runs | Blocks |
+| --- | --- | --- |
+| `git push` | `.githooks/pre-push`: `bun run check` here and in `apps/mobile`, and the migration check | the push (skip once with `--no-verify`) |
+| Pull request | `.github/workflows/ci.yml`: the same, on a clean checkout | the merge: both jobs are required checks on `master` |
+| Merge to `master` | the checks again, then the production deploy | the deploy |
+
+`bun install` turns the pre-push hook on. The tests include:
+
+- `test/server/`: the real JSON API on SQLite with every migration, using the seed history. `api.test.ts` covers sign-in, errors and what calls do to the data.
+- The API contract (`test/server/contract.test.ts`): runs every call and compares the shape of each answer with `test/server/api-signatures.json`, so a change that would break a native build already installed fails. After a change that only adds to an answer, run `UPDATE_API_SIGNATURES=1 bun run test` and commit the file.
+- `tools/check-migrations.ts`: a migration already on `master` may not be edited, renamed or deleted.
+
 ### Seed data
 
 `seed/training-history.json` is a real training history: 242 workouts and 3,560 sets from Nov 2022 to Jul 2026, exported from Gymverse and converted to the app's exercise names. Use it whenever a database needs realistic history. Sign up first, then load it into that account:

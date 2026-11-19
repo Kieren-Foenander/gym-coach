@@ -12,7 +12,8 @@
     "test": "vitest run",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
-    "check": "oxlint --type-aware && tsc --noEmit && vitest run"
+    "check": "oxlint --type-aware && tsc --noEmit && vitest run",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.4",
@@ -30,6 +31,7 @@
     "@cloudflare/workers-types": "5.20261118.1",
     "@effect/platform-bun": "4.1.4",
     "@effect/platform-node": "4.1.4",
+    "@effect/sql-sqlite-node": "4.1.4",
     "@oxlint/plugins": "1.94.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/react": "^19.3.0",
