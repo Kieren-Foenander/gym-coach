@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { describeStreak, describeTrainingDay, formatCompact, formatLongDay, weeksUnit } from "~/format"
+import { describeTrainingDay, formatCompact, formatLongDay } from "~/format"
 
 describe("formatCompact", () => {
   it("leaves small numbers alone", () => {
@@ -20,24 +20,14 @@ describe("formatCompact", () => {
   })
 })
 
-describe("streak and calendar wording", () => {
-  it("names the streak, or says there is none", () => {
-    expect(describeStreak(0)).toBe("No streak yet")
-    expect(describeStreak(1)).toBe("1 week streak")
-    expect(describeStreak(12)).toBe("12 week streak")
-  })
-
-  it("uses a singular unit for one week", () => {
-    expect(weeksUnit(1)).toBe("wk")
-    expect(weeksUnit(0)).toBe("wks")
-    expect(weeksUnit(22)).toBe("wks")
-  })
-
-  it("says how many workouts a calendar day had", () => {
+describe("calendar wording", () => {
+  it("says how many workouts and walks a calendar day had", () => {
     const day = new Date(2026, 10, 9).getTime()
 
     expect(describeTrainingDay(day, 0)).toBe(formatLongDay(day))
     expect(describeTrainingDay(day, 1)).toBe(`${formatLongDay(day)}, 1 workout`)
     expect(describeTrainingDay(day, 2)).toBe(`${formatLongDay(day)}, 2 workouts`)
+    expect(describeTrainingDay(day, 0, 1)).toBe(`${formatLongDay(day)}, 1 walk`)
+    expect(describeTrainingDay(day, 1, 2)).toBe(`${formatLongDay(day)}, 1 workout and 2 walks`)
   })
 })

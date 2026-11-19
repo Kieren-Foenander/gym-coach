@@ -9,6 +9,7 @@ import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
 import { daysAround, shiftDay } from "~/domain/days"
 import { groupByDay, isTotalsEmpty, NUTRIENT_INFO, TARGET_LIMITS } from "~/domain/nutrition"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
+import { describeGoal } from "~/domain/streaks"
 import {
   describedDay,
   ExercisePrescription,
@@ -46,6 +47,7 @@ How the app works:
 - Cardio (search_exercise_library with muscle "Cardio") is logged by time, not load: a cardio set has weight 0, reps 0, a durationSeconds and optionally a distance, in km when the unit is kg and miles when it is lb. In a plan, a cardio exercise's sets are rounds; put the target time or pace in its notes. The progression rule skips cardio.
 - The app has a built-in exercise library. Before adding an exercise to a plan, find it with search_exercise_library and use that exact name. A name the library does not have still works, but shows no muscles or demonstration.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.
+- Streak goals decide what the app's calendar and streak count: each goal is an activity ("training" is any workout except walks, "walking" is walks only, "any" is both) and how often (every day, or a number of days a week). There are one or two, the first leading. A walk is a workout whose only exercise is "Walk". When the user says what they want to keep up, such as walking daily or lifting three times a week, set it with update_profile streakGoals.
 - Use add_coach_note for a short message the user should see on the app's home screen, such as the focus for the coming week.
 - Base advice on the logged data. If there is little history, say so and ask about goals, schedule, equipment and injuries, then save what you learn with update_profile.`
 
@@ -143,7 +145,7 @@ const RemovePlanExercise = Tool.make("remove_plan_exercise", {
 
 const UpdateProfile = Tool.make("update_profile", {
   description:
-    `Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept. Also sets the daily calorie target (${TARGET_LIMITS.calories.min}-${TARGET_LIMITS.calories.max} kcal) and protein target (grams) for the food log; null clears one.`,
+    `Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept. Also sets the daily calorie target (${TARGET_LIMITS.calories.min}-${TARGET_LIMITS.calories.max} kcal) and protein target (grams) for the food log; null clears one. streakGoals replaces the one or two goals the calendar's streaks count.`,
   parameters: ProfilePatch,
   success: Schema.Unknown,
   ...options,
@@ -273,6 +275,7 @@ const profileOf = (user: User) => ({
   trainingContext: user.trainingContext,
   calorieTarget: user.calorieTarget,
   proteinTarget: user.proteinTarget,
+  streakGoals: user.streakGoals.map((goal) => ({ ...goal, described: describeGoal(goal) })),
 })
 
 export const GymHandlers = GymToolkit.toLayer(

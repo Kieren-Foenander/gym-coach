@@ -4,10 +4,11 @@ import { NutritionCard } from "~/components/nutrition"
 import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { localDay } from "~/domain/health"
 import { daysAround } from "~/domain/days"
-import { DAY_STATES, testIds } from "~/domain/test-ids"
-import { startOfWeek, summariseWeek } from "~/domain/week"
+import { dayState, testIds } from "~/domain/test-ids"
+import { startOfWeek } from "~/domain/week"
+import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal } from "~/domain/streaks"
 import { isCardio } from "~/domain/catalog"
-import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
+import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import { deleteCoachNote, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
@@ -46,7 +47,7 @@ function TodayPage() {
       <PageTitle eyebrow={now === null ? "" : longDay.format(now)}>Hi {user.displayName}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} now={now} unit={user.unit} />
+      <WeekCard activity={activity} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} />
 
       {today.activeWorkout ? (
         <Hero eyebrow="In progress" title={today.activeWorkout.name}>
@@ -238,30 +239,32 @@ const dayOfWeek = (now: number, index: number) => {
 
 interface WeekCardProps {
   readonly activity: ReadonlyArray<ActivityEntry>
+  readonly goals: ReadonlyArray<StreakGoal>
   readonly now: number | null
   readonly unit: string
 }
 
-/** This week at a glance: which days were trained, the totals, and the weekly streak. Opens the calendar. */
-function WeekCard({ activity, now, unit }: WeekCardProps) {
-  const week = now === null ? null : summariseWeek(activity, now)
+/** This week at a glance: which days counted, the totals, and the streak for the first goal. Opens the calendar. */
+function WeekCard({ activity, goals, now, unit }: WeekCardProps) {
+  const week = now === null ? null : summariseWeek(activity, goals, now)
+  const streak = week ? describeGoalStreak(week.streak) : "No streak yet"
 
   return (
     <Link
       to="/calendar"
-      aria-label={week ? `This week: ${week.workouts} workouts, ${describeStreak(week.streakWeeks)}. Open calendar` : "Open calendar"}
+      aria-label={week ? `This week: ${week.workouts} workouts, ${week.walks} walks, ${streak}. Open calendar` : "Open calendar"}
       className={`${cardClass} block transition-colors active:bg-raised`}
       data-testid={testIds.today.weekCard}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="eyebrow text-muted">This week</p>
         <p
-          className={`flex items-center gap-1 text-sm font-semibold ${week?.streakWeeks ? "text-accent" : "text-faint"}`}
+          className={`flex items-center gap-1 text-sm font-semibold ${week?.streak.current ? "text-accent" : "text-faint"}`}
           data-testid={testIds.today.streak}
-          data-value={week?.streakWeeks}
+          data-value={week?.streak.current}
         >
           <FlameIcon className="size-4" />
-          {describeStreak(week?.streakWeeks ?? 0)}
+          {streak}
           <span className="text-faint">
             <ChevronIcon className="size-4" />
           </span>
@@ -269,7 +272,7 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
       </div>
       <ol className="grid grid-cols-7 gap-1 pt-3" aria-label="Days trained this week">
         {WEEKDAYS.map((name, index) => {
-          const trained = week?.days[index] ?? false
+          const mark = week?.days[index] ?? null
           const isToday = week?.todayIndex === index
 
           return (
@@ -277,20 +280,22 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
               key={name}
               className="flex flex-col items-center gap-1.5"
               data-testid={now === null ? undefined : testIds.today.weekDay(dayOfWeek(now, index))}
-              data-state={trained ? DAY_STATES.trained : DAY_STATES.rest}
+              data-state={dayState(mark)}
             >
               <span className={`text-xs font-semibold ${isToday ? "text-white" : "text-faint"}`}>{name.charAt(0)}</span>
               <span
                 className={`flex size-9 items-center justify-center rounded-full ${
-                  trained
+                  mark === "counted"
                     ? "bg-accent text-accent-ink"
-                    : isToday
-                      ? "border-2 border-accent/70"
-                      : "border border-line bg-raised/50"
+                    : mark === "other"
+                      ? "border-2 border-accent bg-accent/15"
+                      : isToday
+                        ? "border-2 border-accent/70"
+                        : "border border-line bg-raised/50"
                 }`}
               >
-                {trained ? <CheckIcon /> : null}
-                <span className="sr-only">{trained ? "Trained" : "Not trained"}</span>
+                {mark === "counted" ? <CheckIcon /> : null}
+                <span className="sr-only">{mark ? MARK_WORDS[mark] : "Nothing logged"}</span>
               </span>
             </li>
           )
@@ -300,6 +305,11 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
         <div className="rounded-2xl bg-raised/70 px-3 py-2.5">
           <dd className="display tabular text-3xl" data-testid={testIds.today.workoutsThisWeek} data-value={week?.workouts}>
             {week?.workouts ?? "–"}
+            {week?.walks ? (
+              <span className="pl-1 text-base text-muted" data-testid={testIds.today.walksThisWeek} data-value={week.walks}>
+                +{week.walks} {week.walks === 1 ? "walk" : "walks"}
+              </span>
+            ) : null}
           </dd>
           <dt className="text-xs text-muted">Workouts</dt>
         </div>

@@ -59,17 +59,14 @@ const longDayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", day:
 export const formatLongDay = (timestamp: number) => longDayFormat.format(timestamp)
 
 /** A calendar day and how many workouts it had, as a screen reader should say it. */
-export const describeTrainingDay = (day: number, workouts: number) => {
-  if (workouts === 0) return formatLongDay(day)
+export const describeTrainingDay = (day: number, workouts: number, walks = 0) => {
+  const parts = [
+    workouts > 0 ? `${workouts} ${workouts === 1 ? "workout" : "workouts"}` : null,
+    walks > 0 ? `${walks} ${walks === 1 ? "walk" : "walks"}` : null,
+  ].filter((part) => part !== null)
 
-  return `${formatLongDay(day)}, ${workouts} ${workouts === 1 ? "workout" : "workouts"}`
+  return parts.length === 0 ? formatLongDay(day) : `${formatLongDay(day)}, ${parts.join(" and ")}`
 }
-
-/** The short unit after a count of weeks. */
-export const weeksUnit = (weeks: number) => (weeks === 1 ? "wk" : "wks")
-
-/** The weekly streak as a sentence, for the Today card. */
-export const describeStreak = (weeks: number) => (weeks > 0 ? `${weeks} week streak` : "No streak yet")
 
 export const formatVolume = (volume: number, unit: string) =>
   `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(volume)} ${unit}`

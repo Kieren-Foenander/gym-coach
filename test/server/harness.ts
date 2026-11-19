@@ -47,6 +47,8 @@ export interface TestServer {
   readonly seed: (email: string, history?: History) => void
   /** Runs SQL straight on the database, for setting up what no call can, such as a coach note. */
   readonly exec: (sql: string) => void
+  /** Reads one text value straight from the database, for checking what is stored rather than what a call shows. */
+  readonly readText: (sql: string) => string
   readonly close: () => Promise<void>
 }
 
@@ -110,6 +112,7 @@ export const makeServer = (): TestServer => {
       for (const statement of seedStatements(history, { email })) direct.exec(statement)
     },
     exec: (sql) => direct.exec(sql),
+    readText: (sql) => Schema.decodeUnknownSync(Schema.String)(Object.values(direct.prepare(sql).get() ?? {})[0]),
     close: async () => {
       await runtime.dispose()
       direct.close()

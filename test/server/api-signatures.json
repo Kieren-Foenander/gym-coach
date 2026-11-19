@@ -65,6 +65,11 @@
             "number"
           ]
         },
+        "kind": {
+          "kinds": [
+            "string"
+          ]
+        },
         "name": {
           "kinds": [
             "string"
@@ -745,6 +750,28 @@
           "null"
         ]
       },
+      "streakGoals": {
+        "array": true,
+        "items": {
+          "fields": {
+            "activity": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "period": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "target": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
+      },
       "trainingContext": {
         "kinds": [
           "string"
@@ -763,6 +790,11 @@
         "array": true,
         "items": {
           "fields": {
+            "kind": {
+              "kinds": [
+                "string"
+              ]
+            },
             "startedAt": {
               "kinds": [
                 "number"
@@ -1553,6 +1585,28 @@
         "kinds": [
           "number"
         ]
+      },
+      "streakGoals": {
+        "array": true,
+        "items": {
+          "fields": {
+            "activity": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "period": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "target": {
+              "kinds": [
+                "number"
+              ]
+            }
+          }
+        }
       },
       "trainingContext": {
         "kinds": [

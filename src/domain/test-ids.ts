@@ -1,4 +1,5 @@
 import { slugFor } from "./catalog"
+import { normaliseGoal, type DayMark, type Frequency, type StreakActivity, type StreakGoal } from "./streaks"
 
 /**
  * Every test id in the app, for `data-testid` on the web and `testID` in the native app. Tests
@@ -29,6 +30,16 @@ export const dayKey = (time: number): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }
 
+/** A streak goal as a key, such as `walking-day-1` or `training-week-3`. */
+export const goalKey = (goal: StreakGoal): string => {
+  const { activity, period, target } = normaliseGoal(goal)
+
+  return `${activity}-${period}-${target}`
+}
+
+/** Which of the user's streak goals a part of the goal editor belongs to. */
+export type GoalSlot = "main" | "second"
+
 export const TABS = ["today", "plan", "exercises", "history", "settings"] as const
 
 export type Tab = (typeof TABS)[number]
@@ -53,8 +64,10 @@ export const testIds = {
     weekCard: "today.week-card",
     /** One day of this week, keyed by its date. */
     weekDay: (time: number) => `today.week-day:${dayKey(time)}`,
+    /** The streak for the main goal; `data-value` is its length. */
     streak: "today.streak",
     workoutsThisWeek: "today.workouts-this-week",
+    walksThisWeek: "today.walks-this-week",
     startNextWorkout: "today.start-next-workout",
     /** Start a plan day other than the next one, keyed by its name. */
     startDay: (name: string) => `today.start-day:${slugFor(name)}`,
@@ -68,7 +81,11 @@ export const testIds = {
     discard: "workout.discard",
     /** One exercise's card, keyed by the exercise. */
     exercise: (name: string) => `workout.exercise:${slugFor(name)}`,
+    addExercise: "workout.add-exercise",
     weight: "workout.weight",
+    /** A cardio exercise's time and distance, in place of weight and reps. */
+    minutes: "workout.minutes",
+    distance: "workout.distance",
     reps: "workout.reps",
     logSet: "workout.log-set",
     /** A logged set inside an exercise's card, keyed by its number. */
@@ -84,8 +101,9 @@ export const testIds = {
     nextMonth: "calendar.next-month",
     /** One day of the month, keyed by its date. */
     day: (time: number) => `calendar.day:${dayKey(time)}`,
-    currentStreak: "calendar.current-streak",
-    longestStreak: "calendar.longest-streak",
+    /** A goal's streak, keyed by the goal (goalKey). */
+    currentStreak: (goal: StreakGoal) => `calendar.current-streak:${goalKey(goal)}`,
+    longestStreak: (goal: StreakGoal) => `calendar.longest-streak:${goalKey(goal)}`,
     workoutsInMonth: "calendar.workouts-in-month",
     /** A workout in the list for a day with more than one, keyed by its id. */
     dayWorkout: keyed<number>("calendar.day-workout"),
@@ -95,6 +113,19 @@ export const testIds = {
     goal: "settings.goal",
     saveProfile: "settings.save-profile",
     signOut: "settings.sign-out",
+    /** One streak goal in the editor; its parts below are found inside it. */
+    streakGoal: keyed<GoalSlot>("settings.streak-goal"),
+    streakActivity: keyed<StreakActivity>("settings.streak-activity"),
+    /** How often, keyed as `day-1` or `week-3`. */
+    streakFrequency: (frequency: Frequency) => `settings.streak-frequency:${frequency.period}-${frequency.target}`,
+    removeStreakGoal: "settings.remove-streak-goal",
+    addStreakGoal: "settings.add-streak-goal",
+    saveStreakGoals: "settings.save-streak-goals",
+  },
+  exercisePicker: {
+    search: "exercise-picker.search",
+    /** An exercise to pick, keyed by the exercise. */
+    option: (name: string) => `exercise-picker.option:${slugFor(name)}`,
   },
   stepper: {
     input: "stepper.input",
@@ -103,8 +134,19 @@ export const testIds = {
   },
 } as const
 
-/** What a day on the calendar or the week card shows, in its `data-state`. */
-export const DAY_STATES = { trained: "trained", rest: "rest" } as const
+/**
+ * What a day on the calendar or the week card shows, in its `data-state`: a session that counts
+ * toward a streak goal, sessions that count toward none (a walk under a training goal), or nothing.
+ */
+export const DAY_STATES = { counted: "counted", other: "other", rest: "rest" } as const satisfies Record<
+  NonNullable<DayMark> | "rest",
+  string
+>
+
+export const dayState = (mark: DayMark) => DAY_STATES[mark ?? "rest"]
+
+/** Whether a choice among several is the one picked, in its `data-state`. */
+export const CHOICE_STATES = { selected: "selected", unselected: "unselected" } as const
 
 /** Whether a form's changes have been saved, in its save button's `data-state`. */
 export const SAVE_STATES = { saved: "saved", unsaved: "unsaved" } as const

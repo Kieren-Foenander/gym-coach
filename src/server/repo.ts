@@ -1,4 +1,4 @@
-import { Clock, Context, Effect } from "effect"
+import { Clock, Context, Effect, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import { catalogByName, isCardio, muscleGroupFor, type KnownExercise } from "~/domain/catalog"
 import {
@@ -18,6 +18,15 @@ import type {
   SetInput,
   Unit,
 } from "~/domain/schema"
+import { StreakGoals } from "~/domain/schema"
+import {
+  activeGoals,
+  EXERCISE_NAME_SEPARATOR,
+  kindFromPackedNames,
+  normaliseGoal,
+  type StreakGoal,
+  type WorkoutKind,
+} from "~/domain/streaks"
 import { Invalid, NotFound } from "./errors"
 
 // ---------------------------------------------------------------- models
@@ -32,7 +41,26 @@ export interface User {
   /** Daily targets for the food log, or null when none is set. */
   readonly calorieTarget: number | null
   readonly proteinTarget: number | null
+  /** What the streaks count, the first one leading. Never empty: with none saved it is the default. */
+  readonly streakGoals: ReadonlyArray<StreakGoal>
 }
+
+/** A users row as the database returns it, with the streak goals still as JSON. */
+export type UserRow = Omit<User, "streakGoals"> & { readonly streakGoals: string }
+
+const decodeGoals = Schema.decodeUnknownOption(StreakGoals)
+
+const parseGoals = (json: string): ReadonlyArray<StreakGoal> | undefined => {
+  if (json === "") return undefined
+
+  try {
+    return Option.getOrUndefined(decodeGoals(JSON.parse(json)))
+  } catch {
+    return undefined
+  }
+}
+
+export const toUser = (row: UserRow): User => ({ ...row, streakGoals: activeGoals(parseGoals(row.streakGoals)) })
 
 export class CurrentUser extends Context.Service<CurrentUser, User>()("gym/CurrentUser") {}
 
@@ -178,11 +206,16 @@ export const updateProfile = Effect.fn("updateProfile")(function* (patch: Profil
     // Null clears a target, so only a target left out of the patch keeps its value.
     calorieTarget: patch.calorieTarget === undefined ? user.calorieTarget : patch.calorieTarget,
     proteinTarget: patch.proteinTarget === undefined ? user.proteinTarget : patch.proteinTarget,
+    streakGoals: patch.streakGoals ? patch.streakGoals.map(normaliseGoal) : user.streakGoals,
   }
+
+  // Goals are only written when they are what changes, so an account that never chose any keeps
+  // following the default rather than a copy of it.
+  const goals = patch.streakGoals ? JSON.stringify(next.streakGoals) : null
 
   yield* sql`UPDATE users SET display_name = ${next.displayName}, unit = ${next.unit}, goal = ${next.goal},
     training_context = ${next.trainingContext}, calorie_target = ${next.calorieTarget},
-    protein_target = ${next.proteinTarget} WHERE id = ${user.id}`
+    protein_target = ${next.proteinTarget}, streak_goals = COALESCE(${goals}, streak_goals) WHERE id = ${user.id}`
 
   return { ...user, ...next } satisfies User
 })
@@ -978,7 +1011,12 @@ export const listWorkouts = Effect.fn("listWorkouts")(function* (limit: number) 
 export interface ActivityEntry {
   readonly startedAt: number
   readonly volume: number
+  readonly kind: WorkoutKind
 }
+
+/** A column with the names of a workout's exercises packed into one text, for kindFromPackedNames. */
+const EXERCISE_NAMES = `(SELECT GROUP_CONCAT(e.name, '${EXERCISE_NAME_SEPARATOR}') FROM workout_sets ks
+  JOIN exercises e ON e.id = ks.exercise_id WHERE ks.workout_id = w.id) AS exercise_names`
 
 /**
  * When each finished workout happened, oldest first: all of them, so a long streak is counted in full.
@@ -990,17 +1028,21 @@ export const listActivity = Effect.fn("listActivity")(function* () {
   const user = yield* CurrentUser
   const recent = (yield* now) - 8 * 86_400_000
 
-  return yield* sql<ActivityEntry>`
-    SELECT w.started_at, COALESCE(SUM(s.weight * s.reps), 0) AS volume
+  const rows = yield* sql<Omit<ActivityEntry, "kind"> & { readonly exerciseNames: string | null }>`
+    SELECT w.started_at, COALESCE(SUM(s.weight * s.reps), 0) AS volume, ${sql.unsafe(EXERCISE_NAMES)}
     FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id AND w.started_at >= ${recent}
     WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL
     GROUP BY w.id ORDER BY w.started_at`
+
+  return rows.map(({ exerciseNames, ...row }): ActivityEntry => ({ ...row, kind: kindFromPackedNames(exerciseNames) }))
 })
 
 export interface CalendarWorkout {
   readonly id: number
   readonly name: string
   readonly startedAt: number
+  /** Whether it was a walk, which only counts toward a goal for walks or for anything. */
+  readonly kind: WorkoutKind
 }
 
 /** Every finished workout, oldest first, with just what a calendar needs to mark and open it. */
@@ -1008,10 +1050,12 @@ export const listCalendar = Effect.fn("listCalendar")(function* () {
   const sql = yield* sqlClient
   const user = yield* CurrentUser
 
-  return yield* sql<CalendarWorkout>`
-    SELECT id, name, started_at FROM workouts
-    WHERE user_id = ${user.id} AND finished_at IS NOT NULL
-    ORDER BY started_at`
+  const rows = yield* sql<Omit<CalendarWorkout, "kind"> & { readonly exerciseNames: string | null }>`
+    SELECT w.id, w.name, w.started_at, ${sql.unsafe(EXERCISE_NAMES)} FROM workouts w
+    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL
+    ORDER BY w.started_at`
+
+  return rows.map(({ exerciseNames, ...row }): CalendarWorkout => ({ ...row, kind: kindFromPackedNames(exerciseNames) }))
 })
 
 export interface HistoryWorkout {

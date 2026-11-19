@@ -15,6 +15,10 @@ import { testIds } from "~/domain/test-ids"
 const ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$/
 const KEY = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
+type Sample = number | string | { readonly activity: string; readonly period: string; readonly target: number }
+
+const SAMPLES: ReadonlyArray<Sample> = [1, "sample name", { activity: "walking", period: "day", target: 1 }]
+
 type Entry = string | ((key: never) => string) | { readonly [name: string]: Entry }
 
 /** Every id in the registry, with a keyed id given a sample key. */
@@ -22,17 +26,19 @@ const allIds = (entry: Entry, path: string): ReadonlyArray<{ readonly path: stri
   if (Predicate.isString(entry)) return [{ path, id: entry, keyed: false }]
 
   if (Predicate.isFunction(entry)) {
-    // SAFETY: a keyed id takes a key (a string or a number) or a time (a number). Try a number first.
-    const make = entry as (key: number | string) => string
-    let sample: string
+    // SAFETY: a keyed id takes a key (a string or a number), a time (a number), or a goal or a
+    // frequency (an object with a period). Use the first sample it makes a well-formed key from.
+    const make = entry as (key: Sample) => string
 
-    try {
-      sample = make(1)
-    } catch {
-      sample = make("sample name")
-    }
+    const made = SAMPLES.flatMap((key) => {
+      try {
+        return [make(key)]
+      } catch {
+        return []
+      }
+    })
 
-    return [{ path, id: sample, keyed: true }]
+    return [{ path, id: made.find((id) => KEY.test(id.split(":")[1] ?? "")) ?? made[0] ?? "", keyed: true }]
   }
 
   return Object.entries(entry).flatMap(([name, child]) => allIds(child, `${path}.${name}`))

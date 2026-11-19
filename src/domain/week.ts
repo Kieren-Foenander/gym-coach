@@ -1,21 +1,3 @@
-interface Session {
-  readonly startedAt: number
-  readonly volume: number
-}
-
-export interface WeekSummary {
-  /** Monday to Sunday: whether a workout was finished that day. */
-  readonly days: ReadonlyArray<boolean>
-  /** 0 for Monday through 6 for Sunday. */
-  readonly todayIndex: number
-  readonly workouts: number
-  readonly volume: number
-  /** Weeks in a row with at least one workout. A week still in progress does not break the run. */
-  readonly streakWeeks: number
-}
-
-const DAY = 86_400_000
-
 /** Midnight at the start of the day containing the timestamp, in the device's time zone. */
 export const startOfDay = (timestamp: number): number => {
   const date = new Date(timestamp)
@@ -35,69 +17,8 @@ export const startOfWeek = (timestamp: number): number => {
   return date.getTime()
 }
 
-// Two days back from a Monday lands in the week before, whatever daylight saving does.
-const previousWeek = (weekStart: number) => startOfWeek(weekStart - 2 * DAY)
-
-const weekdayIndex = (timestamp: number) => (new Date(timestamp).getDay() + 6) % 7
-
-export interface Streaks {
-  /** Weeks in a row with at least one workout, up to now. A week still in progress does not break the run. */
-  readonly current: number
-  /** The most weeks in a row ever trained. */
-  readonly longest: number
-  /** The Monday of every week in the current run. */
-  readonly currentWeeks: ReadonlySet<number>
-}
-
-/** Weekly streaks across the given workout start times. */
-export const weeklyStreaks = (startTimes: ReadonlyArray<number>, now: number): Streaks => {
-  const weeks = new Set(startTimes.map(startOfWeek))
-  const thisWeek = startOfWeek(now)
-  const currentWeeks = new Set<number>()
-
-  let cursor = weeks.has(thisWeek) ? thisWeek : previousWeek(thisWeek)
-
-  while (weeks.has(cursor)) {
-    currentWeeks.add(cursor)
-    cursor = previousWeek(cursor)
-  }
-
-  let longest = 0
-
-  for (const week of weeks) {
-    // Only count from the first week of each run, so every run is walked once.
-    if (weeks.has(previousWeek(week))) continue
-
-    let length = 0
-    let next = week
-
-    while (weeks.has(next)) {
-      length += 1
-      next = startOfWeek(next + 9 * DAY)
-    }
-
-    longest = Math.max(longest, length)
-  }
-
-  return { current: currentWeeks.size, longest, currentWeeks }
-}
-
-export const summariseWeek = (sessions: ReadonlyArray<Session>, now: number): WeekSummary => {
-  const thisWeek = startOfWeek(now)
-  const current = sessions.filter((session) => startOfWeek(session.startedAt) === thisWeek)
-  const trained = new Set(current.map((session) => weekdayIndex(session.startedAt)))
-
-  return {
-    days: [0, 1, 2, 3, 4, 5, 6].map((index) => trained.has(index)),
-    todayIndex: weekdayIndex(now),
-    workouts: current.length,
-    volume: current.reduce((total, session) => total + session.volume, 0),
-    streakWeeks: weeklyStreaks(
-      sessions.map((session) => session.startedAt),
-      now,
-    ).current,
-  }
-}
+/** 0 for Monday through 6 for Sunday. */
+export const weekdayIndex = (timestamp: number) => (new Date(timestamp).getDay() + 6) % 7
 
 /** A month as it appears on a calendar: one row per week, Monday first. */
 export interface MonthGrid {

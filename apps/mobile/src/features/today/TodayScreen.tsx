@@ -3,8 +3,8 @@ import type { ReactNode } from "react"
 import { Pressable, View } from "react-native"
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg"
 import { isCardio } from "~/domain/catalog"
-import { summariseWeek } from "~/domain/week"
-import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
+import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal } from "~/domain/streaks"
+import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 import { describeError } from "@/api/client"
 import { call } from "@/api/session"
@@ -55,7 +55,7 @@ export function TodayScreen() {
       <PageTitle eyebrow={longDay.format(now)}>{`Hi ${user.displayName}`}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} now={now} unit={user.unit} onPress={() => navigation.navigate("Calendar")} />
+      <WeekCard activity={activity} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} onPress={() => navigation.navigate("Calendar")} />
 
       {activeWorkout ? (
         <Hero eyebrow="In progress" title={activeWorkout.name}>
@@ -239,14 +239,16 @@ function Hero({ eyebrow, title, children }: HeroProps) {
 
 interface WeekCardProps {
   readonly activity: ReadonlyArray<ActivityEntry>
+  readonly goals: ReadonlyArray<StreakGoal>
   readonly now: number
   readonly unit: string
   readonly onPress: () => void
 }
 
-/** This week at a glance: which days were trained, the totals, and the weekly streak. Opens the calendar. */
-function WeekCard({ activity, now, unit, onPress }: WeekCardProps) {
-  const week = summariseWeek(activity, now)
+/** This week at a glance: which days counted, the totals, and the streak for the first goal. Opens the calendar. */
+function WeekCard({ activity, goals, now, unit, onPress }: WeekCardProps) {
+  const week = summariseWeek(activity, goals, now)
+  const streaking = week.streak.current > 0
 
   return (
     <Pressable
@@ -258,33 +260,39 @@ function WeekCard({ activity, now, unit, onPress }: WeekCardProps) {
       <View className="flex-row items-center justify-between gap-3">
         <Eyebrow>This week</Eyebrow>
         <View className="flex-row items-center gap-1">
-          <FlameIcon size={16} color={week.streakWeeks ? colors.accent : colors.faint} />
-          <Text className={cn("text-sm font-semibold", week.streakWeeks ? "text-accent" : "text-faint")}>
-            {describeStreak(week.streakWeeks)}
+          <FlameIcon size={16} color={streaking ? colors.accent : colors.faint} />
+          <Text className={cn("text-sm font-semibold", streaking ? "text-accent" : "text-faint")}>
+            {describeGoalStreak(week.streak)}
           </Text>
           <ChevronIcon size={14} color={colors.faint} />
         </View>
       </View>
       <View accessibilityLabel="Days trained this week" className="flex-row pt-3">
         {WEEKDAYS.map((name, index) => {
-          const trained = week.days[index] ?? false
+          const mark = week.days[index] ?? null
           const isToday = week.todayIndex === index
 
           return (
             <View
               key={name}
               accessible
-              accessibilityLabel={`${name}: ${trained ? "trained" : "not trained"}`}
+              accessibilityLabel={`${name}: ${mark ? MARK_WORDS[mark] : "Nothing logged"}`}
               className="flex-1 items-center gap-1.5"
             >
               <Text className={cn("text-xs font-semibold", isToday ? "text-chalk" : "text-faint")}>{name.charAt(0)}</Text>
               <View
                 className={cn(
                   "size-9 items-center justify-center rounded-full",
-                  trained ? "bg-accent" : isToday ? "border-2 border-accent/70" : "border border-line bg-raised/50",
+                  mark === "counted"
+                    ? "bg-accent"
+                    : mark === "other"
+                      ? "border-2 border-accent bg-accent/15"
+                      : isToday
+                        ? "border-2 border-accent/70"
+                        : "border border-line bg-raised/50",
                 )}
               >
-                {trained ? <CheckIcon color={colors.accentInk} /> : null}
+                {mark === "counted" ? <CheckIcon color={colors.accentInk} /> : null}
               </View>
             </View>
           )
@@ -292,7 +300,10 @@ function WeekCard({ activity, now, unit, onPress }: WeekCardProps) {
       </View>
       <View className="mt-4 flex-row gap-2">
         <View className="flex-1 rounded-2xl bg-raised/70 px-3 py-2.5">
-          <Display className="tabular-nums">{week.workouts}</Display>
+          <Display className="tabular-nums">
+            {week.workouts}
+            {week.walks > 0 ? <Display className="text-base text-muted"> +{week.walks} {week.walks === 1 ? "walk" : "walks"}</Display> : null}
+          </Display>
           <Text className="text-xs text-muted">Workouts</Text>
         </View>
         <View className="flex-1 rounded-2xl bg-raised/70 px-3 py-2.5">
