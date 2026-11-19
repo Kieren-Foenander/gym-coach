@@ -47,7 +47,16 @@ const record = async <K extends CallName>(name: K, input: CallInput<K>): Promise
  */
 const STEPS = {
   getSession: () => record("getSession", {}),
-  updateProfile: () => record("updateProfile", { goal: "Get stronger", calorieTarget: 2600, proteinTarget: 160 }),
+  updateProfile: () =>
+    record("updateProfile", {
+      goal: "Get stronger",
+      calorieTarget: 2600,
+      proteinTarget: 160,
+      streakGoals: [
+        { activity: "training", period: "week", target: 3 },
+        { activity: "walking", period: "day", target: 1 },
+      ],
+    }),
   getToday: () => record("getToday", {}),
   getPlan: () => record("getPlan", {}),
   getHistory: () => record("getHistory", {}),
