@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "seated-cable-row",
+    views: ["back"],
+    cues: [
+      "Plant your feet and sit tall.",
+      "Pull the handle toward your lower ribs.",
+      "Reach forward under control without rounding your back.",
+    ],
+  },
+  {
     slug: "cable-fly",
     views: ["front"],
     cues: [
