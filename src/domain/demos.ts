@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "decline-machine-press",
+    views: ["front"],
+    cues: [
+      "Set the seat so the grips start near your lower chest.",
+      "Press forward and slightly down.",
+      "Return slowly with your back on the pad.",
+    ],
+  },
+  {
     slug: "machine-row",
     views: ["back"],
     cues: [
