@@ -209,7 +209,12 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
             Nothing here yet. Add the first exercise you are going to do.
           </p>
         ) : null}
-        <Button className="w-full" variant={detail.exercises.length === 0 ? "primary" : "secondary"} onClick={() => setAdding(true)}>
+        <Button
+          className="w-full"
+          variant={detail.exercises.length === 0 ? "primary" : "secondary"}
+          data-testid={testIds.workout.addExercise}
+          onClick={() => setAdding(true)}
+        >
           Add exercise
         </Button>
       </div>
@@ -445,8 +450,15 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onL
         <div className="mt-4 space-y-3">
           {cardio ? (
             <div className="grid grid-cols-2 gap-2">
-              <Stepper label="Minutes" value={minutes} step={1} decimal onChange={setMinutes} />
-              <Stepper label={distanceUnit(unit)} value={distance} step={0.5} decimal onChange={setDistance} />
+              <Stepper testId={testIds.workout.minutes} label="Minutes" value={minutes} step={1} decimal onChange={setMinutes} />
+              <Stepper
+                testId={testIds.workout.distance}
+                label={distanceUnit(unit)}
+                value={distance}
+                step={0.5}
+                decimal
+                onChange={setDistance}
+              />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">

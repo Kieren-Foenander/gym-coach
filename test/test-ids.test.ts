@@ -29,6 +29,7 @@ const allIds = (entry: Entry, path: string): ReadonlyArray<{ readonly path: stri
     // SAFETY: a keyed id takes a key (a string or a number), a time (a number), or a goal or a
     // frequency (an object with a period). Use the first sample it makes a well-formed key from.
     const make = entry as (key: Sample) => string
+
     const made = SAMPLES.flatMap((key) => {
       try {
         return [make(key)]

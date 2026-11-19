@@ -18,6 +18,7 @@ import {
 import { demoFile, demoFor, type ExerciseDemo } from "~/domain/demos"
 import { howToFor } from "~/domain/howto"
 import { distanceUnit, type Unit } from "~/domain/schema"
+import { testIds } from "~/domain/test-ids"
 import { heaviestSet } from "~/domain/progression"
 import { formatDay, formatDuration, formatSet, formatWeight } from "~/format"
 import { addPlanExercise, getExercises } from "~/functions/api"
@@ -91,12 +92,14 @@ export function ExerciseLine({ item, trailing }: ExerciseLineProps) {
 }
 
 interface SearchFieldProps {
+  /** From src/domain/test-ids.ts. */
+  readonly testId?: string
   readonly value: string
   readonly placeholder: string
   readonly onChange: (value: string) => void
 }
 
-export function SearchField({ value, placeholder, onChange }: SearchFieldProps) {
+export function SearchField({ testId, value, placeholder, onChange }: SearchFieldProps) {
   return (
     <div className="relative">
       <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-faint" />
@@ -106,6 +109,7 @@ export function SearchField({ value, placeholder, onChange }: SearchFieldProps) 
         autoComplete="off"
         autoCorrect="off"
         aria-label="Search exercises"
+        data-testid={testId}
         maxLength={80}
         className="pl-12 pr-12 [&::-webkit-search-cancel-button]:hidden"
         placeholder={placeholder}
@@ -160,7 +164,12 @@ export function ExercisePicker({ taken, group = "", disabled, onPick }: Exercise
 
   return (
     <div className="space-y-3">
-      <SearchField value={text} placeholder={`Search ${CATALOG.length} exercises`} onChange={setText} />
+      <SearchField
+        testId={testIds.exercisePicker.search}
+        value={text}
+        placeholder={`Search ${CATALOG.length} exercises`}
+        onChange={setText}
+      />
 
       {heading !== null && shown.length > 0 ? <p className="eyebrow pt-1 text-muted">{heading}</p> : null}
 
@@ -171,6 +180,7 @@ export function ExercisePicker({ taken, group = "", disabled, onPick }: Exercise
               <button
                 type="button"
                 disabled={disabled}
+                data-testid={testIds.exercisePicker.option(item.name)}
                 className="flex min-h-16 w-full items-center gap-3 py-2 active:bg-raised disabled:opacity-40"
                 onClick={() => onPick(item.name)}
               >

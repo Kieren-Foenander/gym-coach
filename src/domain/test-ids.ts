@@ -81,7 +81,11 @@ export const testIds = {
     discard: "workout.discard",
     /** One exercise's card, keyed by the exercise. */
     exercise: (name: string) => `workout.exercise:${slugFor(name)}`,
+    addExercise: "workout.add-exercise",
     weight: "workout.weight",
+    /** A cardio exercise's time and distance, in place of weight and reps. */
+    minutes: "workout.minutes",
+    distance: "workout.distance",
     reps: "workout.reps",
     logSet: "workout.log-set",
     /** A logged set inside an exercise's card, keyed by its number. */
@@ -117,6 +121,11 @@ export const testIds = {
     removeStreakGoal: "settings.remove-streak-goal",
     addStreakGoal: "settings.add-streak-goal",
     saveStreakGoals: "settings.save-streak-goals",
+  },
+  exercisePicker: {
+    search: "exercise-picker.search",
+    /** An exercise to pick, keyed by the exercise. */
+    option: (name: string) => `exercise-picker.option:${slugFor(name)}`,
   },
   stepper: {
     input: "stepper.input",
