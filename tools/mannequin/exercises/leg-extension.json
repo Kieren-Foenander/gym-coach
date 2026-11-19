@@ -11,7 +11,22 @@
         -86,
         2
       ],
-      "thigh_pitch": -7
+      "thigh_pitch": -7,
+      "pads": {
+        "leg seat backrest": {
+          "face": [
+            0,
+            0.178,
+            0.774
+          ],
+          "size": [
+            0.35,
+            0.49
+          ],
+          "pitch": 90,
+          "mount": "seat"
+        }
+      }
     },
     {
       "type": "bench",
