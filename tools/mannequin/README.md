@@ -405,3 +405,10 @@ grip enclosure, and contact with the back pad.
   `travel`. A landmark-based bar target translates the torso to the guide
   while leaving bar height driven by the pose. The guides constrain the bar
   throughout the loop and the carriages are checked against skin.
+
+A `calf-station` uses a fixed forefoot step and paired pads with a common
+vertical travel limit. Set `footplate` to the step centre Y and top Z, and
+`pad_at` to the left pad's positive X, centre Y and unloaded contact Z.
+The `calf_lift` key moves the contact faces and yokes together. With
+`seated: true`, the shorter frame loads the thighs. Each frame checks
+the padded faces, the forefoot support, and clearance of the frame and yokes.

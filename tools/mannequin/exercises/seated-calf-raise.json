@@ -1,0 +1,101 @@
+{
+  "equipment": [
+    {
+      "type": "calf-station",
+      "seated": true,
+      "footplate": [
+        -0.52,
+        0.06
+      ],
+      "pad_at": [
+        0.128,
+        -0.231,
+        0.652
+      ],
+      "travel": [
+        -0.002,
+        0.1
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.11,
+        0.485
+      ],
+      "length": 0.37
+    }
+  ],
+  "stance": {
+    "width": 0.29,
+    "y": -0.36,
+    "toe_out": 7
+  },
+  "camera": {
+    "angle": 90
+  },
+  "frames": 96,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.628
+      ],
+      "lean": -4,
+      "calf_lift": 0,
+      "foot_left": [
+        0,
+        0,
+        0
+      ],
+      "foot_right": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.46,
+      "pelvis": [
+        0,
+        0.07,
+        0.628
+      ],
+      "calf_lift": 0.031,
+      "foot_left": [
+        0,
+        0,
+        38
+      ],
+      "foot_right": [
+        0,
+        0,
+        38
+      ]
+    },
+    {
+      "at": 0.54
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.49,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.152,
+          0.242
+        ]
+      }
+    }
+  ],
+  "touching": [
+    "bench"
+  ]
+}

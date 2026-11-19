@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "standing-calf-raise",
+    views: ["back"],
+    cues: [
+      "Set the pads over your shoulders and plant your forefeet on the step.",
+      "Raise your heels without bending your knees.",
+      "Lower your heels slowly.",
+    ],
+  },
+  {
+    slug: "seated-calf-raise",
+    views: ["back"],
+    cues: [
+      "Sit with the pads over your thighs and your forefeet on the step.",
+      "Raise your heels to lift the pads.",
+      "Lower slowly while keeping your forefeet planted.",
+    ],
+  },
+  {
+    slug: "leg-press-calf-raise",
+    views: ["front"],
+    cues: [
+      "Place the balls of your feet on the foot plate with your knees softly bent.",
+      "Press through your forefeet to raise your heels.",
+      "Lower your heels without moving your knees.",
+    ],
+  },
+  {
     slug: "smith-machine-calf-raise",
     views: ["back"],
     cues: [

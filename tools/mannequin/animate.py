@@ -261,7 +261,9 @@ def pose_legs(spec, key, pelvis):
         swing(f"{side}Leg", ankle - head(f"{side}Leg"))
         place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
         if stride is not None:
-            place(side + "ToeBase", turned @ (pitch if side in key.get("sled_feet", ()) else Matrix.Identity(3)) @ REST[side + "ToeBase"])
+            toe_pitch = key.get("sled_toe_pitch", {}).get(side)
+            toe_rotation = Matrix.Rotation(math.radians(toe_pitch), 3, "X") if toe_pitch is not None else Matrix.Identity(3)
+            place(side + "ToeBase", turned @ toe_rotation @ REST[side + "ToeBase"])
         gaps.append((f"{side} ankle", gap))
     return gaps
 
@@ -1057,17 +1059,24 @@ class LegSled:
         self.carriage.location = self.face - self.rotation @ Vector((0, 0, .155))
         for part in (self.plate, self.carriage):
             part.keyframe_insert("location", frame=frame)
-        key["sled_feet"] = (self.side,) if self.side else tuple(SIDES)
+        key["sled_toe_pitch"] = {side: self.pitch for side in ((self.side,) if self.side else SIDES)}
         for side, (ankle, yaw) in ankles(spec, key).items():
             if self.side and self.side != side:
                 continue
             foot = rig.data.bones[side + "Foot"].head_local
             toe = rig.data.bones[side + "ToeBase"].head_local
             turned = Matrix.Rotation(math.radians(yaw), 3, "Z")
-            correction = turned @ (self.rotation @ (foot - toe) - (foot - toe))
+            pivot = foot - toe
+            heel = span.sample("plate_heel", 0)
+            angle = self.pitch + heel
+            rotation = Matrix.Rotation(math.radians(angle), 3, "X")
+            correction = turned @ (rotation @ pivot - pivot)
             target = self.face + Vector((ankle.x, 0, 0)) + self.rotation @ Vector((0, .057, FLOOR_ANKLE))
+            if heel:
+                target += turned @ (rotation @ pivot - self.rotation @ pivot)
+                target += self.rotation @ Vector((0, 0, .00045 * heel))
             stride = target - ankle - correction
-            key["foot_" + side.lower()] = [stride.y, stride.z, self.pitch, stride.x]
+            key["foot_" + side.lower()] = [stride.y, stride.z, angle, stride.x]
 
     def check(self, points, faces, hands, frame, problems, samples):
         check_hardware_clearance(self.parts, points, faces, hands, {}, frame, problems)
@@ -1125,6 +1134,76 @@ class SupportPad:
                 problems.add(frame, self.name + " penetrates the skin", -gap)
             if gap > .012:
                 problems.add(frame, self.name + " loses skin contact", gap)
+
+
+class CalfStation:
+    """A forefoot step and a guided load borne through two padded faces."""
+
+    def __init__(self, config):
+        self.step_y, self.step_z = config["footplate"]
+        self.seated = config.get("seated", False)
+        self.pad_x, self.pad_y, self.pad_z = config["pad_at"]
+        self.travel = config["travel"]
+        self.half = .094 if self.seated else .060
+        self.pad_length = .132 if self.seated else .146
+        metal = material("calf machine frame", IRON, .55, .45)
+        fabric = material("calf machine upholstery", PAD, .05, .68)
+        box("calf forefoot step", (.55, .16, self.step_z),
+                        (0, self.step_y, self.step_z / 2), metal)
+        self.pads, self.beams, self.parts = {}, {}, []
+        for side, sign in SIDES.items():
+            x = .53 * sign
+            post_height = .85 if self.seated else 1.78
+            post = box("calf machine upright", (.065, .085, post_height),
+                       (x, self.pad_y + .14, post_height / 2), metal)
+            base = box("calf machine base", (.18, .55, .035),
+                       (x, self.step_y + .13, .0175), metal)
+            beam = box("calf machine yoke", (.33, .06, .05), (0, 0, 0), metal)
+            cushion = box("calf load pad", (self.half * 2, self.pad_length, .07),
+                          (0, 0, 0), fabric)
+            self.beams[side] = beam
+            self.pads[side] = cushion
+            self.parts.extend((part, False) for part in (post, base, beam))
+        for i in range(9):
+            weight = box("calf machine stack plate", (.24, .18, .025),
+                         (.53, self.pad_y + .28, .06 + .032 * i), metal)
+            self.parts.append((weight, False))
+        self.bounds = [Vector((x, self.pad_y + .14, z))
+                       for x in (-.58, .58) for z in (0, post_height)]
+
+    def pose(self, span, frame, problems):
+        lift = span.sample("calf_lift")
+        minimum, maximum = self.travel
+        if not minimum <= lift <= maximum:
+            problems.add(frame, "calf station outside its travel",
+                         max(minimum - lift, lift - maximum))
+        self.face_z = self.pad_z + lift
+        for side, sign in SIDES.items():
+            pad = self.pads[side]
+            pad.location = (sign * self.pad_x, self.pad_y, self.face_z + .035)
+            pad.keyframe_insert("location", frame=frame)
+            beam = self.beams[side]
+            beam.location = (sign * .386, self.pad_y + .055, self.face_z + .061)
+            beam.keyframe_insert("location", frame=frame)
+
+    def check(self, points, faces, hands, frame, problems, samples):
+        check_hardware_clearance(self.parts, points, faces, hands, {}, frame, problems)
+        for side, sign in SIDES.items():
+            x = self.pad_x * sign
+            under = (np.abs(points[:, 0] - x) < self.half) & (
+                np.abs(points[:, 1] - self.pad_y) < self.pad_length / 2)
+            near_face = np.abs(points[:, 2] - self.face_z) < .11
+            depth = points[under & near_face, 2].max(initial=-1) - self.face_z
+            if depth > .006:
+                problems.add(frame, side + " calf load pad penetrates skin", depth)
+            if depth < -.012:
+                problems.add(frame, side + " calf load pad loses support", -depth)
+            on_step = (points[:, 0] * sign > .045) & (np.abs(points[:, 0]) < .275)
+            on_step &= np.abs(points[:, 1] - self.step_y) < .08
+            forefoot = points[on_step, 2].min(initial=1)
+            if abs(forefoot - self.step_z) > .012:
+                problems.add(frame, side + " forefoot loses the calf step", abs(forefoot-self.step_z))
+        samples.append(np.array(self.bounds))
 
 
 class LegRollerMachine:
@@ -2149,7 +2228,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -2172,6 +2251,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    calf = next((CalfStation(e) for e in spec.get("equipment", []) if e["type"] == "calf-station"), None)
     sled = next((LegSled(e) for e in spec.get("equipment", []) if e["type"] == "leg-sled"), None)
     roller = next((LegRollerMachine(e) for e in spec.get("equipment", []) if e["type"] == "leg-roller"), None)
     machine = next(((FlyMachine if e.get("motion") == "fly" else SelectorMachine)(e) for e in spec.get("equipment", []) if e["type"] == "selector-machine"), None)
@@ -2256,6 +2336,8 @@ def bake(spec, keys):
         for field in ("foot_left", "foot_right"):
             if field in a:
                 key[field] = span.sample(field)
+        if calf:
+            calf.pose(span, frame, problems)
         if sled:
             sled.pose(spec, span, key, frame, problems)
         if roller:
@@ -2529,6 +2611,8 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if calf:
+            calf.check(everything, contact.faces, hands, frame, problems, samples)
         if sled:
             sled.check(everything, contact.faces, hands, frame, problems, samples)
         if roller:

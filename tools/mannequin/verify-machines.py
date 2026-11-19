@@ -66,3 +66,13 @@ spec["keys"][0]["bar"] = [0, .20, 1.2]
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Smith bar leaves its guides" in problems.found, list(problems.lines())
 print("LEG STATION AND SMITH REGRESSIONS PASSED")
+
+spec = initial_pose("standing-calf-raise")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("standing-calf-raise")
+spec["equipment"][0]["pad_at"][2] += .06
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left calf load pad loses support" in problems.found, list(problems.lines())
+print("CALF STATION REGRESSIONS PASSED")
