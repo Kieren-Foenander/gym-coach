@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-fly",
+    views: ["front"],
+    cues: [
+      "Start with your arms open and elbows soft.",
+      "Sweep the handles together in front of your chest.",
+      "Keep the same soft bend as you open your arms.",
+    ],
+  },
+  {
     slug: "cable-curl",
     views: ["front"],
     cues: [
