@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Renders one exercise on the mannequin from its spec in exercises/<slug>.json.
 #   tools/mannequin/render.sh squat --sheet          checks the motion and writes a four-frame contact sheet
-#   tools/mannequin/render.sh squat                  checks it and writes public/exercises/squat.mp4 and .webp
+#   tools/mannequin/render.sh squat                  checks it and writes tools/mannequin/renders/squat.mp4 and .webp
 #   tools/mannequin/render.sh squat --view back      the same from behind, as squat-rear
 #   tools/mannequin/render.sh squat --sheet --angle 90   a contact sheet from the side (0 is front, 90 the figure's right)
 #   tools/mannequin/render.sh squat --sheet --focus LeftHand   close-ups that follow one bone
-# OUT=<folder> writes somewhere other than public/exercises.
+# OUT=<folder> writes somewhere other than tools/mannequin/renders. publish.sh uploads renders to R2;
+# they are never committed or put under public/.
 set -euo pipefail
 
 slug="${1:?Usage: render.sh <slug> [--sheet] [--view front|back]}"
@@ -93,7 +94,7 @@ grep -E "CHECKS PASSED|GRIP CHECKS|ELBOW CHECKS|SHOULDER CHECKS" "$work/blender.
 
 [[ -z "$check" ]] || exit 0
 
-out="${OUT:-$root/public/exercises}"
+out="${OUT:-$here/renders}"
 mkdir -p "$out"
 name="$slug$suffix"
 if [[ -n "$palette" ]]; then

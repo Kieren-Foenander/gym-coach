@@ -13,7 +13,13 @@ tools/mannequin/render.sh squat
 tools/mannequin/render.sh squat --view back
 tools/mannequin/render.sh --library             # render every shipped slug and view, including posters
 tools/mannequin/render.sh --verify-rig          # shoulder, elbow, grip and deadlift regressions
+tools/mannequin/publish.sh squat                # upload squat's reviewed videos and posters to R2
 ```
+
+Videos and posters are written to `tools/mannequin/renders/`, which git ignores. They are
+never committed and never go under `public/`. The app streams them from the R2 bucket
+`gym-exercise-media` (see `src/server/media.ts`), and `publish.sh` uploads them there once
+they have been reviewed. Previews and prod read the same bucket.
 
 Run on Linux with Blender 5.2, the MPFB extension (MakeHuman, for the body and the fists),
 ffmpeg with libx264, libwebp and drawtext, bun and flock. Nothing needs downloading: MPFB
@@ -36,6 +42,8 @@ MPFB assets, remove the corresponding directory under `gym-trainer/scenes` to re
 5. Render the loop and poster, inspect the motion through its restart, and register the slug,
    shipped views and three cues in `src/domain/demos.ts`. That registry also drives
    `render.sh --library`. Set `OUT` on the library command to stage a complete media refresh.
+6. After review, run `publish.sh <slug>` to upload the files to R2. The app shows a demo once
+   its entry in `demos.ts` is deployed and its files are in the bucket.
 
 ### Extending equipment
 

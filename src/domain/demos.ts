@@ -14,8 +14,8 @@ export interface ExerciseDemo {
 
 /**
  * Rendered demonstrations, made with tools/mannequin from the specs in tools/mannequin/exercises.
- * To add one, render it to public/exercises/<slug>.mp4 and .webp (the slug is in src/domain/catalog.ts)
- * and list it here. The muscles that glow in it, and are listed beside it, come from the library entry.
+ * To add one, render it to tools/mannequin/renders/<slug>.mp4 and .webp (the slug is in src/domain/catalog.ts),
+ * upload it to R2 with tools/mannequin/publish.sh, and list it here. The muscles that glow in it, and are listed beside it, come from the library entry.
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {

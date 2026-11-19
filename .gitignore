@@ -5,3 +5,6 @@ dist
 .tanstack
 .env
 *.local
+
+# Rendered exercise videos and posters. They are uploaded to R2, never committed.
+tools/mannequin/renders/
