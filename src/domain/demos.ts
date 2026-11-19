@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-chest-press",
+    views: ["front"],
+    cues: [
+      "Set the seat so the grips start at chest height.",
+      "Keep your back on the pad and press forward.",
+      "Return the handles under control.",
+    ],
+  },
+  {
+    slug: "incline-machine-press",
+    views: ["front"],
+    cues: [
+      "Sit with your upper back against the inclined pad.",
+      "Press up and forward from your upper chest.",
+      "Lower slowly to the starting position.",
+    ],
+  },
+  {
     slug: "straight-arm-pulldown",
     views: ["back"],
     cues: [

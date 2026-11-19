@@ -372,3 +372,14 @@ With `arm_arc: [elbow_x, upper_pitch]`, the solver derives the bar position
 from the mirrored elbow targets and the limb lengths. The upper-arm pitch
 uses the same world-space convention as the grip pitch. The regular grip,
 wrist, skin and equipment checks still run on every frame.
+
+### Selectorized press stations
+
+Combine `selector-machine` with a flat `bench` for the seat. Set the
+left bearing's world `pivot` and the `grip_offset` from the bearing to
+the left grip at zero rotation. The right bearing and grip mirror across X.
+Key `lever_angle` in degrees around the axle and give the permitted
+`travel` as two angles. A `back_pad` specifies the front face's bottom
+edge as `[y, z, incline]`. The lever carries its grips through the arc,
+and the arms solve against those moving grips. The bake checks lever travel,
+skin clearance, grip enclosure, and contact with the back pad.

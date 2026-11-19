@@ -890,17 +890,7 @@ class CableStation:
             self.lines.append((anchor, eye))
 
     def check_grips(self, grips, frame, problems):
-        for side, part in self.handles.items():
-            transform = part.matrix_world
-            axis = transform.col[2].to_3d().normalized()
-            centre = transform.translation
-            surface = grips[side]
-            surface.check(frame, centre, axis, Barbell.SHAFT, problems)
-            along = surface.points @ np.array(surface.transform.to_3x3().transposed() @ axis)
-            along += (surface.transform.translation - centre).dot(axis)
-            excess = np.abs(along).max() - transform.col[2].to_3d().length / 2
-            if excess > 0:
-                problems.add(frame, side + " fist extends past the rendered grip", excess)
+        check_rendered_grips(self.handles, grips, frame, problems)
         for side, start, end in self.straps:
             surface = grips[side]
             to_skin = surface.transform.inverted()
@@ -936,6 +926,94 @@ class CableStation:
                     problems.add(frame, label + " crosses the body", delta.length - distance)
                     break
         samples.append(np.array(self.bounds + [eye for _, eye in self.lines]))
+
+
+def check_rendered_grips(handles, grips, frame, problems):
+    for side, part in handles.items():
+        transform = part.matrix_world
+        axis = transform.col[2].to_3d().normalized()
+        centre = transform.translation
+        surface = grips[side]
+        surface.check(frame, centre, axis, Barbell.SHAFT, problems)
+        along = surface.points @ np.array(surface.transform.to_3x3().transposed() @ axis)
+        along += (surface.transform.translation - centre).dot(axis)
+        excess = np.abs(along).max() - transform.col[2].to_3d().length / 2
+        if excess > 0:
+            problems.add(frame, side + " fist extends past the rendered grip", excess)
+
+
+class SelectorMachine:
+    """A seated press whose grips and lever rotate about the same fixed axle."""
+
+    def __init__(self, config):
+        self.pivot = Vector(config["pivot"])
+        self.offset = Vector(config["grip_offset"])
+        self.travel = config["travel"]
+        y, bottom, incline = config["back_pad"]
+        self.pad_rotation = Matrix.Rotation(math.radians(incline), 3, "X")
+        self.pad_face = Vector((0, y, bottom))
+        self.metal = material("machine frame", (.085, .095, .11), .65, .43)
+        pad = material("machine upholstery", PAD, .05, .65)
+        box("machine back pad", (.36, .09, .57),
+            self.pad_face + self.pad_rotation @ Vector((0, .045, .285)),
+            pad, rotation=self.pad_rotation.to_euler())
+        box("machine support", (.63, .72, .06), (0, .26, .03), self.metal)
+        for x in (.18, .42):
+            box("machine stack rail", (.028, .028, .85), (x, .53, .46), self.metal)
+        weight = material("machine weight", IRON, .4, .55)
+        for plate in range(10):
+            box("machine stack plate", (.34, .17, .026), (.30, .53, .086 + .036 * plate),
+                weight)
+        self.handles = {}
+        self.arms = {}
+        self.ends = {}
+        for side, sign in SIDES.items():
+            bearing = self.pivot.copy()
+            bearing.x *= sign
+            box("machine bearing support", (.075, .09, bearing.z),
+                (bearing.x, bearing.y, bearing.z / 2), self.metal)
+            pin = cylinder("machine pivot", .045, .10, 0, self.metal, None)
+            pin.location = bearing
+            self.arms[side] = CableStation.part("machine lever", .023, self.metal)
+            self.handles[side] = CableStation.part("machine grip", Barbell.SHAFT, self.metal)
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        angle = span.sample("lever_angle")
+        minimum, maximum = self.travel
+        if not minimum <= angle <= maximum:
+            problems.add(frame, "machine lever outside its stops",
+                         max(minimum - angle, angle - maximum), "degrees")
+        rotation = Matrix.Rotation(math.radians(angle), 3, "X")
+        axis = Vector((1, 0, 0))
+        for side, sign in SIDES.items():
+            pivot = self.pivot.copy()
+            pivot.x *= sign
+            grip = pivot + rotation @ Vector((sign * self.offset.x, self.offset.y, self.offset.z))
+            pole = torso.direction(span.sample("elbows"), sign)
+            gap = pose_arm(side, grip, pole, span.keys[1].get("grip", "pronated"), torso, axis)
+            gaps.append((side + " machine grip", gap))
+            set_segment(self.handles[side], grip - axis * .076, grip + axis * .076, frame)
+            set_segment(self.arms[side], pivot, grip + axis * .076 * sign, frame)
+            self.ends[side] = pivot, grip + axis * .076 * sign
+
+    def check(self, points, frame, problems, samples):
+        # Measure skin against the front plane of the upholstery in pad coordinates.
+        local = (points - np.array(self.pad_face)) @ np.array(self.pad_rotation)
+        on_pad = (np.abs(local[:, 0]) < .18) & (local[:, 2] > 0) & (local[:, 2] < .57)
+        depth = local[on_pad, 1].max(initial=-1)
+        if depth < -.035:
+            problems.add(frame, "back loses machine pad contact", -depth)
+        if depth > .025:
+            problems.add(frame, "the body sinks into the machine pad", depth)
+        for pivot, end in self.ends.values():
+            start = np.array(pivot)
+            direction = np.array(end - pivot)
+            offset = points - start
+            travel = np.clip((offset @ direction) / (direction @ direction), 0, .92)
+            clearance = np.linalg.norm(offset - travel[:, None] * direction, axis=1).min()
+            if clearance < .022:
+                problems.add(frame, "machine lever crosses the body", .022 - clearance)
+        samples.append(np.array([point for pair in self.ends.values() for point in pair]))
 
 
 class ContactLoad:
@@ -1775,7 +1853,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -1798,6 +1876,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    machine = next((SelectorMachine(e) for e in spec.get("equipment", []) if e["type"] == "selector-machine"), None)
     station = next((PullStation(e) for e in spec.get("equipment", []) if e["type"] in ("platform","rack-pins")), None)
     if station and not barbell:
         raise ValueError("Pull stations need a barbell")
@@ -1816,7 +1895,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles or cables and side in cables.handles)
+                        or landmine and side in landmine.handles or cables and side in cables.handles or machine)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -1824,7 +1903,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -1993,6 +2072,8 @@ def bake(spec, keys):
                     target = head(side+"Arm") + torso.direction(span.sample("free_arm", [.23,.17,-1]),sign)*.50
                     gap = pose_arm(side, target, pole, "neutral", torso)
                 gaps.append((side+" hand", gap))
+        if machine:
+            machine.pose(span, torso, grips, frame, gaps, problems)
         if cables:
             cables.pose(span, torso, grips, frame, gaps, problems)
         if contact_load:
@@ -2115,7 +2196,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -2131,6 +2212,9 @@ def bake(spec, keys):
         everything, hands = evaluated_points(body)
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
+        if machine:
+            check_rendered_grips(machine.handles, grips, frame, problems)
+            machine.check(everything, frame, problems, samples)
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
