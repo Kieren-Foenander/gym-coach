@@ -3,7 +3,7 @@
   "stance": {"width": 0.54, "y": 0.942, "toe_out": 0},
   "camera": {"angle": 66},
   "keys": [
-    {"at": 0, "pelvis": [0, 0.092, 0.534], "lean": 75, "head": -8, "bar": [0, -0.285, 0.063], "grip_width": 0.23, "grip": "neutral", "handle_direction": [0, 0, 1], "elbows": [0.42, -1, -0.55], "foot_left": [0, 0, 65], "foot_right": [0, 0, 65]},
+    {"at": 0, "pelvis": [0, 0.092, 0.534], "lean": 75, "head": -8, "bar": [0, -0.285, 0.063], "grip_width": 0.23, "grip": "neutral", "handle_direction": [0, 0.267949, 1], "elbows": [0.42, -1, -0.55], "foot_left": [0, 0, 65], "foot_right": [0, 0, 65]},
     {"at": 0.085, "bar": [0, -0.237, 0.205], "grip_width": 0.27},
     {"at": 0.22, "bar": [0, -0.137, 0.374], "grip_width": 0.255},
     {"at": 0.28},
