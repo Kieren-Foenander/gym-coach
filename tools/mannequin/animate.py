@@ -942,6 +942,32 @@ def check_rendered_grips(handles, grips, frame, problems):
             problems.add(frame, side + " fist extends past the rendered grip", excess)
 
 
+def check_moving_parts(parts, points, faces, hands, grips, frame, problems):
+    """Check the rendered mechanism against posed skin, including actual fists."""
+    skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
+    outside_hands = BVHTree.FromPolygons(
+        points, [face for face in faces if not any(hands[index] for index in face)],
+        all_triangles=True,
+    )
+    fist_surfaces = []
+    for grip in grips.values():
+        transform = grip.transform
+        posed = grip.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+        fist_surfaces.append(BVHTree.FromPolygons(posed, grip.triangles, all_triangles=True))
+    for part, held in parts:
+        vertices = [part.matrix_world @ vertex.co for vertex in part.data.vertices]
+        part.data.calc_loop_triangles()
+        polygons = [tuple(triangle.vertices) for triangle in part.data.loop_triangles]
+        hardware = BVHTree.FromPolygons(vertices, polygons, all_triangles=True)
+        surfaces = (outside_hands,) if held else (skin, *fist_surfaces)
+        for surface in surfaces:
+            nearest, normal, _, distance = surface.find_nearest(part.matrix_world.translation)
+            if surface.overlap(hardware) or (nearest is not None and
+                    (part.matrix_world.translation - nearest).dot(normal) < 0 and surface == skin):
+                problems.add(frame, part.name.split(".")[0] + " crosses the body", .001)
+                break
+
+
 class SelectorMachine:
     """A seated press whose grips and lever rotate about the same fixed axle."""
 
@@ -966,7 +992,8 @@ class SelectorMachine:
                 weight)
         self.handles = {}
         self.arms = {}
-        self.ends = {}
+        self.links = {}
+        self.parts = []
         for side, sign in SIDES.items():
             bearing = self.pivot.copy()
             bearing.x *= sign
@@ -975,7 +1002,10 @@ class SelectorMachine:
             pin = cylinder("machine pivot", .045, .10, 0, self.metal, None)
             pin.location = bearing
             self.arms[side] = CableStation.part("machine lever", .023, self.metal)
+            self.links[side] = CableStation.part("machine handle return", .019, self.metal)
             self.handles[side] = CableStation.part("machine grip", Barbell.SHAFT, self.metal)
+            self.parts.extend(((self.arms[side], False), (self.links[side], False),
+                               (self.handles[side], True)))
 
     def pose(self, span, torso, grips, frame, gaps, problems):
         angle = span.sample("lever_angle")
@@ -993,10 +1023,11 @@ class SelectorMachine:
             gap = pose_arm(side, grip, pole, span.keys[1].get("grip", "pronated"), torso, axis)
             gaps.append((side + " machine grip", gap))
             set_segment(self.handles[side], grip - axis * .076, grip + axis * .076, frame)
-            set_segment(self.arms[side], pivot, grip + axis * .076 * sign, frame)
-            self.ends[side] = pivot, grip + axis * .076 * sign
+            elbow = Vector((pivot.x, grip.y, grip.z))
+            set_segment(self.arms[side], pivot, elbow, frame)
+            set_segment(self.links[side], elbow, grip + axis * .076 * sign, frame)
 
-    def check(self, points, frame, problems, samples):
+    def check(self, points, faces, hands, grips, frame, problems, samples):
         # Measure skin against the front plane of the upholstery in pad coordinates.
         local = (points - np.array(self.pad_face)) @ np.array(self.pad_rotation)
         on_pad = (np.abs(local[:, 0]) < .18) & (local[:, 2] > 0) & (local[:, 2] < .57)
@@ -1005,15 +1036,9 @@ class SelectorMachine:
             problems.add(frame, "back loses machine pad contact", -depth)
         if depth > .025:
             problems.add(frame, "the body sinks into the machine pad", depth)
-        for pivot, end in self.ends.values():
-            start = np.array(pivot)
-            direction = np.array(end - pivot)
-            offset = points - start
-            travel = np.clip((offset @ direction) / (direction @ direction), 0, .92)
-            clearance = np.linalg.norm(offset - travel[:, None] * direction, axis=1).min()
-            if clearance < .022:
-                problems.add(frame, "machine lever crosses the body", .022 - clearance)
-        samples.append(np.array([point for pair in self.ends.values() for point in pair]))
+        check_moving_parts(self.parts, points, faces, hands, grips, frame, problems)
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part, _ in self.parts for corner in part.bound_box]))
 
 
 class ContactLoad:
@@ -2214,7 +2239,7 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if machine:
             check_rendered_grips(machine.handles, grips, frame, problems)
-            machine.check(everything, frame, problems, samples)
+            machine.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)

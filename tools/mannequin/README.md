@@ -381,5 +381,7 @@ the left grip at zero rotation. The right bearing and grip mirror across X.
 Key `lever_angle` in degrees around the axle and give the permitted
 `travel` as two angles. A `back_pad` specifies the front face's bottom
 edge as `[y, z, incline]`. The lever carries its grips through the arc,
-and the arms solve against those moving grips. The bake checks lever travel,
-skin clearance, grip enclosure, and contact with the back pad.
+and the arms solve against those moving grips. Levers stay in the plane
+of each outer bearing and turn inward at the grip. The bake checks lever
+travel, overlaps between the rendered moving hardware and the posed skin,
+grip enclosure, and contact with the back pad.
