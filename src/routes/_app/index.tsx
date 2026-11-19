@@ -4,7 +4,8 @@ import { NutritionCard } from "~/components/nutrition"
 import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { localDay } from "~/domain/health"
 import { daysAround } from "~/domain/days"
-import { summariseWeek } from "~/domain/week"
+import { DAY_STATES, testIds } from "~/domain/test-ids"
+import { startOfWeek, summariseWeek } from "~/domain/week"
 import { isCardio } from "~/domain/catalog"
 import { describeStreak, estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
 import { deleteCoachNote, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
@@ -89,6 +90,7 @@ function TodayPage() {
             variant="primary"
             className="mt-5 w-full"
             disabled={pending || nextDay.exercises.length === 0}
+            data-testid={testIds.today.startNextWorkout}
             onClick={() => start(nextDay.id)}
           >
             Start workout
@@ -101,13 +103,19 @@ function TodayPage() {
           <SectionTitle>Or do something else</SectionTitle>
           <div className="flex flex-wrap gap-2">
             {otherDays.map((day) => (
-              <Button key={day.id} disabled={pending || day.exercises.length === 0} onClick={() => start(day.id)}>
+              <Button
+                key={day.id}
+                disabled={pending || day.exercises.length === 0}
+                data-testid={testIds.today.startDay(day.name)}
+                onClick={() => start(day.id)}
+              >
                 {day.name}
               </Button>
             ))}
             <Button
               className="border border-dashed border-line bg-transparent"
               disabled={pending}
+              data-testid={testIds.today.startOpenWorkout}
               onClick={() => start(null)}
             >
               Open workout
@@ -219,6 +227,15 @@ function Hero({ eyebrow, title, children }: HeroProps) {
   )
 }
 
+/** Midnight on a day of the week containing `now`, 0 for Monday. */
+const dayOfWeek = (now: number, index: number) => {
+  const date = new Date(startOfWeek(now))
+
+  date.setDate(date.getDate() + index)
+
+  return date.getTime()
+}
+
 interface WeekCardProps {
   readonly activity: ReadonlyArray<ActivityEntry>
   readonly now: number | null
@@ -234,10 +251,15 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
       to="/calendar"
       aria-label={week ? `This week: ${week.workouts} workouts, ${describeStreak(week.streakWeeks)}. Open calendar` : "Open calendar"}
       className={`${cardClass} block transition-colors active:bg-raised`}
+      data-testid={testIds.today.weekCard}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="eyebrow text-muted">This week</p>
-        <p className={`flex items-center gap-1 text-sm font-semibold ${week?.streakWeeks ? "text-accent" : "text-faint"}`}>
+        <p
+          className={`flex items-center gap-1 text-sm font-semibold ${week?.streakWeeks ? "text-accent" : "text-faint"}`}
+          data-testid={testIds.today.streak}
+          data-value={week?.streakWeeks}
+        >
           <FlameIcon className="size-4" />
           {describeStreak(week?.streakWeeks ?? 0)}
           <span className="text-faint">
@@ -251,7 +273,12 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
           const isToday = week?.todayIndex === index
 
           return (
-            <li key={name} className="flex flex-col items-center gap-1.5">
+            <li
+              key={name}
+              className="flex flex-col items-center gap-1.5"
+              data-testid={now === null ? undefined : testIds.today.weekDay(dayOfWeek(now, index))}
+              data-state={trained ? DAY_STATES.trained : DAY_STATES.rest}
+            >
               <span className={`text-xs font-semibold ${isToday ? "text-white" : "text-faint"}`}>{name.charAt(0)}</span>
               <span
                 className={`flex size-9 items-center justify-center rounded-full ${
@@ -271,7 +298,9 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
       </ol>
       <dl className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-2xl bg-raised/70 px-3 py-2.5">
-          <dd className="display tabular text-3xl">{week?.workouts ?? "–"}</dd>
+          <dd className="display tabular text-3xl" data-testid={testIds.today.workoutsThisWeek} data-value={week?.workouts}>
+            {week?.workouts ?? "–"}
+          </dd>
           <dt className="text-xs text-muted">Workouts</dt>
         </div>
         <div className="rounded-2xl bg-raised/70 px-3 py-2.5">

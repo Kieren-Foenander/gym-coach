@@ -4,6 +4,7 @@ import { ChevronIcon } from "~/components/icons"
 import { BackButton, Card, cardClass, SectionTitle, Stat, useNow } from "~/components/ui"
 import { byDay, countInMonth, monthGrid, shiftMonth, startOfDay, weeklyStreaks } from "~/domain/week"
 import { describeTrainingDay, formatLongDay, weeksUnit } from "~/format"
+import { DAY_STATES, dayKey, testIds } from "~/domain/test-ids"
 import { getCalendar } from "~/functions/api"
 import type { CalendarWorkout } from "~/server/repo"
 
@@ -67,14 +68,29 @@ function Calendar({ workouts, now }: CalendarProps) {
   return (
     <>
       <div className="grid grid-cols-3 gap-2 pb-4">
-        <Stat label="Current streak" value={streaks.current} unit={weeksUnit(streaks.current)} />
-        <Stat label="Longest streak" value={streaks.longest} unit={weeksUnit(streaks.longest)} />
-        <Stat label={`Workouts in ${shortMonth.format(month)}`} value={inMonth} />
+        <Stat
+          label="Current streak"
+          value={streaks.current}
+          unit={weeksUnit(streaks.current)}
+          testId={testIds.calendar.currentStreak}
+        />
+        <Stat
+          label="Longest streak"
+          value={streaks.longest}
+          unit={weeksUnit(streaks.longest)}
+          testId={testIds.calendar.longestStreak}
+        />
+        <Stat label={`Workouts in ${shortMonth.format(month)}`} value={inMonth} testId={testIds.calendar.workoutsInMonth} />
       </div>
 
       <Card>
         <div className="flex items-center gap-1">
-          <h2 className="display min-w-0 flex-1 truncate text-2xl" aria-live="polite">
+          <h2
+            className="display min-w-0 flex-1 truncate text-2xl"
+            aria-live="polite"
+            data-testid={testIds.calendar.month}
+            data-value={dayKey(month).slice(0, 7)}
+          >
             {monthFormat.format(month)}
           </h2>
           {month === thisMonth ? null : (
@@ -82,8 +98,19 @@ function Calendar({ workouts, now }: CalendarProps) {
               Today
             </button>
           )}
-          <MonthButton label="Previous month" disabled={month <= firstMonth} onClick={() => show(shiftMonth(month, -1))} flip />
-          <MonthButton label="Next month" disabled={month >= thisMonth} onClick={() => show(shiftMonth(month, 1))} />
+          <MonthButton
+            label="Previous month"
+            testId={testIds.calendar.previousMonth}
+            disabled={month <= firstMonth}
+            onClick={() => show(shiftMonth(month, -1))}
+            flip
+          />
+          <MonthButton
+            label="Next month"
+            testId={testIds.calendar.nextMonth}
+            disabled={month >= thisMonth}
+            onClick={() => show(shiftMonth(month, 1))}
+          />
         </div>
 
         <div className="grid grid-cols-7 pb-1 pt-3" aria-hidden="true">
@@ -141,16 +168,18 @@ function Calendar({ workouts, now }: CalendarProps) {
 
 interface MonthButtonProps {
   readonly label: string
+  readonly testId: string
   readonly disabled: boolean
   readonly onClick: () => void
   readonly flip?: boolean
 }
 
-function MonthButton({ label, disabled, onClick, flip = false }: MonthButtonProps) {
+function MonthButton({ label, testId, disabled, onClick, flip = false }: MonthButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
+      data-testid={testId}
       disabled={disabled}
       onClick={onClick}
       className="flex size-11 items-center justify-center rounded-full text-white active:bg-raised disabled:text-line"
@@ -178,6 +207,8 @@ function DayButton({ day, count, isToday, isFuture, isSelected, onClick }: DayBu
   if (count === 0) {
     return (
       <span
+        data-testid={testIds.calendar.day(day)}
+        data-state={DAY_STATES.rest}
         className={`tabular flex size-10 items-center justify-center rounded-full text-sm ${
           isToday ? "border-2 border-accent/70 font-semibold text-white" : isFuture ? "text-line" : "text-muted"
         }`}
@@ -193,6 +224,9 @@ function DayButton({ day, count, isToday, isFuture, isSelected, onClick }: DayBu
       type="button"
       aria-label={label}
       aria-pressed={count > 1 ? isSelected : undefined}
+      data-testid={testIds.calendar.day(day)}
+      data-state={DAY_STATES.trained}
+      data-value={count}
       onClick={onClick}
       className={`tabular relative flex size-10 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-ink active:bg-accent-strong ${
         isSelected ? "ring-2 ring-white ring-offset-2 ring-offset-surface" : ""
@@ -222,6 +256,7 @@ function DayWorkouts({ day, workouts }: DayWorkoutsProps) {
         {workouts.map((workout) => (
           <Link
             key={workout.id}
+            data-testid={testIds.calendar.dayWorkout(workout.id)}
             to="/workout/$workoutId"
             params={{ workoutId: String(workout.id) }}
             className={`${cardClass} flex items-center gap-3 active:bg-raised`}

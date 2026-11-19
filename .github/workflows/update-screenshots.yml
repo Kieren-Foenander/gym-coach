@@ -1,0 +1,48 @@
+name: Update screenshots
+
+# Records new approved screenshots for the browser tests (e2e/screenshots.spec.ts) on a branch, after a
+# change that is meant to alter how a screen looks. Run it from the Actions tab on the pull request's
+# branch (or run `bun run e2e:screenshots` with Docker), then look at the new images in the pull request
+# before merging.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  update:
+    name: Record screenshots
+    if: github.ref != 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The same image the browser tests run in (ci.yml), so the screenshots match there.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run e2e e2e/screenshots.spec.ts --update-snapshots=all
+        env:
+          CI: "true"
+      - name: Commit the new screenshots
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git add e2e/screenshots
+          if git diff --cached --quiet; then
+            echo "The screenshots already match."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Record screenshots"
+          git push
+          # A push made with this workflow's token starts no other workflow, so start the checks on it here.
+          gh workflow run ci.yml --ref "$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -25,6 +25,7 @@ import {
   isTestStage,
   type CoachAppId,
 } from "~/domain/coach-apps"
+import { testIds } from "~/domain/test-ids"
 import { getDeployment, signOut, updateProfile } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/settings")({
@@ -68,6 +69,7 @@ function SettingsPage() {
         <form onSubmit={save} className="space-y-4">
           <Field label="Name">
             <TextInput
+              data-testid={testIds.settings.displayName}
               required
               maxLength={80}
               value={displayName}
@@ -81,6 +83,7 @@ function SettingsPage() {
           </div>
           <Field label="Goal">
             <TextArea
+              data-testid={testIds.settings.goal}
               rows={2}
               maxLength={2000}
               placeholder="Get stronger on the big lifts"
@@ -98,7 +101,7 @@ function SettingsPage() {
             />
           </Field>
           <ErrorNote message={error} />
-          <Button type="submit" variant="primary" className="w-full" disabled={pending}>
+          <Button type="submit" variant="primary" className="w-full" data-testid={testIds.settings.saveProfile} disabled={pending}>
             {saved && !pending ? "Saved" : "Save"}
           </Button>
         </form>
@@ -128,7 +131,7 @@ function SettingsPage() {
       <SectionTitle>Account</SectionTitle>
       <Card>
         <p className="pb-3 text-muted">Signed in as {user.email}</p>
-        <Button className="w-full" onClick={leave}>
+        <Button className="w-full" data-testid={testIds.settings.signOut} onClick={leave}>
           Sign out
         </Button>
       </Card>

@@ -2,7 +2,8 @@ name: Deploy
 
 # Alchemy deploys one stage per branch of work (see alchemy.run.ts):
 #   a push to master         -> the "prod" stage, after the checks pass
-#   a pull request           -> its own "pr-<number>" preview, with the address posted as a comment
+#   a pull request           -> its own "pr-<number>" preview, with the address posted as a comment, then the
+#                               browser tests marked @smoke run against it
 #   closing the pull request -> that preview is destroyed
 on:
   push:
@@ -72,12 +73,38 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - name: Deploy
-        run: bun alchemy deploy --stage "$STAGE" --yes
+        id: deploy
+        run: |
+          set -o pipefail
+          bun alchemy deploy --stage "$STAGE" --yes --no-input | tee deploy.log
+          url=$(grep -oE "https://[a-z0-9.-]+\.workers\.dev" deploy.log | tail -1)
+          if [ -z "$url" ]; then
+            echo "The deploy printed no address" >&2
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # So the smoke tests below can make accounts after the first one, as people can on the live app.
+          SIGNUP_CODE: ${{ secrets.SIGNUP_CODE }}
           PULL_REQUEST: ${{ github.event.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: bunx playwright install --with-deps chromium
+      # The browser tests marked @smoke, against the preview just deployed: the real Worker, D1 and KV.
+      - name: Smoke test the preview
+        run: bun run e2e
+        env:
+          E2E_BASE_URL: ${{ steps.deploy.outputs.url }}
+          E2E_INVITE_CODE: ${{ secrets.SIGNUP_CODE }}
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: preview-smoke-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14
 
   cleanup:
     name: Destroy preview

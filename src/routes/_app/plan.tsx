@@ -30,6 +30,7 @@ import {
 } from "~/functions/api"
 import type { Direction } from "~/domain/schema"
 import type { PlanExercise } from "~/server/repo"
+import { testIds } from "~/domain/test-ids"
 
 export const Route = createFileRoute("/_app/plan")({
   loader: () => getPlan(),
@@ -254,6 +255,7 @@ function TemplateList({ onDone }: { readonly onDone: () => void }) {
           key={template.id}
           type="button"
           disabled={pending}
+          data-testid={testIds.plan.template(template.id)}
           className="flex w-full items-center justify-between gap-3 rounded-3xl border border-white/5 bg-raised/60 p-4 text-left transition active:scale-[0.98] active:border-accent/40 disabled:opacity-50"
           onClick={() =>
             act(async () => {
