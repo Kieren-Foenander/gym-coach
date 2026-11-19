@@ -248,10 +248,10 @@ def pose_legs(spec, key, pelvis):
         pitch = Matrix.Identity(3)
         stride = key.get("foot_" + side.lower())
         if stride is not None:
-            y, clearance, heel = stride
+            y, clearance, heel, *lateral = stride
             pitch = Matrix.Rotation(math.radians(heel), 3, "X")
             pivot = rig.data.bones[side + "Foot"].head_local - rig.data.bones[side + "ToeBase"].head_local
-            ankle += Vector((0, y, clearance)) + turned @ (pitch @ pivot - pivot)
+            ankle += Vector((lateral[0] if lateral else 0, y, clearance)) + turned @ (pitch @ pivot - pivot)
         thigh, shin = segment(f"{side}UpLeg", f"{side}Leg", f"{side}Foot")
         hip = head(f"{side}UpLeg")
         knee_pole = spec.get("stance", {}).get("knee_direction", {}).get(side)

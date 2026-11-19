@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "curtsy-lunge",
+    views: ["front"],
+    cues: [
+      "Step back and diagonally behind your front leg.",
+      "Bend both knees with the front foot flat.",
+      "Drive through the front leg to return to standing.",
+    ],
+  },
+  {
+    slug: "walking-lunge",
+    views: ["front"],
+    cues: [
+      "Step forward and lower your rear knee toward the floor.",
+      "Push through the front foot to stand.",
+      "Bring the rear leg through into the next step.",
+    ],
+  },
+  {
+    slug: "lateral-lunge",
+    views: ["front"],
+    cues: [
+      "Step wide to one side.",
+      "Sit back over the stepping leg while keeping the other leg long.",
+      "Push off the bent leg to return to centre.",
+    ],
+  },
+  {
     slug: "dumbbell-side-bend",
     views: ["front"],
     cues: [

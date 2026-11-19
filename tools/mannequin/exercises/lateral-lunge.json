@@ -1,0 +1,23 @@
+{
+  "equipment": [{"type": "vertical-dumbbell"}],
+  "stance": {"width": 0.27, "toe_out": 5},
+  "camera": {"angle": 29, "elevation": 9},
+  "keys": [
+    {"at": 0, "pelvis": [-0.0, 0.0, 0.91], "elbows": [0.28, -0.35, -1], "lean": 4, "foot_left": [0.0, 0, 0], "foot_right": [0, 0, 0, -0.0], "load": {"at": "chest", "offset": [0, 0.069, 0.015], "world_offset": [0, 0, -0.09]}},
+    {"at": 0.13, "pelvis": [-0.144, 0.0198, 0.8300000000000001], "foot_right": [0, 0.055, 0, -0.36240000000000006]},
+    {"at": 0.22, "pelvis": [-0.288, 0.0396, 0.7649999999999999], "foot_right": [0, 0, 0, -0.6040000000000001]},
+    {"at": 0.44, "pelvis": [-0.4032, 0.05544, 0.5499999999999999], "lean": 12, "foot_right": [0, 0, 0, -0.6040000000000001]},
+    {"at": 0.52},
+    {"at": 0.71, "pelvis": [-0.288, 0.0396, 0.7649999999999999], "foot_right": [0, 0, 0, -0.6040000000000001]},
+    {"at": 0.82, "pelvis": [-0.144, 0.0198, 0.8300000000000001], "foot_right": [0, 0.055, 0, -0.36240000000000006]},
+    {"at": 0.96, "pelvis": [-0.0, 0.0, 0.91], "lean": 4, "foot_left": [0.0, 0, 0], "foot_right": [0, 0, 0, -0.0]}
+  ],
+  "checkpoints": [
+    {"surface_gap": {"landmark": "sternum", "max_m": 0.03, "upper_head": true}, "handle_axis": {"direction": [0, 0, 1], "degrees": 5, "directed": true}},
+    {"at": 0.48, "side": "Right", "position": {"point": "Foot", "x": [-0.77, -0.7]}},
+    {"at": 0.48, "position": {"point": "Hips", "z": [0.53, 0.57]}}
+  ],
+  "frames": 120,
+  "hands": {"Left": "cup", "Right": "cup"},
+  "contact": {"wrist": [0.11235, 0.06443, 0.04753], "along": [-0.25376, -0.96727, 0], "palm": [-0.7868, 0.20642, 0.58167]}
+}
