@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "leg-press",
+    views: ["front"],
+    cues: [
+      "Plant both feet on the plate and keep your back on the pad.",
+      "Press the sled away without locking your knees.",
+      "Lower until your knees are deeply bent.",
+    ],
+  },
+  {
+    slug: "single-leg-leg-press",
+    views: ["front"],
+    cues: [
+      "Plant one foot on the plate and keep both hips on the pad.",
+      "Press through the whole foot with your knee in line with your toes.",
+      "Lower slowly without twisting your pelvis.",
+    ],
+  },
+  {
     slug: "leg-extension",
     views: ["front"],
     cues: [
