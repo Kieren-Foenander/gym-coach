@@ -132,7 +132,7 @@ These run on every frame before anything renders:
 
 - a hand or ankle can't reach its target
 - posed skin triangles cross on non-adjacent faces. The check ignores face pairs already crossing at rest and reports the smaller of the two inward plane depths in centimetres. The allowance is 1 cm between regions separated by at least 15 cm at rest and 2 cm for local folds
-- the body goes through the floor
+- the body or a moving weight goes through the floor
 - the bar's shaft or a plate passes through the body (hands are allowed round the shaft)
 - a hand misses the bar: the bar must run through the middle of the fist
 - any **finished fist triangle**, including its edges and interior, penetrates the shaft by

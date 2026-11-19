@@ -1394,8 +1394,8 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend"}
-        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend"}:
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
@@ -1450,6 +1450,14 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, co
                 upper = joint("ForeArm") - joint("Arm")
                 fore = joint("Hand") - joint("ForeArm")
                 bounds("elbow flexion", math.degrees(upper.angle(fore)), check["elbow"], "degrees")
+            if "knee" in check or "shin_vertical" in check:
+                thigh = joint("Leg") - joint("UpLeg")
+                shin = joint("Foot") - joint("Leg")
+                if "knee" in check:
+                    bounds("knee flexion", math.degrees(thigh.angle(shin)), check["knee"], "degrees")
+                if "shin_vertical" in check:
+                    bounds("shin to vertical", math.degrees(shin.angle(Vector((0, 0, -1)))),
+                           [0, check["shin_vertical"]], "degrees")
             if "upper_arm_to_torso" in check:
                 upper = joint("ForeArm") - joint("Arm")
                 bounds("upper arm to torso", math.degrees(upper.angle(-Torso().up)),
@@ -1853,6 +1861,9 @@ def bake(spec, keys):
         if low < -0.012:
             problems.add(frame, "the body goes through the floor", -low)
         if barbell:
+            bottom = barbell.centre.z - barbell.PLATE
+            if bottom < -.002:
+                problems.add(frame, "a barbell plate crosses the floor", -bottom)
             samples.append(np.array([barbell.centre + Vector((s * 1.1, 0, z)) for s in (-1, 1) for z in (-barbell.PLATE-.005, barbell.PLATE+.005)]))
             if cradle:
                 for side, sign in SIDES.items():
@@ -1870,7 +1881,14 @@ def bake(spec, keys):
         if dumbbells:
             corners = np.array(dumbbells.corners())
             samples.append(corners)
-            if isinstance(dumbbells, Kettlebells) and corners[:, 2].min() < -.002:
+            if not bell_spec:
+                for side, centre in dumbbells.centres.items():
+                    vertical = abs(dumbbells.axes[side].z)
+                    bottom = centre.z - (dumbbells.INNER + dumbbells.DEPTH) * vertical
+                    bottom -= dumbbells.HEAD * math.sqrt(max(0, 1 - vertical ** 2))
+                    if bottom < -.002:
+                        problems.add(frame, "a dumbbell crosses the floor", -bottom)
+            elif corners[:, 2].min() < -.002:
                 problems.add(frame, "a kettlebell crosses the floor", -corners[:, 2].min())
             inside, gap = dumbbells.intrusions(everything)
             closest["dumbbells"] = min(closest["dumbbells"], gap)
