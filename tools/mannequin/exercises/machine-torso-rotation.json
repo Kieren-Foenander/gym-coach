@@ -1,0 +1,81 @@
+{
+  "equipment": [
+    {
+      "type": "rotary-torso",
+      "pivot": [
+        0,
+        0.065,
+        0.68
+      ],
+      "pad_y": -0.141,
+      "travel": [
+        -39,
+        39
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.09,
+        0.43
+      ],
+      "length": 0.43
+    }
+  ],
+  "stance": {
+    "width": 0.41,
+    "y": -0.28,
+    "toe_out": 12
+  },
+  "camera": {
+    "angle": 70
+  },
+  "frames": 120,
+  "touching": [
+    "bench"
+  ],
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.063,
+        0.58
+      ],
+      "lean": 0,
+      "torso_twist": -34
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "torso_twist": 34
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "position": {
+        "point": "ForeArm",
+        "relative_to": "Hips",
+        "x": [
+          0.15,
+          0.49
+        ]
+      },
+      "side": "Left"
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        44,
+        132
+      ]
+    }
+  ]
+}

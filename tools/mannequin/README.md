@@ -449,6 +449,10 @@ the leg-machine pads. The pulldown uses a split thigh restraint.
   The shaft rotates with the lever and its actual transform drives the grip
   check.
 
+- A `rotary-torso` station carries its chest pad and grips around the
+  seat's vertical axis. `torso_twist` turns the spine and frame together.
+  Set `pivot`, `pad_y` for the pad face in the rotating frame, and angular
+  `travel`. The bake checks pad contact and full frame clearance.
 - A `leg-roller` with `hip_drive: true` pivots at the working hip for
   standing kickbacks. The roller stays against the lower leg.
 - A `thrust-station` carries a hip pad and two grips on one fixed axle.

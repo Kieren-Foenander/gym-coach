@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-torso-rotation",
+    views: ["front"],
+    cues: [
+      "Settle into the seat and hold both handles.",
+      "Turn your rib cage while keeping your hips square.",
+      "Return through center under control and change sides.",
+    ],
+  },
+  {
     slug: "donkey-calf-raise",
     views: ["back"],
     cues: [
