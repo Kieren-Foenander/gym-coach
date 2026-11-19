@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-front-raise",
+    views: ["front"],
+    cues: [
+      "Stand facing the low pulley with a soft bend in your elbows.",
+      "Raise the bar to shoulder height.",
+      "Lower slowly without leaning back.",
+    ],
+  },
+  {
     slug: "reverse-grip-pushdown",
     views: ["back"],
     cues: [
