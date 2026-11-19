@@ -19,6 +19,51 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "treadmill-run",
+    views: ["front"],
+    cues: [
+      "Run tall with a slight forward lean.",
+      "Land under your hips and keep your steps quick.",
+      "Let your arms swing loosely beside you.",
+    ],
+  },
+  {
+    slug: "incline-treadmill-walk",
+    views: ["front"],
+    cues: [
+      "Walk tall with a slight lean from the ankles.",
+      "Take short steps and drive through each planted foot.",
+      "Let your arms swing without holding the rails.",
+    ],
+  },
+  {
+    slug: "stationary-bike",
+    views: ["front"],
+    cues: [
+      "Set the saddle so your knee stays soft at the bottom.",
+      "Keep your hips steady and hold the grips lightly.",
+      "Pedal smoothly through each revolution.",
+    ],
+  },
+  {
+    slug: "recumbent-bike",
+    views: ["front"],
+    cues: [
+      "Sit against the backrest and hold the side grips.",
+      "Set the seat so your knees stay soft at full reach.",
+      "Pedal smoothly without rocking your hips.",
+    ],
+  },
+  {
+    slug: "air-bike",
+    views: ["front"],
+    cues: [
+      "Sit tall and hold both handles.",
+      "Push one handle and pull the other as you pedal.",
+      "Keep your effort smooth and your hips steady.",
+    ],
+  },
+  {
     slug: "machine-lateral-raise",
     views: ["front"],
     cues: [

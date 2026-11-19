@@ -119,3 +119,14 @@ spec["keys"][0]["assist_height"] -= .07
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left knee platform contact" in problems.found, list(problems.lines())
 print("ASSISTANCE AND PADDED LEVER REGRESSIONS PASSED")
+
+for slug in ("stationary-bike", "treadmill-run"):
+    spec = initial_pose(slug)
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert not problems.found, (slug, list(problems.lines()))
+
+spec = initial_pose("treadmill-run")
+spec["keys"][0]["gait"][1] = -.06
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left foot goes through treadmill belt" in problems.found, list(problems.lines())
+print("TREADMILL AND CYCLE REGRESSIONS PASSED")

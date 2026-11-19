@@ -446,3 +446,13 @@ the leg-machine pads. The pulldown uses a split thigh restraint.
 - A selectorized `grip_axis` is specified in the lever's local coordinates.
   The shaft rotates with the lever and its actual transform drives the grip
   check.
+
+- A `treadmill` uses `gait: [y, lift, heel]` for one leg. The second leg
+  and both arm swings sample the same cycle half a turn apart. The
+  `incline` is in degrees. The bake checks belt support through stance
+  and checks the deck rails and console for collisions.
+- A `cycle-station` places the pedals on opposite sides of a shared
+  crank. Set the world `crank`, `radius`, `saddle`, and mirrored `grip`
+  positions. A recumbent cycle adds a `backrest` contact pad, and `air`
+  makes the handles move with the crank. The bake checks the saddle,
+  pedals, grips, and frame.

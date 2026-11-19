@@ -206,6 +206,8 @@ def pose_trunk(key):
         turn(name, left, key.get("spine", 0) / 3)
         if "side_bend" in key:
             turn(name, forward, key["side_bend"] / 3)
+    if "torso_twist" in key:
+        turn("Spine", Vector((0, 0, 1)), key["torso_twist"])
     for name in ("Neck", "Head"):
         turn(name, left, key.get("head", 0) / 2)
     return pelvis
@@ -1690,6 +1692,173 @@ class LateralRaiseStation:
                                  for part, _ in self.parts for corner in part.bound_box]))
 
 
+class Treadmill:
+    """An inclined deck and a phase-shifted repeating gait on the belt."""
+
+    def __init__(self, config):
+        self.pitch = config.get("incline", 0)
+        self.rotation = Matrix.Rotation(math.radians(-self.pitch), 3, "X")
+        self.height = config.get("height", .14)
+        self.face = Vector((0, 0, self.height))
+        metal = material("treadmill frame", IRON, .55, .49)
+        rubber = material("treadmill belt", (.023,.027,.032), .08, .70)
+        frame_mid = self.face - self.rotation @ Vector((0,0,.041))
+        box("treadmill belt", (.65,1.61,.080), frame_mid, rubber,
+            rotation=self.rotation.to_euler())
+        self.parts = []
+        for sign in (-1, 1):
+            rail = box("treadmill deck rail", (.096,1.69,.095),
+                       frame_mid + Vector((sign*.378,0,0)), metal, rotation=self.rotation.to_euler())
+            post = box("treadmill console post", (.071,.078,1.10),
+                       (sign*.40,-.81,.55), metal)
+            self.parts.extend(((rail,False),(post,False)))
+        console = box("treadmill console", (.82,.17,.085), (0,-.81,1.11), metal, rotation=(-.26,0,0))
+        self.parts.append((console,False))
+        self.bounds = [Vector((sign*.43,y,z)) for sign in (-1,1) for y,z in ((.81,self.height),(-.85,1.15))]
+        self.contacts = {}
+        self.rib_positions = []
+        edge = material("treadmill belt seams", (.066,.075,.083), .1,.65)
+        for index in range(12):
+            part = box("treadmill belt seam", (.64,.008,.002), (0,0,0), edge)
+            part.rotation_euler = self.rotation.to_euler()
+            self.rib_positions.append((index,part))
+
+    def pose(self, spec, keys, phase, key, torso, frame, gaps):
+        pitch = math.radians(self.pitch)
+        for index, seam in self.rib_positions:
+            travel = ((index / len(self.rib_positions) + phase * .75) % 1) * 1.56 - .78
+            seam.location = self.face + self.rotation @ Vector((0,travel,.001))
+            seam.keyframe_insert("location", frame=frame)
+        for side, sign in SIDES.items():
+            stride = PoseSpan(keys, phase + (0 if side == "Left" else .5))
+            y, lift, heel = stride.sample("gait")
+            self.contacts[side] = lift < .002
+            ankle_bone = rig.data.bones[side + "Foot"].head_local
+            toe_bone = rig.data.bones[side + "ToeBase"].head_local
+            height = self.height - (y - (ankle_bone.y - toe_bone.y)) * math.tan(pitch) + lift
+            # The toe pivots on the inclined belt as the heel rises.
+            key["foot_" + side.lower()] = [y, height, heel - self.pitch]
+            key.setdefault("sled_toe_pitch", {})[side] = -self.pitch
+            upper = stride.sample("arm_swing")
+            curl = stride.sample("arm_bend")
+            _, hand = held_point(side, {"upper_arm":upper,"curl":curl,"flex_toward":[0,1,0]}, torso)
+            pole = torso.direction(upper, sign)
+            upper_length, _ = segment(side + "Arm", side + "ForeArm", side + "Hand")
+            elbow = head(side + "Arm") + pole * upper_length
+            along = (hand - elbow).normalized()
+            inward = -torso.left * sign
+            palm = (inward - along * along.dot(inward)).normalized()
+            hand += palm * GRIP[side][1]
+            gap = pose_arm(side, hand, pole, "neutral", torso, contact_frame=(along,palm))
+            gaps.append((side + " treadmill arm", gap))
+
+    def check(self, points, faces, hands, frame, problems, samples):
+        check_hardware_clearance(self.parts, points, faces, hands, {}, frame, problems)
+        local = (points - np.array(self.face)) @ np.array(self.rotation)
+        for side, sign in SIDES.items():
+            over = (local[:,0] * sign > 0) & (abs(local[:,0]) < .325) & (abs(local[:,1]) < .803)
+            sole = local[over, 2].min(initial=1)
+            if sole < -.013:
+                problems.add(frame, side + " foot goes through treadmill belt", -sole)
+            if self.contacts[side] and sole > .017:
+                problems.add(frame, side + " stance foot loses treadmill belt", sole)
+        samples.append(np.array(self.bounds))
+
+
+class CycleStation:
+    """A crank drives the pedals and, on an air bike, the moving handles."""
+
+    def __init__(self, config):
+        self.crank = Vector(config["crank"])
+        self.radius = config.get("radius", .137)
+        self.saddle = Vector(config["saddle"])
+        self.grip = Vector(config["grip"])
+        self.air = config.get("air", False)
+        self.seat_half = .14 if config.get("backrest") else .089
+        self.seat_depth = .12
+        metal = material("cycle frame", IRON, .60, .46)
+        rubber = material("cycle upholstery", PAD, .05, .70)
+        box("cycle saddle", (2*self.seat_half,2*self.seat_depth,.075), self.saddle - Vector((0,0,.0375)), rubber)
+        self.parts, self.handles, self.pedals, self.rods, self.handle_braces = [], {}, {}, {}, {}
+        self.pedal_axles = {}
+        self.backrest = SupportPad("recumbent cycle backrest", config["backrest"], rubber, metal) if "backrest" in config else None
+        if self.backrest:
+            self.parts.extend((mount,False) for mount in self.backrest.mounts)
+        support = box("cycle saddle post", (.095,.11,self.saddle.z),
+                      (0,self.saddle.y,self.saddle.z / 2), metal)
+        self.parts.append((support,False))
+        for y in (self.crank.y-.26,self.saddle.y+.13):
+            base = box("cycle ground stabilizer", (.71,.115,.055),(0,y,.0275),metal)
+            self.parts.append((base,False))
+        wheel = cylinder("cycle flywheel", .245 if self.air else .175, .16, 0, metal, None)
+        wheel.location = (0,self.crank.y-.29,.29 if self.air else .245)
+        self.parts.append((wheel,False))
+        for name, start, end in (
+            ("cycle frame spine", Vector((0,self.saddle.y,.18)), self.crank),
+            ("cycle flywheel carrier", self.crank, wheel.location),
+        ):
+            member = CableStation.part(name,.035,metal)
+            set_segment(member,start,end,1)
+            self.parts.append((member,False))
+        for side, sign in SIDES.items():
+            self.pedals[side] = box("cycle pedal", (.126,.22,.031), (0,0,0), rubber)
+            self.rods[side] = CableStation.part("cycle crank arm", .016, metal)
+            self.pedal_axles[side] = CableStation.part("cycle pedal spindle", .011, metal)
+            self.handle_braces[side] = CableStation.part("cycle grip support", .022, metal)
+            self.handles[side] = CableStation.part("cycle grip", Barbell.SHAFT, metal)
+            self.parts.extend(((self.rods[side],False),(self.pedal_axles[side],False),(self.handle_braces[side],False),
+                               (self.handles[side],True)))
+        self.pedal_faces = {}
+        self.bounds = [Vector((sign*.37,y,z)) for sign in (-1,1)
+                       for y,z in ((self.crank.y-.44,.0),(self.saddle.y+.19,self.saddle.z))]
+
+    def pose(self, spec, span, phase, key, torso, frame, gaps):
+        for side, (ankle, yaw) in ankles(spec, key).items():
+            sign = SIDES[side]
+            angle = (phase + (0 if side == "Left" else .50)) * math.tau
+            pedal = self.crank + Vector((sign*.165, self.radius * math.cos(angle), self.radius * math.sin(angle)))
+            self.pedal_faces[side] = pedal
+            part = self.pedals[side]
+            part.location = pedal - Vector((0,0,.0155))
+            part.keyframe_insert("location", frame=frame)
+            axle = Vector((sign*.076,self.crank.y,self.crank.z))
+            outer_joint = pedal - Vector((0,0,.031))
+            inner_joint = Vector((axle.x,outer_joint.y,outer_joint.z))
+            set_segment(self.rods[side], axle, inner_joint, frame)
+            set_segment(self.pedal_axles[side], inner_joint, outer_joint, frame)
+            key["foot_" + side.lower()] = [
+                pedal.y + .063 - ankle.y, pedal.z + FLOOR_ANKLE - ankle.z,0,pedal.x - ankle.x]
+            target = Vector((sign * self.grip.x,self.grip.y,self.grip.z))
+            if self.air:
+                target += Vector((0,-.106 * math.cos(angle),.045 * math.cos(angle)))
+            axis = Vector((1,0,0))
+            inner = target - axis * sign * .077
+            outer = target + axis * sign * .077
+            set_segment(self.handles[side],inner,outer,frame)
+            base = Vector((sign*.406,self.crank.y-.28,.34))
+            set_segment(self.handle_braces[side],base,outer,frame)
+            gap = pose_arm(side,target,torso.direction(span.sample("elbows"),sign),"pronated",torso,axis)
+            gaps.append((side + " cycle grip",gap))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        if self.backrest:
+            self.backrest.check(points, frame, problems)
+        local = points - np.array(self.saddle)
+        over = (abs(local[:,0]) < self.seat_half) & (abs(local[:,1]) < self.seat_depth)
+        gap = local[over & (abs(local[:,2]) < .10),2].min(initial=1)
+        if gap > .016 or gap < -.014:
+            problems.add(frame,"seat loses cycle saddle contact",abs(gap))
+        for side, face in self.pedal_faces.items():
+            rel = points - np.array(face)
+            over = (abs(rel[:,0]) < .063) & (abs(rel[:,1]) < .11)
+            gap = rel[over,2].min(initial=1)
+            if abs(gap) > .011:
+                problems.add(frame,side + " foot loses cycle pedal contact",abs(gap))
+        samples.append(np.array(self.bounds))
+
+
 class LegRollerMachine:
     """A knee-height axle drives padded rollers through a fixed arc."""
 
@@ -2759,7 +2928,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -2782,6 +2951,8 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
+    cycle = next((CycleStation(e) for e in spec.get("equipment", []) if e["type"] == "cycle-station"), None)
     lateral = next((LateralRaiseStation(e) for e in spec.get("equipment", []) if e["type"] == "lateral-station"), None)
     trunk_station = next((RotatingTrunkStation(e) for e in spec.get("equipment", []) if e["type"] == "trunk-station"), None)
     assist = next((AssistanceStation(e) for e in spec.get("equipment", []) if e["type"] == "assist-station"), None)
@@ -2805,6 +2976,10 @@ def bake(spec, keys):
     floor_hands = spec.get("floor_hands")
     if (rack_contact or cradle) and type(barbell) is not Barbell:
         raise ValueError("Open rack contact requires a straight barbell")
+    handled_station = next((item for item in (
+        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
+        cycle, calf, roller,
+    ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
         if (side == support_side or floor_hands) and shape != "support":
@@ -2812,7 +2987,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine or hip_machine or guided_squat or assist or trunk_station or lateral or roller and roller.handles)
+                        or landmine and side in landmine.handles or handled_station and side in handled_station.handles)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -2820,7 +2995,8 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or hip_machine or guided_squat or assist or trunk_station or lateral or roller and roller.handles or calf and calf.handles else {}
+    has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station
+    grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -2876,6 +3052,12 @@ def bake(spec, keys):
                 key[field] = span.sample(field)
         if sled:
             sled.pose(spec, span, key, frame, problems)
+        activity_gaps = []
+        phase = (frame - 1) / frames
+        if treadmill:
+            treadmill.pose(spec, keys, phase, key, torso, frame, activity_gaps)
+        if cycle:
+            cycle.pose(spec, span, phase, key, torso, frame, activity_gaps)
         if assist:
             gaps = []
             assist.pose(span, torso, frame, gaps, problems)
@@ -2888,6 +3070,7 @@ def bake(spec, keys):
             roller.pose_grips(torso, gaps)
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
+        gaps.extend(activity_gaps)
         if lateral:
             lateral.pose(span, torso, frame, gaps, problems)
         if trunk_station:
@@ -3144,7 +3327,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or hip_machine or guided_squat or assist or trunk_station or lateral or calf or roller)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, handled_station)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -3162,6 +3345,10 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if treadmill:
+            treadmill.check(everything, contact.faces, hands, frame, problems, samples)
+        if cycle:
+            cycle.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if lateral:
             lateral.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if trunk_station:
