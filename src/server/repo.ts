@@ -209,9 +209,13 @@ export const updateProfile = Effect.fn("updateProfile")(function* (patch: Profil
     streakGoals: patch.streakGoals ? patch.streakGoals.map(normaliseGoal) : user.streakGoals,
   }
 
+  // Goals are only written when they are what changes, so an account that never chose any keeps
+  // following the default rather than a copy of it.
+  const goals = patch.streakGoals ? JSON.stringify(next.streakGoals) : null
+
   yield* sql`UPDATE users SET display_name = ${next.displayName}, unit = ${next.unit}, goal = ${next.goal},
     training_context = ${next.trainingContext}, calorie_target = ${next.calorieTarget},
-    protein_target = ${next.proteinTarget}, streak_goals = ${JSON.stringify(next.streakGoals)} WHERE id = ${user.id}`
+    protein_target = ${next.proteinTarget}, streak_goals = COALESCE(${goals}, streak_goals) WHERE id = ${user.id}`
 
   return { ...user, ...next } satisfies User
 })

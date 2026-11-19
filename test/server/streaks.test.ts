@@ -58,6 +58,14 @@ describe("streak goals", () => {
     expect((await me.call("getSession", {})).streakGoals).toEqual(goals)
   })
 
+  it("leave an account that never chose goals on the default, whatever else it saves", async () => {
+    const me = await server.signUp("default@example.com")
+
+    await me.call("updateProfile", { displayName: "Renamed" })
+
+    expect(server.readText(`SELECT streak_goals FROM users WHERE email = 'default@example.com'`)).toBe("")
+  })
+
   it("refuse no goals, three goals, or one it does not know", async () => {
     const me = await server.signUp()
     const goal = { activity: "training", period: "week", target: 1 }

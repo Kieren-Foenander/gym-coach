@@ -1,4 +1,3 @@
-
 /** Midnight at the start of the day containing the timestamp, in the device's time zone. */
 export const startOfDay = (timestamp: number): number => {
   const date = new Date(timestamp)
