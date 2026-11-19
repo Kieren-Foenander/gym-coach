@@ -1807,8 +1807,9 @@ class CycleStation:
             wheel = cylinder("cycle flywheel", .175, .16, 0, metal, None)
             wheel.location = (0, self.crank.y - .29, .245)
         elif self.air:
-            wheel = cylinder("cycle flywheel", .245, .16, 0, metal, None)
-            wheel.location = (0, self.crank.y - .29, .29)
+            wheel = cylinder("air bike fan housing", .268, .18, 0, metal, None)
+            wheel.location = front
+            self.fan_grille(front, metal)
         else:
             shell = material("spin bike belt cover", (.135, .148, .165), .45, .36)
             wheel = cylinder("enclosed spin bike flywheel", .199, .12, 0, shell, None)
@@ -1821,9 +1822,15 @@ class CycleStation:
             member = CableStation.part(name,.035,metal)
             set_segment(member,start,end,1)
             self.parts.append((member,False))
-        if not self.backrest and not self.air:
+        if not self.backrest:
             self.member("cycle front dropout", front, Vector((0, self.crank.y - .26, .046)), .036, metal)
-        if not self.air and not self.backrest:
+        if self.air:
+            self.arm_axle = Vector((0, front.y, .557))
+            self.member("air bike pivot mast", front, self.arm_axle, .047, metal)
+            self.member("air bike arm axle",
+                        self.arm_axle - Vector((self.grip.x + .094, 0, 0)),
+                        self.arm_axle + Vector((self.grip.x + .094, 0, 0)), .027, metal)
+        elif not self.backrest:
             stem = Vector((0, self.grip.y, self.grip.z))
             self.member("spin bike handlebar stem", front, stem, .036, metal)
             reach = Vector((self.grip.x - .077, 0, 0))
@@ -1838,6 +1845,10 @@ class CycleStation:
             if self.backrest or self.air:
                 self.handle_braces[side] = CableStation.part("cycle grip support", .022, metal)
                 self.parts.append((self.handle_braces[side], False))
+            if self.air:
+                hub = cylinder("air bike arm bearing", .045, .042, 0, metal, None)
+                hub.location = self.arm_axle + Vector((sign * (self.grip.x + .088), 0, 0))
+                self.parts.append((hub, False))
         self.pedal_faces = {}
         self.bounds = [Vector((sign*.37,y,z)) for sign in (-1,1)
                        for y,z in ((self.crank.y-.44,.0),(self.saddle.y+.19,self.saddle.z))]
@@ -1846,6 +1857,19 @@ class CycleStation:
         member = CableStation.part(name, radius, finish)
         set_segment(member, start, end, 1)
         self.parts.append((member, False))
+
+    def fan_grille(self, centre, finish):
+        grille = material("air bike fan grille", (.25, .27, .31), .62, .38)
+        for sign in (-1, 1):
+            face = centre + Vector((sign * .093, 0, 0))
+            hub = cylinder("air bike fan hub", .053, .018, 0, finish, None)
+            hub.location = face
+            self.parts.append((hub, False))
+            for blade in range(8):
+                angle = blade * math.tau / 8
+                start = face + Vector((0, .048 * math.cos(angle), .048 * math.sin(angle)))
+                end = face + Vector((0, .239 * math.cos(angle + .22), .239 * math.sin(angle + .22)))
+                self.member("air bike radial grille", start, end, .009, grille)
 
     def pose(self, spec, span, phase, key, torso, frame, gaps):
         for side, (ankle, yaw) in ankles(spec, key).items():
@@ -1865,12 +1889,16 @@ class CycleStation:
                 pedal.y + .063 - ankle.y, pedal.z + FLOOR_ANKLE - ankle.z,0,pedal.x - ankle.x]
             target = Vector((sign * self.grip.x,self.grip.y,self.grip.z))
             if self.air:
-                target += Vector((0, -.106 * math.cos(angle), .045 * math.cos(angle)))
+                base = self.arm_axle + Vector((sign * (self.grip.x + .077), 0, 0))
+                rotation = Matrix.Rotation(.229 * math.cos(angle), 3, "X")
+                target = base + rotation @ (target - base)
             axis = Vector((1,0,0))
             inner = target - axis * sign * .077
             outer = target + axis * sign * .077
             set_segment(self.handles[side],inner,outer,frame)
-            if self.air or self.backrest:
+            if self.air:
+                set_segment(self.handle_braces[side], base, outer, frame)
+            elif self.backrest:
                 base = Vector((sign * .406, self.crank.y - .28, .34))
                 set_segment(self.handle_braces[side], base, outer, frame)
             gap = pose_arm(side,target,torso.direction(span.sample("elbows"),sign),"pronated",torso,axis)
