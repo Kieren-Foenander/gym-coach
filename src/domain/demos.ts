@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "t-bar-row",
+    views: ["back", "front"],
+    cues: [
+      "Straddle the bar and hinge with a flat back.",
+      "Pull the handles toward your lower ribs.",
+      "Lower to long arms while holding the hinge.",
+    ],
+  },
+  {
+    slug: "meadows-row",
+    views: ["back", "front"],
+    cues: [
+      "Hinge and grip the end of the bar from the side.",
+      "Drive your working elbow up and out.",
+      "Lower the bar until your arm is long.",
+    ],
+  },
+  {
+    slug: "pendlay-row",
+    views: ["back", "front"],
+    cues: [
+      "Hinge until your torso is nearly horizontal.",
+      "Row the bar from the floor to your lower ribs.",
+      "Return it to a dead stop before each rep.",
+    ],
+  },
+  {
     slug: "preacher-curl",
     views: ["front"],
     cues: [
