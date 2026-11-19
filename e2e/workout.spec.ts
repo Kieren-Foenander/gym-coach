@@ -5,7 +5,7 @@ import { expect, test, testIds } from "./support"
 const template = PLAN_TEMPLATES[0]!
 const firstExercise = template.plan.days[0]!.exercises[0]!.exercise
 
-test("starts a plan, logs a set, finishes, and the day shows as trained @smoke", async ({ page }) => {
+test("starts a plan, logs a set, finishes, and the day counts toward the streak @smoke", async ({ page }) => {
   await page.getByTestId(testIds.nav.tab("plan")).click()
   await page.getByTestId(testIds.plan.template(template.id)).click()
   // The templates go once the plan is saved; going to Today before that would find no plan.
@@ -27,10 +27,10 @@ test("starts a plan, logs a set, finishes, and the day shows as trained @smoke",
 
   await page.getByTestId(testIds.workout.done).click()
   await expect(page.getByTestId(testIds.today.workoutsThisWeek)).toHaveAttribute("data-value", "1")
-  await expect(page.getByTestId(testIds.today.weekDay(Date.now()))).toHaveAttribute("data-state", DAY_STATES.trained)
+  await expect(page.getByTestId(testIds.today.weekDay(Date.now()))).toHaveAttribute("data-state", DAY_STATES.counted)
 
   await page.getByTestId(testIds.today.weekCard).click()
-  await expect(page.getByTestId(testIds.calendar.day(Date.now()))).toHaveAttribute("data-state", DAY_STATES.trained)
+  await expect(page.getByTestId(testIds.calendar.day(Date.now()))).toHaveAttribute("data-state", DAY_STATES.counted)
 })
 
 test("an open workout with nothing logged leaves no trace", async ({ page }) => {

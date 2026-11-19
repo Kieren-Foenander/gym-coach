@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { byDay, countInMonth, monthGrid, shiftMonth, startOfWeek, summariseWeek, weeklyStreaks } from "~/domain/week"
+import { byDay, countInMonth, monthGrid, shiftMonth, startOfWeek } from "~/domain/week"
 
 const at = (year: number, month: number, day: number, hour = 12) => new Date(year, month - 1, day, hour).getTime()
 
@@ -13,112 +13,6 @@ describe("startOfWeek", () => {
 
   it("treats Sunday as the last day of the week", () => {
     expect(startOfWeek(at(2026, 11, 15, 23))).toBe(at(2026, 11, 9, 0))
-  })
-})
-
-describe("summariseWeek", () => {
-  it("marks the days trained this week and totals them", () => {
-    const week = summariseWeek(
-      [
-        { startedAt: at(2026, 11, 8), volume: 9000 },
-        { startedAt: at(2026, 11, 9), volume: 1000 },
-        { startedAt: at(2026, 11, 11, 7), volume: 2500 },
-      ],
-      now,
-    )
-
-    expect(week.days).toEqual([true, false, true, false, false, false, false])
-    expect(week.todayIndex).toBe(2)
-    expect(week.workouts).toBe(2)
-    expect(week.volume).toBe(3500)
-  })
-
-  it("counts consecutive weeks including the current one", () => {
-    const week = summariseWeek(
-      [
-        { startedAt: at(2026, 10, 28), volume: 1 },
-        { startedAt: at(2026, 11, 3), volume: 1 },
-        { startedAt: at(2026, 11, 10), volume: 1 },
-      ],
-      now,
-    )
-
-    expect(week.streakWeeks).toBe(3)
-  })
-
-  it("keeps the streak while this week has no workout yet", () => {
-    const week = summariseWeek(
-      [
-        { startedAt: at(2026, 10, 28), volume: 1 },
-        { startedAt: at(2026, 11, 3), volume: 1 },
-      ],
-      now,
-    )
-
-    expect(week.streakWeeks).toBe(2)
-    expect(week.workouts).toBe(0)
-  })
-
-  it("ends the streak after a missed week", () => {
-    const week = summariseWeek(
-      [
-        { startedAt: at(2026, 10, 14), volume: 1 },
-        { startedAt: at(2026, 10, 28), volume: 1 },
-      ],
-      now,
-    )
-
-    expect(week.streakWeeks).toBe(0)
-  })
-
-  it("handles no history", () => {
-    expect(summariseWeek([], now)).toMatchObject({ workouts: 0, volume: 0, streakWeeks: 0 })
-  })
-})
-
-describe("weeklyStreaks", () => {
-  it("finds the current run, the longest run, and which weeks are in the current one", () => {
-    const streaks = weeklyStreaks(
-      [
-        // A four week run in September.
-        at(2026, 9, 1),
-        at(2026, 9, 9),
-        at(2026, 9, 9, 18),
-        at(2026, 9, 16),
-        at(2026, 9, 26),
-        // A gap, then the two weeks up to last week.
-        at(2026, 10, 27),
-        at(2026, 11, 5),
-      ],
-      now,
-    )
-
-    expect(streaks.current).toBe(2)
-    expect(streaks.longest).toBe(4)
-    expect([...streaks.currentWeeks].toSorted()).toEqual([at(2026, 10, 26, 0), at(2026, 11, 2, 0)])
-  })
-
-  it("counts the current run as the longest when it is", () => {
-    const streaks = weeklyStreaks([at(2026, 10, 28), at(2026, 11, 3), at(2026, 11, 10)], now)
-
-    expect(streaks).toMatchObject({ current: 3, longest: 3 })
-  })
-
-  it("keeps the longest run after the current one has ended", () => {
-    const streaks = weeklyStreaks([at(2026, 10, 14), at(2026, 10, 21)], now)
-
-    expect(streaks).toMatchObject({ current: 0, longest: 2 })
-    expect(streaks.currentWeeks.size).toBe(0)
-  })
-
-  it("runs across the end of daylight saving and the new year", () => {
-    const weekly = Array.from({ length: 20 }, (_, index) => at(2026, 10, 1 + index * 7))
-
-    expect(weeklyStreaks(weekly, at(2027, 2, 17)).longest).toBe(20)
-  })
-
-  it("handles no history", () => {
-    expect(weeklyStreaks([], now)).toMatchObject({ current: 0, longest: 0 })
   })
 })
 

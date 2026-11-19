@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
 import { isDay } from "./days"
 import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
+import { MAX_STREAK_GOALS, MAX_WEEKLY_TARGET, STREAK_ACTIVITIES, STREAK_PERIODS } from "./streaks"
 import { MEASUREMENT_KINDS } from "./units"
 
 export { distanceUnit, MEASUREMENT_KINDS, measurementUnit } from "./units"
@@ -27,6 +28,19 @@ export const SignUpInput = Schema.Struct({
   inviteCode: Schema.optional(Text(200)),
 })
 
+/** One streak goal: what counts and how often. A daily goal's target is always 1. */
+export const StreakGoal = Schema.Struct({
+  activity: Schema.Literals(STREAK_ACTIVITIES).annotate({
+    description: "training: any workout except walks. walking: walks only. any: anything logged, walks included.",
+  }),
+  period: Schema.Literals(STREAK_PERIODS),
+  target: Int(1, MAX_WEEKLY_TARGET).annotate({ description: "Days a week with a session that counts. Use 1 for a daily goal." }),
+})
+
+export type StreakGoal = typeof StreakGoal.Type
+
+export const StreakGoals = Schema.Array(StreakGoal).check(Schema.isMinLength(1), Schema.isMaxLength(MAX_STREAK_GOALS))
+
 export const ProfilePatch = Schema.Struct({
   displayName: Schema.optional(Name),
   unit: Schema.optional(Unit),
@@ -35,6 +49,8 @@ export const ProfilePatch = Schema.Struct({
   /** Daily targets for the food log. Null clears one. */
   calorieTarget: Schema.optional(Schema.NullOr(Int(TARGET_LIMITS.calories.min, TARGET_LIMITS.calories.max))),
   proteinTarget: Schema.optional(Schema.NullOr(Int(TARGET_LIMITS.protein.min, TARGET_LIMITS.protein.max))),
+  /** What the calendar's streaks count, the first one leading. Replaces the saved goals. */
+  streakGoals: Schema.optional(StreakGoals),
 })
 
 export type ProfilePatch = typeof ProfilePatch.Type

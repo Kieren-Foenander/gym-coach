@@ -4,7 +4,22 @@ import * as WebBrowser from "expo-web-browser"
 import { useState } from "react"
 import { Linking, Platform, View } from "react-native"
 import { call, fetchDeployment, rememberUser, signOut, useSession } from "@/api/session"
-import { Button, Card, Chip, ErrorNote, Field, PageTitle, Screen, SectionTitle, Segmented, Text, TextArea, TextInput } from "@/components/ui"
+import {
+  Button,
+  Card,
+  Chip,
+  Display,
+  ErrorNote,
+  Eyebrow,
+  Field,
+  PageTitle,
+  Screen,
+  SectionTitle,
+  Segmented,
+  Text,
+  TextArea,
+  TextInput,
+} from "@/components/ui"
 import { useAction } from "@/data/calls"
 import { useOutbox } from "@/data/outbox-store"
 import { AppleHealthCard } from "@/features/health/AppleHealthCard"
@@ -21,6 +36,19 @@ import {
   isTestStage,
   type CoachAppId,
 } from "~/domain/coach-apps"
+import {
+  ACTIVITY_HINTS,
+  ACTIVITY_LABELS,
+  activeGoals,
+  describeGoal,
+  FREQUENCIES,
+  isFrequency,
+  MAX_STREAK_GOALS,
+  normaliseGoal,
+  STREAK_ACTIVITIES,
+  suggestSecondGoal,
+  type StreakGoal,
+} from "~/domain/streaks"
 
 export function SettingsScreen() {
   const user = useUser()
@@ -57,6 +85,9 @@ export function SettingsScreen() {
           <AppleHealthCard />
         </>
       ) : null}
+
+      <SectionTitle>Streak goals</SectionTitle>
+      <StreakGoalsCard saved={activeGoals(user.streakGoals)} />
 
       <SectionTitle>About you</SectionTitle>
       <Card className="gap-4">
@@ -125,6 +156,84 @@ export function SettingsScreen() {
         <Button onPress={() => void signOut()}>Sign out</Button>
       </Card>
     </Screen>
+  )
+}
+
+/** What the calendar's streaks count and how often: one goal, or two with the first leading. */
+function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> }) {
+  const { act, pending, error } = useAction()
+  const [goals, setGoals] = useState(saved)
+  const [done, setDone] = useState(false)
+  const first = goals[0]
+
+  const edit = (next: ReadonlyArray<StreakGoal>) => {
+    setGoals(next)
+    setDone(false)
+  }
+
+  const change = (index: number, patch: Partial<StreakGoal>) =>
+    edit(goals.map((goal, at) => (at === index ? normaliseGoal({ ...goal, ...patch }) : goal)))
+
+  const save = () =>
+    void act(async () => {
+      await call("updateProfile", { streakGoals: goals })
+      rememberUser(await call("getSession", {}))
+      setDone(true)
+    })
+
+  return (
+    <Card className="gap-5">
+      <Text className="text-muted">
+        Your streak counts what you set here. A walk on its own only counts toward a goal for walks or for anything.
+      </Text>
+      {goals.map((goal, index) => (
+        <View key={index} className="gap-3">
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-1">
+              <Eyebrow className="text-xs text-faint">{index === 0 ? "Main goal" : "Second goal"}</Eyebrow>
+              <Display className="text-2xl">{describeGoal(goal)}</Display>
+            </View>
+            {index > 0 ? (
+              <Button onPress={() => edit(goals.filter((_, at) => at !== index))}>Remove</Button>
+            ) : null}
+          </View>
+          <View>
+            <Text className="pb-1.5 text-sm text-muted">What counts</Text>
+            <View accessibilityLabel="What counts" className="flex-row flex-wrap gap-2">
+              {STREAK_ACTIVITIES.map((activity) => (
+                <Chip
+                  key={activity}
+                  label={ACTIVITY_LABELS[activity]}
+                  selected={goal.activity === activity}
+                  onPress={() => change(index, { activity })}
+                />
+              ))}
+            </View>
+            <Text className="pt-1.5 text-sm text-faint">{ACTIVITY_HINTS[goal.activity]}</Text>
+          </View>
+          <View>
+            <Text className="pb-1.5 text-sm text-muted">How often</Text>
+            <View accessibilityLabel="How often" className="flex-row flex-wrap gap-2">
+              {FREQUENCIES.map((frequency) => (
+                <Chip
+                  key={frequency.label}
+                  label={frequency.label}
+                  selected={isFrequency(goal, frequency)}
+                  onPress={() => change(index, { period: frequency.period, target: frequency.target })}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+      ))}
+      {goals.length < MAX_STREAK_GOALS && first ? (
+        <Button onPress={() => edit([...goals, suggestSecondGoal(first)])}>Add a second goal</Button>
+      ) : null}
+      <ErrorNote message={error} />
+      <Button variant="primary" disabled={pending} onPress={save}>
+        {done && !pending ? "Saved" : "Save goals"}
+      </Button>
+    </Card>
   )
 }
 
