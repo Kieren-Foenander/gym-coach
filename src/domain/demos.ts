@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "deficit-deadlift",
+    views: ["back", "front"],
+    cues: [
+      "Stand on a low platform and grip the bar outside your legs.",
+      "Push through the platform and keep the bar close.",
+      "Return the plates to the floor under control.",
+    ],
+  },
+  {
+    slug: "rack-pull",
+    views: ["back", "front"],
+    cues: [
+      "Set the bar on pins just below your knees.",
+      "Brace and stand tall with the bar close to your legs.",
+      "Hinge back and let the bar settle on the pins.",
+    ],
+  },
+  {
     slug: "ez-bar-overhead-triceps-extension",
     views: ["back", "front"],
     cues: [
