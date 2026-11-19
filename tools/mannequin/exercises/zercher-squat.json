@@ -12,6 +12,5 @@
   "checkpoints": [
     {"elbow": [91, 145], "handle_axis": {"direction": [1, 0, 0], "degrees": 2}},
     {"at": 0.48, "position": {"point": "Hips", "z": [0.49, 0.51]}}
-  ],
-  "hands": {"Left": "cup", "Right": "cup"}
+  ]
 }
