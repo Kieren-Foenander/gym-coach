@@ -10,12 +10,13 @@
       "pad_at": [
         0.193,
         0.007,
-        1.405
+        1.426
       ],
       "travel": [
         -0.002,
         0.1
-      ]
+      ],
+      "handles": true
     }
   ],
   "stance": {
@@ -24,7 +25,7 @@
     "toe_out": 8
   },
   "camera": {
-    "angle": 90
+    "angle": 111
   },
   "frames": 96,
   "keys": [
@@ -84,6 +85,20 @@
           0.242
         ]
       }
+    },
+    {
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 2
+      },
+      "elbow": [
+        65,
+        148
+      ]
     }
   ]
 }

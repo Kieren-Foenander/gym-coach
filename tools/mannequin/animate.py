@@ -1151,6 +1151,7 @@ class CalfStation:
         box("calf forefoot step", (.55, .16, self.step_z),
                         (0, self.step_y, self.step_z / 2), metal)
         self.pads, self.beams, self.parts = {}, {}, []
+        self.handles, self.handle_links = {}, {}
         for side, sign in SIDES.items():
             x = .53 * sign
             post_height = .85 if self.seated else 1.78
@@ -1164,6 +1165,10 @@ class CalfStation:
             self.beams[side] = beam
             self.pads[side] = cushion
             self.parts.extend((part, False) for part in (post, base, beam))
+            if config.get("handles"):
+                self.handles[side] = CableStation.part("calf grip", Barbell.SHAFT, metal)
+                self.handle_links[side] = CableStation.part("calf grip support", .018, metal)
+                self.parts.extend(((self.handles[side], True), (self.handle_links[side], False)))
         for i in range(9):
             weight = box("calf machine stack plate", (.24, .18, .025),
                          (.53, self.pad_y + .28, .06 + .032 * i), metal)
@@ -1171,7 +1176,7 @@ class CalfStation:
         self.bounds = [Vector((x, self.pad_y + .14, z))
                        for x in (-.58, .58) for z in (0, post_height)]
 
-    def pose(self, span, frame, problems):
+    def pose(self, span, torso, frame, gaps, problems):
         lift = span.sample("calf_lift")
         minimum, maximum = self.travel
         if not minimum <= lift <= maximum:
@@ -1185,9 +1190,19 @@ class CalfStation:
             beam = self.beams[side]
             beam.location = (sign * .386, self.pad_y + .055, self.face_z + .061)
             beam.keyframe_insert("location", frame=frame)
+            if side in self.handles:
+                axis = Vector((1, 0, 0))
+                target = Vector((sign * .283, self.pad_y - .24, self.face_z - .135))
+                outer = target + axis * sign * .081
+                set_segment(self.handles[side], target - axis * sign * .081, outer, frame)
+                set_segment(self.handle_links[side], beam.location, outer, frame)
+                pole = torso.direction([.48, .17, -1], sign)
+                gap = pose_arm(side, target, pole, "pronated", torso, axis)
+                gaps.append((side + " calf grip", gap))
 
-    def check(self, points, faces, hands, frame, problems, samples):
-        check_hardware_clearance(self.parts, points, faces, hands, {}, frame, problems)
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
         for side, sign in SIDES.items():
             x = self.pad_x * sign
             under = (np.abs(points[:, 0] - x) < self.half) & (
@@ -2276,7 +2291,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles or cables and side in cables.handles or machine)
+                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -2284,7 +2299,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or calf and calf.handles else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -2336,8 +2351,6 @@ def bake(spec, keys):
         for field in ("foot_left", "foot_right"):
             if field in a:
                 key[field] = span.sample(field)
-        if calf:
-            calf.pose(span, frame, problems)
         if sled:
             sled.pose(spec, span, key, frame, problems)
         if roller:
@@ -2345,6 +2358,8 @@ def bake(spec, keys):
             gaps = []
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
+        if calf:
+            calf.pose(span, torso, frame, gaps, problems)
         if barbell:
             arc_pole = None
             if "arm_arc" in a:
@@ -2593,7 +2608,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or calf)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -2612,7 +2627,7 @@ def bake(spec, keys):
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
         if calf:
-            calf.check(everything, contact.faces, hands, frame, problems, samples)
+            calf.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if sled:
             sled.check(everything, contact.faces, hands, frame, problems, samples)
         if roller:
