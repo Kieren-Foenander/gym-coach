@@ -47,18 +47,27 @@ MPFB assets, remove the corresponding directory under `gym-trainer/scenes` to re
 
 ### Extending equipment
 
-The supported equipment types are `barbell`, `dumbbells`, `bench`, `ez-bar`, `trap-bar` and `kettlebells`. Unsupported types fail
+The supported equipment includes `barbell`, `dumbbells`, `bench`, `ez-bar`, `trap-bar`, `kettlebells` and `cable`. Unsupported types fail
 before rendering. Keep exercise JSON focused on the setup and movement. Put geometry, handle
 axes, travel limits and contact checks in the shared equipment implementation. Existing bar
 and dumbbell classes provide examples of grip targets and collision measurements.
 
-For the first cable exercise, model the pulley exit and moving handle as explicit anchors.
-Both the visible cable segment and the tension direction should use those anchors. For a
-machine, define its hinge or slide, limits, pads and handle in the apparatus's local coordinates.
-Drive the handle from the mechanism and solve the body to that handle. Add a known-good motion
-and a deliberately bad travel or contact case when introducing each apparatus. A subsequent
-exercise using the same apparatus should only need a spec. The current closed fists require
-a straight 28 mm grip; ropes, open hands and other handle diameters need their own grip geometry.
+A `cable` uses `columns` keyed by hand (`Left` or `Right`) with a `d-handle`, or
+by `Both` with a `rope`, `straight-bar` or `v-bar`. Each column takes `at: [x, y]`,
+`height: "high" | "mid" | "low"`, and an optional horizontal exit direction
+`exit: [x, y]` (default `[0, 1]`). The cable runs straight from that exit to
+the attachment eye. The bake checks travel, cable clearance against the posed skin,
+and contact and wrist alignment at each 28 mm grip. The rope has molded end grips.
+
+Use `cable_target` for a left grip position in world metres, mirrored for the right
+hand, and `handle_direction` for the grip shaft direction in torso coordinates.
+For an elbow-driven arc, use `upper_arm`, `curl`, and `flex_toward`. The geometry
+follows the hand targets in either mode.
+
+For a machine, define its hinge or slide, limits, pads and handle in the apparatus's
+local coordinates. Drive the handle from the mechanism and solve the body to that
+handle. Add a known-good motion and a deliberately bad travel or contact case when
+introducing each apparatus.
 
 ### Choosing a colour
 

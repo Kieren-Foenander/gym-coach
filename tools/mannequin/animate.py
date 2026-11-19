@@ -709,6 +709,180 @@ class Kettlebells(Dumbbells):
                 for z in (-self.DROP-self.RADIUS,self.HANDLE)]
 
 
+def set_segment(part, start, end, frame):
+    """Pose a unit cylinder along the segment between two world anchors."""
+    delta = end - start
+    if delta.length < .001:
+        raise ValueError("Equipment segment has coincident anchors")
+    part.location = (start + end) / 2
+    part.rotation_euler = delta.to_track_quat("Z", "Y").to_euler()
+    part.scale.z = delta.length
+    for channel in ("location", "rotation_euler", "scale"):
+        part.keyframe_insert(channel, frame=frame)
+
+
+class CableStation:
+    """A fixed column with a selectable cable exit and a moving attachment."""
+
+    HEIGHTS = {"low": .18, "mid": 1.21, "high": 1.92}
+    GRIP_HALF = {"d-handle": .068, "rope": .069, "straight-bar": .32, "v-bar": .078}
+    RADIUS = .004
+    TRAVEL = (.10, 3.05)
+
+    def __init__(self, config):
+        self.attachment = config["attachment"]
+        self.half = self.GRIP_HALF[self.attachment]
+        dual = self.attachment == "d-handle"
+        self.stations = {}
+        self.handles = {}
+        self.lines = []
+        self.bounds = []
+        self.steel = material("cable hardware", STEEL, .8, .33)
+        self.rubber = material("cable and rope", (.072, .078, .085), .24, .62)
+        frame_finish = material("cable frame", (.085, .095, .11), .65, .43)
+        columns = config["columns"]
+        if not columns or not set(columns) <= (set(SIDES) if dual else {"Both"}):
+            raise ValueError("D-handles need side-specific columns; other attachments need one Both column")
+        for key, column in columns.items():
+            x, y = column["at"]
+            facing = Vector((*column.get("exit", [0, 1]), 0)).normalized()
+            if not facing.length:
+                raise ValueError("Pulley exit direction must be nonzero")
+            height = self.HEIGHTS[column["height"]]
+            origin = Vector((x, y, height))
+            anchor = origin + facing * .15
+            box("cable column", (.16, .18, 2.06), (x, y, 1.03), frame_finish)
+            box("cable base", (.43, .38, .045), (x, y, .0225), frame_finish)
+            box("pulley carriage", (.19, .19, .13), origin + facing * .065, frame_finish)
+            pulley = cylinder("pulley wheel", .047, .036, 0, self.steel, None)
+            pulley.location = anchor - facing * .038
+            axle = facing.cross(Vector((0, 0, 1)))
+            pulley.rotation_euler = axle.to_track_quat("Z", "Y").to_euler()
+            stack_at = Vector((x, y, 0)) - facing * .19
+            for plate in range(10):
+                box("stack plate", (.27, .16, .025), stack_at + Vector((0, 0, .105 + .033 * plate)), frame_finish)
+            for side in (-1, 1):
+                self.bounds.append(Vector((x + side * .22, y, 0)))
+                self.bounds.append(Vector((x + side * .09, y, 2.06)))
+            grip_sides = (key,) if dual else SIDES
+            for side in grip_sides:
+                self.handles[side] = self.part("attachment grip", Barbell.SHAFT, self.steel)
+            count = {"straight-bar": 1, "rope": 2, "v-bar": 2, "d-handle": 3}[self.attachment]
+            links = [self.part("attachment link", .012 if self.attachment == "rope" else .008, self.rubber if self.attachment == "rope" else self.steel) for _ in range(count)]
+            self.stations[key] = (anchor, self.part("taut cable", self.RADIUS, self.rubber), links)
+        if self.attachment == "straight-bar":
+            bpy.data.objects.remove(self.handles["Right"], do_unlink=True)
+            self.handles["Right"] = self.handles["Left"]
+
+    @staticmethod
+    def part(name, radius, finish):
+        part = cylinder(name, radius, 1, 0, finish, None)
+        part.rotation_mode = "XYZ"
+        return part
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        targets, axes = {}, {}
+        self.lines.clear()
+        straight = self.attachment == "straight-bar"
+        for side, sign in SIDES.items():
+            if side not in self.handles:
+                pole = torso.direction(span.sample("free_arm", [.27, .02, -1]), sign)
+                gap = pose_arm(side, head(side + "Arm") + pole * .51, pole, "neutral", torso)
+                gaps.append((side + " hand", gap))
+                continue
+            grip = span.keys[1].get("grip", "neutral")
+            if "cable_target" in span.keys[1]:
+                target = Vector(span.sample("cable_target"))
+                target.x *= sign
+                pole = torso.direction(span.sample("elbows", [.25, -.1, -1]), sign)
+                axis = torso.direction(span.sample("handle_direction", [1, 0, 0]), sign)
+                if straight:
+                    axis = Vector((1, 0, 0))
+                hand_frame = None
+            else:
+                arms = {field: span.sample(field) for field in ("upper_arm", "curl", "flex_toward")}
+                neutral_axis, rough_target = held_point(side, arms, torso)
+                pole = torso.direction(arms["upper_arm"], sign)
+                upper, fore = segment(side + "Arm", side + "ForeArm", side + "Hand")
+                elbow = head(side + "Arm") + pole * upper
+                lower = (rough_target - elbow).normalized()
+                axis = neutral_axis if grip == "neutral" else Vector((1, 0, 0))
+                along, palm = hand_on_bar(lower, palm_facing(grip, lower, pole, torso, sign, axis), axis)
+                target = elbow + lower * fore + along * GRIP[side][0] + palm * GRIP[side][1]
+                hand_frame = (along, palm)
+            targets[side], axes[side] = target, axis.normalized()
+            gap = pose_arm(side, target, pole, grip, torso, axis, hand_frame)
+            gaps.append((side + " cable grip", gap))
+            surface = grips[side]
+            surface.check(frame, target, axis, Barbell.SHAFT, problems)
+            axial = surface.points @ np.array(surface.transform.to_3x3().transposed() @ axis)
+            axial += (surface.transform.translation - target).dot(axis)
+            if not straight and (excess := np.abs(axial).max() - self.half) > 0:
+                problems.add(frame, side + " fist extends off its cable grip", excess)
+            tucked(side, torso, problems, frame)
+            if not straight:
+                set_segment(self.handles[side], target - axes[side] * self.half, target + axes[side] * self.half, frame)
+        for key, (anchor, cable, links) in self.stations.items():
+            if key == "Both":
+                middle = (targets["Left"] + targets["Right"]) / 2
+            else:
+                middle = targets[key]
+            tension = anchor - middle
+            direction = tension.normalized()
+            eye = middle + direction * (.17 if self.attachment == "rope" else .105)
+            if straight:
+                set_segment(self.handles["Left"], middle - Vector((self.half, 0, 0)), middle + Vector((self.half, 0, 0)), frame)
+                set_segment(links[0], eye, middle, frame)
+                for side, surface in grips.items():
+                    axial = surface.points @ np.array(surface.transform.to_3x3().row[0])
+                    axial += surface.transform.translation.x - middle.x
+                    if (excess := np.abs(axial).max() - self.half) > 0:
+                        problems.add(frame, side + " fist extends off the straight cable bar", excess)
+            elif key == "Both":
+                if self.attachment == "v-bar":
+                    eye = middle + Vector((0, -.12, .07))
+                for link, side in zip(links, SIDES):
+                    axis = axes[side]
+                    endpoint = targets[side] + axis * self.half * (1 if axis.dot(eye - targets[side]) > 0 else -1)
+                    set_segment(link, eye, endpoint, frame)
+            else:
+                axis = axes[key]
+                # Construct a triangular D-handle in the plane of the grip and cable.
+                outward = (direction - axis * axis.dot(direction)).normalized()
+                if outward.length < .5:
+                    outward = axis.orthogonal().normalized()
+                eye = middle + outward * .105
+                endpoints = [middle + axis * self.half * sign for sign in (-1, 1)]
+                for link, endpoint in zip(links[:2], endpoints):
+                    set_segment(link, endpoint, eye, frame)
+                set_segment(links[2], eye, eye + (anchor - eye).normalized() * .025, frame)
+                eye += (anchor - eye).normalized() * .025
+            length = (eye - anchor).length
+            minimum, maximum = self.TRAVEL
+            if not minimum <= length <= maximum:
+                problems.add(frame, "cable outside its travel", max(minimum - length, length - maximum))
+            if length >= .001:
+                set_segment(cable, anchor, eye, frame)
+            self.lines.append((anchor, eye))
+
+    def check(self, points, faces, frame, problems, samples):
+        # Cast the centreline and its surrounding cable surface through the posed skin.
+        skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
+        for anchor, eye in self.lines:
+            delta = eye - anchor
+            if delta.length < .001:
+                continue
+            direction = delta.normalized()
+            first = direction.orthogonal().normalized()
+            second = direction.cross(first)
+            for offset in (Vector(), first, -first, second, -second):
+                hit, _, _, distance = skin.ray_cast(anchor + offset * self.RADIUS, direction, delta.length)
+                if hit is not None:
+                    problems.add(frame, "cable line crosses the body", delta.length - distance)
+                    break
+        samples.append(np.array(self.bounds + [eye for _, eye in self.lines]))
+
+
 class ContactLoad:
     """One or two loads held by their faces or ends. Dimensions drive mesh and contact checks."""
 
@@ -1439,7 +1613,7 @@ def movement_checkpoints(spec, frames):
     return scheduled
 
 
-def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, contact_load=None, landmine=None):
+def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, contact_load=None, landmine=None, cables=None):
     """Measure actual joints and rendered apparatus transforms in world coordinates."""
     for check in checks:
         for side in ([check["side"]] if "side" in check else SIDES):
@@ -1459,6 +1633,8 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, co
                 tool = contact_load.roots[side if contact_load.paired else "both"]
             if landmine:
                 tool = landmine.handles.get(side)
+            if cables:
+                tool = cables.handles.get(side)
             if "surface_gap" in check:
                 expected = check["surface_gap"]
                 if contact_load is None:
@@ -1523,6 +1699,8 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, co
                     cosine = actual.dot(direction)
                 else:
                     actual = tool.matrix_world.to_3x3().col[0].normalized()
+                    if cables:
+                        actual = tool.matrix_world.to_3x3().col[2].normalized()
                     if landmine:
                         actual = tool.matrix_world.to_3x3().col[2].normalized()
                     if contact_load:
@@ -1542,7 +1720,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -1564,6 +1742,7 @@ def bake(spec, keys):
         bench.surfaces.extend(preacher.surfaces)
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
+    cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
     station = next((PullStation(e) for e in spec.get("equipment", []) if e["type"] in ("platform","rack-pins")), None)
     if station and not barbell:
         raise ValueError("Pull stations need a barbell")
@@ -1582,7 +1761,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles)
+                        or landmine and side in landmine.handles or cables and side in cables.handles)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -1590,7 +1769,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -1759,6 +1938,8 @@ def bake(spec, keys):
                     target = head(side+"Arm") + torso.direction(span.sample("free_arm", [.23,.17,-1]),sign)*.50
                     gap = pose_arm(side, target, pole, "neutral", torso)
                 gaps.append((side+" hand", gap))
+        if cables:
+            cables.pose(span, torso, grips, frame, gaps, problems)
         if contact_load:
             contact_load.pose(spec,span,torso,grips,frame,gaps,problems)
         if "support" in spec:
@@ -1879,7 +2060,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -1895,6 +2076,8 @@ def bake(spec, keys):
         everything, hands = evaluated_points(body)
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
+        if cables:
+            cables.check(everything, contact.faces, frame, problems, samples)
         if spec.get("forearm_support") == "thighs":
             contact.check_resting_forearms(frame, everything, problems)
         samples.append(everything[::50])
@@ -1972,7 +2155,7 @@ def bake(spec, keys):
     for patch in shoulders:
         print("SHOULDER CHECKS", patch.side, {k: round(float(v), 3) for k, v in patch.worst.items()})
     for side, surface in grips.items():
-        if landmine and side not in landmine.handles:
+        if (landmine and side not in landmine.handles) or (cables and side not in cables.handles):
             continue
         print("GRIP CHECKS", side, json.dumps({k: round(v, 2) for k, v in getattr(surface, "contact_metrics", surface.metrics).items()}))
     bpy.data.objects.remove(wrists, do_unlink=True)

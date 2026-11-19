@@ -71,7 +71,7 @@ if [[ ! -f "$blend" ]]; then
   ) 9>"$scene_dir/build.lock"
 fi
 if [[ "$slug" == --verify-rig ]]; then
-  for suite in verify-grips verify-elbows verify-shoulders verify-deadlift; do
+  for suite in verify-grips verify-elbows verify-shoulders verify-deadlift verify-cables; do
     blender -b "$blend" --python-exit-code 1 --python "$here/$suite.py"
   done
   exit 0

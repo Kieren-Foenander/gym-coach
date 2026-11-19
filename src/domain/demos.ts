@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "triceps-pushdown",
+    views: ["back"],
+    cues: [
+      "Pin your elbows at your sides.",
+      "Press the bar down until your arms are straight.",
+      "Let the bar rise without moving your upper arms.",
+    ],
+  },
+  {
+    slug: "rope-pushdown",
+    views: ["back"],
+    cues: [
+      "Hold both rope ends with elbows at your sides.",
+      "Press down until your arms are straight.",
+      "Bring the rope back up under control.",
+    ],
+  },
+  {
     slug: "snatch",
     views: ["front"],
     cues: [
