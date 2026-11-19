@@ -28,4 +28,11 @@ grips = {side: api["GripSurface"](side) for side in api["SIDES"]}
 problems = api["Problems"]()
 station.pose(api["PoseSpan"](keys, 0), api["Torso"](), grips, 1, [], problems)
 assert "cable outside its travel" in problems.found, list(problems.lines())
+# The original shaft check was infinite. A rendered grip can miss the fingers
+# axially even when its centreline passes through the fist.
+station.handles["Left"].scale.z = .04
+api["update"]()
+problems = api["Problems"]()
+station.check_grips(grips, 1, problems)
+assert "Left fist extends past the rendered grip" in problems.found, list(problems.lines())
 print("CABLE REGRESSIONS PASSED")

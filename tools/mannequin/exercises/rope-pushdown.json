@@ -11,7 +11,8 @@
           ],
           "height": "high"
         }
-      }
+      },
+      "end_stops": true
     }
   ],
   "stance": {

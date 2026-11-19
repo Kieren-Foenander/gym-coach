@@ -234,6 +234,7 @@ def ankles(spec, key):
     stance = {**spec.get("stance", {}), **key.get("stance", {})}
     width, y, toe_out = stance.get("width", 0.3), stance.get("y", 0.0), stance.get("toe_out", 10)
     height = next((e["height"] for e in spec.get("equipment", []) if e["type"] == "platform"), 0)
+    height += next((e["footplate"][1] for e in spec.get("equipment", []) if "footplate" in e), 0)
     return {side: (Vector((sign * width / 2, y, FLOOR_ANKLE + height)), sign * toe_out)
             for side, sign in SIDES.items()}
 
@@ -736,10 +737,17 @@ class CableStation:
         self.stations = {}
         self.handles = {}
         self.lines = []
+        self.straps = []
+        self.rope_stops = {}
         self.bounds = []
         self.steel = material("cable hardware", STEEL, .8, .33)
         self.rubber = material("cable and rope", (.072, .078, .085), .24, .62)
         frame_finish = material("cable frame", (.085, .095, .11), .65, .43)
+        self.footplate = config.get("footplate")
+        if self.footplate:
+            y, top = self.footplate
+            box("row foot platform", (.51, .36, top), (0, y, top / 2), frame_finish)
+            box("row foot stop", (.51, .035, .055), (0, y - .161, top + .0275), self.steel)
         columns = config["columns"]
         if not columns or not set(columns) <= (set(SIDES) if dual else {"Both"}):
             raise ValueError("D-handles need side-specific columns; other attachments need one Both column")
@@ -767,6 +775,8 @@ class CableStation:
             grip_sides = (key,) if dual else SIDES
             for side in grip_sides:
                 self.handles[side] = self.part("attachment grip", Barbell.SHAFT, self.steel)
+                if config.get("end_stops"):
+                    self.rope_stops[side] = self.part("rope end stop", .025, self.rubber)
             count = {"straight-bar": 1, "rope": 2, "v-bar": 2, "d-handle": 3}[self.attachment]
             links = [self.part("attachment link", .012 if self.attachment == "rope" else .008, self.rubber if self.attachment == "rope" else self.steel) for _ in range(count)]
             self.stations[key] = (anchor, self.part("taut cable", self.RADIUS, self.rubber), links)
@@ -783,6 +793,7 @@ class CableStation:
     def pose(self, span, torso, grips, frame, gaps, problems):
         targets, axes = {}, {}
         self.lines.clear()
+        self.straps.clear()
         straight = self.attachment == "straight-bar"
         for side, sign in SIDES.items():
             if side not in self.handles:
@@ -814,7 +825,6 @@ class CableStation:
             gap = pose_arm(side, target, pole, grip, torso, axis, hand_frame)
             gaps.append((side + " cable grip", gap))
             surface = grips[side]
-            surface.check(frame, target, axis, Barbell.SHAFT, problems)
             axial = surface.points @ np.array(surface.transform.to_3x3().transposed() @ axis)
             axial += (surface.transform.translation - target).dot(axis)
             if not straight and (excess := np.abs(axial).max() - self.half) > 0:
@@ -843,8 +853,14 @@ class CableStation:
                     eye = middle + Vector((0, -.12, .07))
                 for link, side in zip(links, SIDES):
                     axis = axes[side]
-                    endpoint = targets[side] + axis * self.half * (1 if axis.dot(eye - targets[side]) > 0 else -1)
+                    direction_sign = 1 if axis.dot(eye - targets[side]) > 0 else -1
+                    if side in self.rope_stops:
+                        direction_sign = 1
+                    endpoint = targets[side] + axis * self.half * direction_sign
                     set_segment(link, eye, endpoint, frame)
+                    if side in self.rope_stops:
+                        stop = targets[side] - axis * self.half * direction_sign
+                        set_segment(self.rope_stops[side], stop, stop - axis * .014 * direction_sign, frame)
             else:
                 axis = axes[key]
                 # Construct a triangular D-handle in the plane of the grip and cable.
@@ -852,9 +868,17 @@ class CableStation:
                 if outward.length < .5:
                     outward = axis.orthogonal().normalized()
                 eye = middle + outward * .105
-                endpoints = [middle + axis * self.half * sign for sign in (-1, 1)]
+                width = self.half
+                if "upper_arm" in span.keys[1]:
+                    outward = world_rotation(key + "Hand").col[1].normalized()
+                    eye = middle + outward * .155
+                    width = .095
+                    set_segment(self.handles[key], middle - axis * width, middle + axis * width, frame)
+                endpoints = [middle + axis * width * sign for sign in (-1, 1)]
                 for link, endpoint in zip(links[:2], endpoints):
                     set_segment(link, endpoint, eye, frame)
+                    if "upper_arm" in span.keys[1]:
+                        self.straps.append((key, endpoint, eye))
                 set_segment(links[2], eye, eye + (anchor - eye).normalized() * .025, frame)
                 eye += (anchor - eye).normalized() * .025
             length = (eye - anchor).length
@@ -865,10 +889,41 @@ class CableStation:
                 set_segment(cable, anchor, eye, frame)
             self.lines.append((anchor, eye))
 
+    def check_grips(self, grips, frame, problems):
+        for side, part in self.handles.items():
+            transform = part.matrix_world
+            axis = transform.col[2].to_3d().normalized()
+            centre = transform.translation
+            surface = grips[side]
+            surface.check(frame, centre, axis, Barbell.SHAFT, problems)
+            along = surface.points @ np.array(surface.transform.to_3x3().transposed() @ axis)
+            along += (surface.transform.translation - centre).dot(axis)
+            excess = np.abs(along).max() - transform.col[2].to_3d().length / 2
+            if excess > 0:
+                problems.add(frame, side + " fist extends past the rendered grip", excess)
+        for side, start, end in self.straps:
+            surface = grips[side]
+            to_skin = surface.transform.inverted()
+            start, end = to_skin @ start, to_skin @ end
+            delta = end - start
+            hit, _, _, _ = surface.surface.ray_cast(start, delta.normalized(), delta.length)
+            if hit is not None:
+                problems.add(frame, side + " stirrup strap crosses the fist", .008)
+
     def check(self, points, faces, frame, problems, samples):
+        if self.footplate:
+            y, top = self.footplate
+            for side, sign in SIDES.items():
+                over = (points[:, 0] * sign > 0) & (np.abs(points[:, 0]) < .255)
+                over &= np.abs(points[:, 1] - y) < .18
+                sole = points[over, 2].min(initial=1)
+                if abs(sole - top) > .012:
+                    problems.add(frame, side + " foot loses the row platform", abs(sole - top))
         # Cast the centreline and its surrounding cable surface through the posed skin.
         skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
-        for anchor, eye in self.lines:
+        segments = [(a, b, self.RADIUS, "cable line") for a, b in self.lines]
+        segments += [(a, b, .008, "stirrup strap") for _, a, b in self.straps]
+        for anchor, eye, radius, label in segments:
             delta = eye - anchor
             if delta.length < .001:
                 continue
@@ -876,9 +931,9 @@ class CableStation:
             first = direction.orthogonal().normalized()
             second = direction.cross(first)
             for offset in (Vector(), first, -first, second, -second):
-                hit, _, _, distance = skin.ray_cast(anchor + offset * self.RADIUS, direction, delta.length)
+                hit, _, _, distance = skin.ray_cast(anchor + offset * radius, direction, delta.length)
                 if hit is not None:
-                    problems.add(frame, "cable line crosses the body", delta.length - distance)
+                    problems.add(frame, label + " crosses the body", delta.length - distance)
                     break
         samples.append(np.array(self.bounds + [eye for _, eye in self.lines]))
 
@@ -2077,6 +2132,7 @@ def bake(spec, keys):
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
         if cables:
+            cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
         if spec.get("forearm_support") == "thighs":
             contact.check_resting_forearms(frame, everything, problems)
