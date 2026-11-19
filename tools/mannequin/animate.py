@@ -1146,6 +1146,7 @@ class CalfStation:
         self.seated = config.get("seated", False)
         self.pad_x, self.pad_y, self.pad_z = config["pad_at"]
         self.travel = config["travel"]
+        self.fixed_grip = Vector(config["fixed_grip"]) if "fixed_grip" in config else None
         self.half = .094 if self.seated else .060
         self.pad_length = .132 if self.seated else .146
         metal = material("calf machine frame", IRON, .55, .45)
@@ -1154,20 +1155,26 @@ class CalfStation:
                         (0, self.step_y, self.step_z / 2), metal)
         self.pads, self.beams, self.parts = {}, {}, []
         self.handles, self.handle_links = {}, {}
+        post_height = .85 if self.seated else 1.78
+        base_length, base_y = .55, self.step_y + .13
+        if self.fixed_grip:
+            post_height = self.pad_z + self.travel[1] + .16
+            rear = self.pad_y + .30
+            base_length = rear - self.fixed_grip.y + .16
+            base_y = (rear + self.fixed_grip.y) / 2
         for side, sign in SIDES.items():
             x = .53 * sign
-            post_height = .85 if self.seated else 1.78
             post = box("calf machine upright", (.065, .085, post_height),
                        (x, self.pad_y + .14, post_height / 2), metal)
-            base = box("calf machine base", (.18, .55, .035),
-                       (x, self.step_y + .13, .0175), metal)
+            base = box("calf machine base", (.24 if self.fixed_grip else .18, base_length, .035),
+                       (x, base_y, .0175), metal)
             beam = box("calf machine yoke", (.33, .06, .05), (0, 0, 0), metal)
             cushion = box("calf load pad", (self.half * 2, self.pad_length, .07),
                           (0, 0, 0), fabric)
             self.beams[side] = beam
             self.pads[side] = cushion
             self.parts.extend((part, False) for part in (post, base, beam))
-            if config.get("handles"):
+            if config.get("handles") or self.fixed_grip:
                 self.handles[side] = CableStation.part("calf grip", Barbell.SHAFT, metal)
                 self.handle_links[side] = CableStation.part("calf grip support", .018, metal)
                 self.parts.extend(((self.handles[side], True), (self.handle_links[side], False)))
@@ -1194,10 +1201,15 @@ class CalfStation:
             beam.keyframe_insert("location", frame=frame)
             if side in self.handles:
                 axis = Vector((1, 0, 0))
-                target = Vector((sign * .283, self.pad_y - .24, self.face_z - .135))
+                if self.fixed_grip:
+                    target = Vector((sign * self.fixed_grip.x, self.fixed_grip.y, self.fixed_grip.z))
+                    mount = Vector((sign * .44, target.y, .035))
+                else:
+                    target = Vector((sign * .283, self.pad_y - .24, self.face_z - .135))
+                    mount = beam.location
                 outer = target + axis * sign * .081
                 set_segment(self.handles[side], target - axis * sign * .081, outer, frame)
-                set_segment(self.handle_links[side], beam.location, outer, frame)
+                set_segment(self.handle_links[side], mount, outer, frame)
                 pole = torso.direction([.48, .17, -1], sign)
                 gap = pose_arm(side, target, pole, "pronated", torso, axis)
                 gaps.append((side + " calf grip", gap))

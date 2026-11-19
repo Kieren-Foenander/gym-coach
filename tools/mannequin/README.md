@@ -412,6 +412,8 @@ vertical travel limit. Set `footplate` to the step centre Y and top Z, and
 The `calf_lift` key moves the contact faces and yokes together. With
 `seated: true`, the shorter frame loads the thighs. Each frame checks
 the padded faces, the forefoot support, and clearance of the frame and yokes.
+For donkey calf raises, set `fixed_grip` to place the handles on the frame
+while the pads load the back of the hips.
 
 A `hip-machine` rotates both thigh supports about fixed vertical axles.
 Set `contact` to `outer` for abduction or `inner` for adduction, give

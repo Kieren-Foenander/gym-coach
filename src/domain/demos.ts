@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "donkey-calf-raise",
+    views: ["back"],
+    cues: [
+      "Brace on the handles and set the balls of your feet on the step.",
+      "Raise your heels while keeping your hips steady.",
+      "Lower your heels slowly below the step.",
+    ],
+  },
+  {
     slug: "machine-glute-kickback",
     views: ["back"],
     cues: [
