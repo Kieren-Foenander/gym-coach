@@ -391,11 +391,14 @@ grip enclosure, and contact with the back pad.
 - A `leg-roller` keeps the thigh at `thigh_pitch` and rotates the lower leg
   and roller together around the knee-height axle. The `roller_offset` is
   measured from the knee at zero `lever_angle`. Both rollers are checked
-  for skin contact and penetration, and the moving linkage must clear the body.
+  on every frame against the lower calf for contact and against the skin for
+  penetration. Optional `pads` give a contact face, width and length, and pitch
+  around X. Use `split` to require contact on both thighs.
 - A `leg-sled` uses an inclined foot plate on fixed guides. Set its plate
   `origin`, optional `pitch`, and travel limits in metres. The `sled` key
   sets displacement along the guide. Set `side` for single-leg work. The
-  plate must stay against the working soles and the carriage must clear skin.
+  plate must stay against the working soles. The rendered carriage, fixed
+  rails, and supports must clear skin.
 - Setting `motion: "fly"` on a selectorized station uses overhead vertical
   bearings and a suspended grip on each arm.
 - Add `smith-rails` to a straight bar with fixed world `y` and vertical

@@ -21,8 +21,13 @@ api["set_segment"](intruder, Vector((-.6, .04, .86)), Vector((.6, .04, .86)), 1)
 api["update"]()
 points, hands = api["evaluated_points"](api["body"])
 problems = api["Problems"]()
-api["check_moving_parts"]([(intruder, False)], points, api["SkinContact"]().faces, hands, {}, 1, problems)
+api["check_hardware_clearance"]([(intruder, False)], points, api["SkinContact"]().faces, hands, {}, 1, problems)
 assert "test lever crosses the body" in problems.found, list(problems.lines())
+fixed_post = api["box"]("test fixed post", (.10, .10, 1.10), (0, .04, .66), intruder.data.materials[0])
+api["update"]()
+problems = api["Problems"]()
+api["check_hardware_clearance"]([(fixed_post, False)], points, api["SkinContact"]().faces, hands, {}, 1, problems)
+assert "test fixed post crosses the body" in problems.found, list(problems.lines())
 
 spec["keys"][0]["lever_angle"] = spec["equipment"][0]["travel"][0] - 5
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
@@ -50,6 +55,11 @@ spec = initial_pose("leg-extension")
 spec["equipment"][0]["roller_offset"][1] -= .08
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left roller contact" in problems.found, list(problems.lines())
+
+spec = initial_pose("seated-leg-curl")
+spec["equipment"][0]["pads"]["thigh hold-down pad"]["face"][2] += .06
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "thigh hold-down pad loses skin contact" in problems.found, list(problems.lines())
 
 spec = initial_pose("smith-machine-squat")
 spec["keys"][0]["bar"] = [0, .20, 1.2]

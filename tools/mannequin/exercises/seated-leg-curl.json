@@ -4,14 +4,43 @@
       "type": "leg-roller",
       "roller_offset": [
         0,
-        0.111,
+        0.102,
         -0.34
       ],
       "travel": [
         -79,
         8
       ],
-      "thigh_pitch": -7
+      "thigh_pitch": -7,
+      "pads": {
+        "leg seat backrest": {
+          "face": [
+            0,
+            0.178,
+            0.774
+          ],
+          "size": [
+            0.35,
+            0.49
+          ],
+          "pitch": 90,
+          "mount": "seat"
+        },
+        "thigh hold-down pad": {
+          "face": [
+            0,
+            -0.194,
+            0.662
+          ],
+          "size": [
+            0.39,
+            0.15
+          ],
+          "pitch": 180,
+          "split": true,
+          "mount": "hold-down"
+        }
+      }
     },
     {
       "type": "bench",
