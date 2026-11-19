@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "thruster",
+    views: ["front"],
+    cues: [
+      "Rack the bar at shoulder height and squat.",
+      "Drive out of the squat and press overhead in one motion.",
+      "Lower the bar to the rack before the next squat.",
+    ],
+  },
+  {
     slug: "concentration-curl",
     views: ["front"],
     cues: [
