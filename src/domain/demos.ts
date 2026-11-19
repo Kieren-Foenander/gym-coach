@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-crunch",
+    views: ["front"],
+    cues: [
+      "Sit with your chest against the pad.",
+      "Curl your ribs toward your hips.",
+      "Return under control without lifting your hips.",
+    ],
+  },
+  {
+    slug: "machine-back-extension",
+    views: ["front"],
+    cues: [
+      "Sit with the pad against your back.",
+      "Extend your torso until you are upright.",
+      "Return forward slowly without lifting your hips.",
+    ],
+  },
+  {
     slug: "standing-leg-curl",
     views: ["front"],
     cues: [

@@ -1,0 +1,72 @@
+{
+  "equipment": [
+    {
+      "type": "trunk-station",
+      "axle": [
+        0,
+        0.063,
+        0.581
+      ],
+      "support": "back",
+      "pad_y": 0.095,
+      "travel": [
+        -2,
+        37
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.09,
+        0.43
+      ],
+      "length": 0.43
+    }
+  ],
+  "stance": {
+    "width": 0.39,
+    "y": -0.29,
+    "toe_out": 12
+  },
+  "camera": {
+    "angle": 46
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.063,
+        0.581
+      ],
+      "lean": 33
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.48,
+      "lean": 0
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 2
+      }
+    }
+  ],
+  "touching": [
+    "bench"
+  ]
+}
