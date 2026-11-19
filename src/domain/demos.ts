@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "seal-row",
+    views: ["back"],
+    cues: [
+      "Lie chest-down on the elevated bench with your arms hanging.",
+      "Pull the bar up beneath the bench without lifting your chest.",
+      "Lower to long arms.",
+    ],
+  },
+  {
     slug: "zercher-squat",
     views: ["front"],
     cues: [
