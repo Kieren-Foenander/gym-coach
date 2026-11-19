@@ -259,13 +259,15 @@ of a cycle to add when sampling that arm's movement.
 
 EZ bars and trap bars use the equipment types `ez-bar` and `trap-bar`.
 Their modeled straight grip sections determine the hand positions and shaft axes.
-The `kettlebells` type supports hanging pulls with level handles.
+The `kettlebells` type uses level handles. Set `side` on the equipment
+for a single bell and use `bell_roll` in the keys to rotate the bell around its handle.
 For dumbbell arcs, `fixed_upper_arm` preserves the authored elbow position and
 `flex_toward` chooses the torso-relative direction of elbow flexion.
 Continuous checkpoints can limit `upper_arm_to_torso` in degrees and
 `fixed_elbow_m` in metres. For stepping movements, each key can specify
 `foot_left` or `foot_right` as forward/back displacement in world Y,
-vertical clearance in metres and heel lift in degrees about the toe joint.
+vertical clearance in metres and heel lift in degrees about the toe joint. A fourth
+value optionally gives the lateral displacement in world X.
 
 For an adjustable bench, set `angle` in degrees and place `at` at the hinge
 between the seat and backrest. Zero is flat, positive angles incline the back,
@@ -338,3 +340,17 @@ A dumbbell spec can key `handle_direction` in torso coordinates. With
 `grip: "neutral"` this is the directed shaft toward the thumb end, mirrored
 for the opposite hand. Use an intermediate direction for a half-turn so
 the interpolated shaft never goes through a zero vector.
+
+
+### Elbow cradles and floor contact
+
+Use `elbow_cradle` on a straight barbell when the load rests in the elbow
+creases. Its `wrist` offset is measured from the shaft in torso coordinates.
+Use `along` and `palm` to orient the hands. The solver mirrors the left
+socket to the right and checks contact at each elbow and shaft clearance
+against the full skin surface.
+
+For bodyweight moves with both palms flat, use the `support` hand shape
+on both sides. Set `floor_hands` to the left wrist's world coordinates.
+The right wrist mirrors across X. The palms are checked against the floor
+on every frame.

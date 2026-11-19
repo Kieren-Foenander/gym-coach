@@ -1529,15 +1529,17 @@ def bake(spec, keys):
     if support_side and (not bench or bench.pads or not dumbbells or support_side in dumbbells.roots):
         raise ValueError("A support hand needs a free arm and a flat bench")
     rack_contact = spec.get("rack_contact")
-    if rack_contact and type(barbell) is not Barbell:
+    cradle = spec.get("elbow_cradle")
+    floor_hands = spec.get("floor_hands")
+    if (rack_contact or cradle) and type(barbell) is not Barbell:
         raise ValueError("Open rack contact requires a straight barbell")
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
-        if side == support_side and shape != "support":
+        if (side == support_side or floor_hands) and shape != "support":
             raise ValueError("Bench contact needs the open support hand")
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
-        holds_handle = (barbell and not rack_contact or dumbbells and side in dumbbells.roots
+        holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
                         or landmine and side in landmine.handles)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
@@ -1546,7 +1548,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -1638,6 +1640,16 @@ def bake(spec, keys):
             width = a["wrist_rest"][0] if "wrist_rest" in a else span.sample("grip_width", 0.25)
             elbows = span.sample("elbows", [0.4, -0.6, -0.5])
             for side, sign in SIDES.items():
+                if cradle:
+                    wrist = barbell.centre + torso.point(cradle["wrist"], sign) - torso.origin
+                    along = torso.direction(cradle["along"], sign)
+                    palm = torso.direction(cradle["palm"], sign)
+                    palm = (palm - along * palm.dot(along)).normalized()
+                    target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+                    gap = pose_arm(side, target, torso.direction(elbows, sign), "neutral",
+                                   torso, contact_frame=(along, palm))
+                    gaps.append((side + " cradle wrist", gap))
+                    continue
                 if rack_contact:
                     pole = torso.direction(elbows, sign)
                     gap = barbell.pose_open_hand(side, rack_contact, pole, torso, grips[side], frame, problems)
@@ -1711,6 +1723,23 @@ def bake(spec, keys):
             surface.record_contact(height[on_pad].min(initial=1))
             if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
                 problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
+        if floor_hands:
+            along, palm = Vector((0, -1, 0)), Vector((0, 0, -1))
+            for side, sign in SIDES.items():
+                radius, y, z = floor_hands
+                wrist = Vector((sign * radius, y, z))
+                target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+                pole = Vector((sign * .58, .14, -.45))
+                gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
+                gaps.append((side + " floor wrist", gap))
+                surface = grips[side]
+                transform = surface.transform
+                heights = surface.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
+                gap = heights.min(initial=1)
+                surface.record_contact(gap)
+                if gap < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:
+                    problems.add(frame, side + " open palm loses floor contact", abs(gap))
+                surface.check_wrist(frame, problems)
         if dumbbells:
             for side in dumbbells.roots:
                 sign = SIDES[side]
@@ -1825,7 +1854,16 @@ def bake(spec, keys):
             problems.add(frame, "the body goes through the floor", -low)
         if barbell:
             samples.append(np.array([barbell.centre + Vector((s * 1.1, 0, z)) for s in (-1, 1) for z in (-barbell.PLATE-.005, barbell.PLATE+.005)]))
-            shaft, plate, gap = barbell.intrusions(everything, hands)
+            if cradle:
+                for side, sign in SIDES.items():
+                    elbow = head(side + "ForeArm")
+                    near = np.linalg.norm(everything - np.array(elbow), axis=1) < .105
+                    near &= np.abs(everything[:, 0] - elbow.x) < .052
+                    radial = np.linalg.norm(everything[near, 1:] - np.array(barbell.centre)[1:], axis=1)
+                    contact_gap = radial.min(initial=1) - barbell.SHAFT
+                    if contact_gap > .012:
+                        problems.add(frame, side + " elbow loses shaft contact", contact_gap)
+            shaft, plate, gap = barbell.intrusions(everything, hands if not cradle else np.zeros_like(hands))
             closest["bar"] = min(closest["bar"], gap)
             if shaft or plate:
                 problems.add(frame, f"the bar passes through the body ({'plate' if plate else 'shaft'})", -gap)
