@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "reverse-grip-pushdown",
+    views: ["back"],
+    cues: [
+      "Hold the bar with palms up.",
+      "Keep your elbows by your sides as you straighten your arms.",
+      "Let the bar rise under control.",
+    ],
+  },
+  {
+    slug: "single-arm-pushdown",
+    views: ["back"],
+    cues: [
+      "Hold the handle with your elbow at your side.",
+      "Straighten your arm without moving the upper arm.",
+      "Return the handle slowly.",
+    ],
+  },
+  {
     slug: "cable-lateral-raise",
     views: ["front"],
     cues: [
