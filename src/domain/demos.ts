@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "smith-machine-calf-raise",
+    views: ["back"],
+    cues: [
+      "Set the bar across your upper back.",
+      "Rise onto the balls of your feet with your knees softly bent.",
+      "Lower your heels slowly.",
+    ],
+  },
+  {
     slug: "smith-machine-row",
     views: ["back"],
     cues: [
