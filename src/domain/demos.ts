@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "wrist-curl",
+    views: ["front"],
+    cues: [
+      "Rest your forearms on your thighs with your palms up.",
+      "Lift your knuckles by moving only your wrists.",
+      "Lower slowly to a comfortable stretch.",
+    ],
+  },
+  {
+    slug: "reverse-wrist-curl",
+    views: ["front"],
+    cues: [
+      "Rest your forearms on your thighs with your palms down.",
+      "Lift your knuckles by moving only your wrists.",
+      "Lower slowly to a comfortable stretch.",
+    ],
+  },
+  {
+    slug: "dumbbell-wrist-curl",
+    views: ["front"],
+    cues: [
+      "Rest your forearms on your thighs with your palms up.",
+      "Lift your knuckles by moving only your wrists.",
+      "Lower slowly to a comfortable stretch.",
+    ],
+  },
+  {
+    slug: "dumbbell-reverse-wrist-curl",
+    views: ["front"],
+    cues: [
+      "Rest your forearms on your thighs with your palms down.",
+      "Lift your knuckles by moving only your wrists.",
+      "Lower slowly to a comfortable stretch.",
+    ],
+  },
+  {
     slug: "t-bar-row",
     views: ["back", "front"],
     cues: [
