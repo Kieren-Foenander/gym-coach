@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "landmine-press",
+    views: ["front"],
+    cues: [
+      "Start with the handle just in front of one shoulder.",
+      "Brace and press up and forward along the arc.",
+      "Bring the handle back to shoulder height.",
+    ],
+  },
+  {
     slug: "wrist-curl",
     views: ["front"],
     cues: [
