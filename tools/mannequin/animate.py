@@ -206,8 +206,6 @@ def pose_trunk(key):
         turn(name, left, key.get("spine", 0) / 3)
         if "side_bend" in key:
             turn(name, forward, key["side_bend"] / 3)
-    if "torso_twist" in key:
-        turn("Spine", Vector((0, 0, 1)), key["torso_twist"])
     for name in ("Neck", "Head"):
         turn(name, left, key.get("head", 0) / 2)
     return pelvis
@@ -1859,6 +1857,63 @@ class CycleStation:
         samples.append(np.array(self.bounds))
 
 
+class HipThrustStation:
+    """A transverse hip pad and hand grips share a lever mounted behind the bench."""
+
+    def __init__(self, config):
+        self.pivot = Vector(config["pivot"])
+        self.offset = Vector(config["pad_offset"])
+        self.travel = config["travel"]
+        metal = material("hip thrust machine frame", IRON,.57,.44)
+        pad = material("hip thrust machine upholstery",PAD,.05,.66)
+        self.radius, self.half = .048,.20
+        self.pad = CableStation.part("hip thrust load pad",self.radius,pad)
+        self.parts, self.links, self.handles = [],{},{}
+        for side,sign in SIDES.items():
+            axle = (sign*.52,self.pivot.y,self.pivot.z)
+            post = box("hip thrust machine upright",(.08,.105,self.pivot.z),
+                       (axle[0],axle[1],axle[2]/2),metal)
+            base = box("hip thrust base",(.15,.83,.055),(axle[0],.31,.0275),metal)
+            bearing = cylinder("hip thrust bearing",.044,.095,0,metal,None)
+            bearing.location = axle
+            self.parts.extend((part,False) for part in (post,base,bearing))
+            self.links[side] = [CableStation.part(name,radius,metal) for name,radius in (
+                ("hip thrust lever",.024),("hip thrust grip return",.018))]
+            self.parts.extend((part,False) for part in self.links[side])
+            self.handles[side] = CableStation.part("hip thrust grip",Barbell.SHAFT,metal)
+            self.parts.append((self.handles[side],True))
+
+    def pose(self, span, torso, frame, gaps, problems):
+        angle=span.sample("thrust_lever")
+        lo,hi=self.travel
+        if not lo <= angle <= hi:
+            problems.add(frame,"hip thrust lever outside travel",max(lo-angle,angle-hi),"degrees")
+        rotation=Matrix.Rotation(math.radians(angle),3,"X")
+        self.centre=self.pivot+rotation @ self.offset
+        axis=Vector((1,0,0))
+        set_segment(self.pad,self.centre-axis*self.half,self.centre+axis*self.half,frame)
+        for side,sign in SIDES.items():
+            pivot=Vector((sign*.52,self.pivot.y,self.pivot.z))
+            outer=Vector((pivot.x,self.centre.y,self.centre.z))
+            grip=self.centre+axis*sign*.300
+            set_segment(self.links[side][0],pivot,outer,frame)
+            set_segment(self.links[side][1],outer,grip+axis*sign*.073,frame)
+            set_segment(self.handles[side],grip-axis*sign*.073,grip+axis*sign*.073,frame)
+            gap=pose_arm(side,grip,torso.direction([.65,-.1,-.55],sign),"pronated",torso,axis)
+            gaps.append((side+" hip thrust grip",gap))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles,grips,frame,problems)
+        check_hardware_clearance(self.parts,points,faces,hands,grips,frame,problems)
+        rel=points-np.array(self.centre)
+        radial=np.linalg.norm(rel[abs(rel[:,0]) < self.half,1:],axis=1)
+        gap=radial.min(initial=1)-self.radius
+        if gap < -.007 or gap > .014:
+            problems.add(frame,"hip thrust pad contact",abs(gap))
+        samples.append(np.array([part.matrix_world @ Vector(v)
+                                 for part,_ in self.parts for v in part.bound_box]))
+
+
 class LegRollerMachine:
     """A knee-height axle drives padded rollers through a fixed arc."""
 
@@ -2928,7 +2983,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "thrust-station"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -2951,6 +3006,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     cycle = next((CycleStation(e) for e in spec.get("equipment", []) if e["type"] == "cycle-station"), None)
     lateral = next((LateralRaiseStation(e) for e in spec.get("equipment", []) if e["type"] == "lateral-station"), None)
@@ -2978,7 +3034,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        cycle, calf, roller,
+        cycle, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3071,6 +3127,8 @@ def bake(spec, keys):
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
         gaps.extend(activity_gaps)
+        if hip_thrust:
+            hip_thrust.pose(span,torso,frame,gaps,problems)
         if lateral:
             lateral.pose(span, torso, frame, gaps, problems)
         if trunk_station:
@@ -3345,6 +3403,8 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if hip_thrust:
+            hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
         if cycle:

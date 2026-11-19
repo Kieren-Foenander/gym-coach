@@ -447,6 +447,12 @@ the leg-machine pads. The pulldown uses a split thigh restraint.
   The shaft rotates with the lever and its actual transform drives the grip
   check.
 
+- A `leg-roller` with `hip_drive: true` pivots at the working hip for
+  standing kickbacks. The roller stays against the lower leg.
+- A `thrust-station` carries a hip pad and two grips on one fixed axle.
+  Specify its world-space `pivot`, resting `pad_offset` and angular
+  `travel`. Animate it with `thrust_lever` while the upper back rests
+  on a separate bench.
 - A `treadmill` uses `gait: [y, lift, heel]` for one leg. The second leg
   and both arm swings sample the same cycle half a turn apart. The
   `incline` is in degrees. The bake checks belt support through stance

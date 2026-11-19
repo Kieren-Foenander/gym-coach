@@ -1,0 +1,123 @@
+{
+  "equipment": [
+    {
+      "type": "thrust-station",
+      "pivot": [
+        0,
+        0.73,
+        0.663
+      ],
+      "pad_offset": [
+        0,
+        -0.6387,
+        -0.1954
+      ],
+      "travel": [
+        -26,
+        2
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.58,
+        0.42
+      ],
+      "length": 0.28
+    }
+  ],
+  "stance": {
+    "width": 0.38,
+    "y": -0.32,
+    "toe_out": 15
+  },
+  "camera": {
+    "angle": 125
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.17,
+        0.31
+      ],
+      "lean": -49,
+      "head": 6,
+      "grip_width": 0.3,
+      "grip": "pronated",
+      "elbows": [
+        0.65,
+        -0.1,
+        -0.55
+      ],
+      "thrust_lever": 0
+    },
+    {
+      "at": 0.44,
+      "pelvis": [
+        0,
+        0.065,
+        0.54
+      ],
+      "lean": -90,
+      "head": 18,
+      "thrust_lever": -21.45
+    },
+    {
+      "at": 0.52
+    },
+    {
+      "at": 0.95,
+      "pelvis": [
+        0,
+        0.17,
+        0.31
+      ],
+      "lean": -49,
+      "head": 6,
+      "thrust_lever": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.295,
+          0.325
+        ]
+      }
+    },
+    {
+      "at": 0.48,
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.525,
+          0.555
+        ]
+      },
+      "knee": [
+        85,
+        97
+      ],
+      "shin_vertical": 7
+    },
+    {
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 8
+      }
+    }
+  ],
+  "touching": [
+    "bench"
+  ]
+}

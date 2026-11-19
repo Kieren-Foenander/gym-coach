@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-glute-kickback",
+    views: ["back"],
+    cues: [
+      "Plant one foot and hold the support handles.",
+      "Drive the working leg back from the hip.",
+      "Return slowly without turning your hips or arching your back.",
+    ],
+  },
+  {
+    slug: "machine-hip-thrust",
+    views: ["back"],
+    cues: [
+      "Rest your upper back on the pad and plant both feet.",
+      "Drive your hips up until your torso and thighs line up.",
+      "Lower under control with your ribs and chin tucked.",
+    ],
+  },
+  {
     slug: "treadmill-run",
     views: ["front"],
     cues: [
