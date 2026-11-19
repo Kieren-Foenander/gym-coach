@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "smith-machine-row",
+    views: ["back"],
+    cues: [
+      "Hinge at the hips and start with long arms.",
+      "Drive your elbows back to pull the bar toward your waist.",
+      "Lower the bar while holding your torso still.",
+    ],
+  },
+  {
+    slug: "smith-machine-shrug",
+    views: ["front"],
+    cues: [
+      "Hold the bar in front of your thighs with arms long.",
+      "Lift your shoulders toward your ears.",
+      "Lower your shoulders without rolling them.",
+    ],
+  },
+  {
     slug: "smith-machine-bench-press",
     views: ["front"],
     cues: [
