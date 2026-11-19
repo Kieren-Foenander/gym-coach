@@ -1,0 +1,81 @@
+{
+  "equipment": [
+    {
+      "type": "guided-squat",
+      "at": [
+        0,
+        0.155,
+        0.908
+      ],
+      "lean": -22,
+      "travel": [
+        -31,
+        2
+      ],
+      "footplate": [
+        -0.32,
+        0.085
+      ],
+      "back_y": 0.113,
+      "shoulder_z": 0.451,
+      "pivot": [
+        0,
+        -0.6,
+        1.5
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.37,
+    "y": -0.237,
+    "toe_out": 15
+  },
+  "camera": {
+    "angle": 28,
+    "elevation": 14
+  },
+  "keys": [
+    {
+      "at": 0,
+      "carriage": 0,
+      "head": 12
+    },
+    {
+      "at": 0.08
+    },
+    {
+      "at": 0.47,
+      "carriage": -27
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "at": 0,
+      "knee": [
+        3,
+        45
+      ]
+    },
+    {
+      "at": 0.52,
+      "knee": [
+        70,
+        145
+      ]
+    },
+    {
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 2
+      }
+    }
+  ]
+}

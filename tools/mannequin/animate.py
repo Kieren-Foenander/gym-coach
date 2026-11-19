@@ -1332,6 +1332,131 @@ class HipMachine:
                                  for part in (*self.pads.values(), *self.rests.values()) for corner in part.bound_box]))
 
 
+class GuidedSquat:
+    """One padded carriage, mounted on either inclined rails or an overhead axle."""
+
+    def __init__(self, config):
+        self.start = Vector(config["at"])
+        self.lean = config["lean"]
+        self.travel = config["travel"]
+        self.pivot = Vector(config["pivot"]) if "pivot" in config else None
+        self.plate_y, self.plate_z = config["footplate"]
+        self.back_y = config["back_y"]
+        self.shoulder_z = config["shoulder_z"]
+        self.parts, self.links, self.handles = [], {}, {}
+        self.shoulders, self.bearings = {}, {}
+        metal = material("squat machine frame", IRON, .55, .43)
+        pad = material("squat machine pads", PAD, .05, .66)
+        self.back = box("squat machine back pad", (.37, .08, .63), (0, 0, 0), pad)
+        self.back_brace = CableStation.part("squat back brace", .026, metal)
+        self.parts.append((self.back_brace, False))
+        box("squat machine foot plate", (.64, .48, self.plate_z),
+            (0, self.plate_y, self.plate_z / 2), metal)
+        self.direction = Matrix.Rotation(math.radians(self.lean), 3, "X") @ Vector((0, 0, 1))
+        self.width = .61
+        self.bounds = []
+        for side, sign in SIDES.items():
+            x = self.width * sign
+            base = box("squat machine foot", (.135, .84, .043),
+                       (x, -.05, .0215), metal)
+            self.parts.append((base, False))
+            if self.pivot:
+                pin = Vector((x, self.pivot.y, self.pivot.z))
+                tower = box("squat pendulum upright", (.085, .09, pin.z), (x, pin.y, pin.z / 2), metal)
+                bearing = cylinder("squat pendulum bearing", .048, .115, 0, metal, None)
+                bearing.location = pin
+                self.bearings[side] = pin
+                self.parts.extend(((tower, False), (bearing, False)))
+                self.bounds.append(pin)
+            else:
+                anchor = self.start + Vector((x, .19, .04))
+                lower = anchor + self.direction * (min(self.travel) - .05)
+                upper = anchor + self.direction * (max(self.travel) + .34)
+                rail = CableStation.part("hack squat rail", .026, metal)
+                set_segment(rail, lower, upper, 1)
+                tower = box("hack rail support", (.077, .098, upper.z), (x, upper.y, upper.z / 2), metal)
+                self.parts.extend(((rail, False), (tower, False)))
+                self.bounds.extend((lower, upper))
+            self.links[side] = [CableStation.part(name, radius, metal) for name, radius in (
+                ("squat carriage arm", .028), ("squat shoulder bracket", .022),
+                ("squat grip bracket", .018), ("squat pad support", .018))]
+            self.handles[side] = CableStation.part("squat machine grip", Barbell.SHAFT, metal)
+            self.shoulders[side] = box("squat shoulder pad", (.13, .17, .07), (0, 0, 0), pad)
+            self.parts.extend((part, False) for part in self.links[side])
+            self.parts.append((self.handles[side], True))
+
+    def trunk(self, span, key, frame, problems):
+        value = span.sample("carriage")
+        minimum, maximum = self.travel
+        if not minimum <= value <= maximum:
+            problems.add(frame, "squat carriage outside travel",
+                         max(minimum-value, value-maximum), "degrees" if self.pivot else "cm")
+        if self.pivot:
+            self.lean_now = self.lean + value
+            rotation = Matrix.Rotation(math.radians(value), 3, "X")
+            origin = self.pivot + rotation @ (self.start - self.pivot)
+        else:
+            self.lean_now = self.lean
+            origin = self.start + self.direction * value
+        self.origin = origin
+        self.rotation = Matrix.Rotation(math.radians(self.lean_now), 3, "X")
+        key.update(pelvis=origin, lean=self.lean_now)
+
+    def pose(self, torso, frame, gaps):
+        def mount(part, local):
+            part.location = self.origin + self.rotation @ Vector(local)
+            part.rotation_euler = self.rotation.to_euler()
+            for channel in ("location", "rotation_euler"):
+                part.keyframe_insert(channel, frame=frame)
+
+        mount(self.back, (0, self.back_y + .04, .19))
+        left = self.origin + self.rotation @ Vector((.31, self.back_y + .08, .35))
+        set_segment(self.back_brace, left, left - Vector((.62, 0, 0)), frame)
+        axis = Vector((1, 0, 0))
+        for side, sign in SIDES.items():
+            x = self.width * sign
+            joint = self.origin + self.rotation @ Vector((x, self.back_y + .08, .35))
+            outer = self.origin + self.rotation @ Vector((sign * .31, self.back_y + .08, .35))
+            target = self.origin + self.rotation @ Vector((sign * .269, -.185, .302))
+            leading = target + axis * sign * .075
+            if self.pivot:
+                set_segment(self.links[side][0], self.bearings[side], joint, frame)
+            else:
+                axle = self.origin + Vector((x, .19, .04))
+                set_segment(self.links[side][0], axle, joint, frame)
+            set_segment(self.links[side][1], joint, outer, frame)
+            set_segment(self.links[side][2], outer, leading, frame)
+            pad_mount = self.origin + self.rotation @ Vector((sign * .25, .015, self.shoulder_z + .06))
+            set_segment(self.links[side][3], outer, pad_mount, frame)
+            set_segment(self.handles[side], target - axis * sign * .075, leading, frame)
+            mount(self.shoulders[side], (sign * .19, -.005, self.shoulder_z + .035))
+            pole = torso.direction([.48, -.25, -1], sign)
+            gap = pose_arm(side, target, pole, "pronated", torso, axis)
+            gaps.append((side + " squat machine grip", gap))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        local = (points - np.array(self.origin)) @ np.array(self.rotation)
+        x, y, z = local.T
+        back = (abs(x) < .185) & (abs(z - .19) < .315) & (abs(y - self.back_y) < .09)
+        depth = y[back].max(initial=-1) - self.back_y
+        if depth > .012 or depth < -.018:
+            problems.add(frame, "back loses squat pad contact or penetrates it", abs(depth))
+        for side, sign in SIDES.items():
+            shoulder = (abs(sign * x - .19) < .065) & (abs(y + .005) < .085)
+            shoulder &= abs(z - self.shoulder_z) < .08
+            depth = z[shoulder].max(initial=-1) - self.shoulder_z
+            if depth > .008 or depth < -.016:
+                problems.add(frame, side + " shoulder pad contact", abs(depth))
+            over = (sign * points[:, 0] > 0) & (abs(points[:, 0]) < .32)
+            over &= abs(points[:, 1] - self.plate_y) < .24
+            sole = points[over, 2].min(initial=1)
+            if abs(sole - self.plate_z) > .012:
+                problems.add(frame, side + " foot loses squat plate contact", abs(sole-self.plate_z))
+        samples.append(np.array(self.bounds))
+
+
 class LegRollerMachine:
     """A knee-height axle drives padded rollers through a fixed arc."""
 
@@ -2354,7 +2479,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -2377,6 +2502,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    guided_squat = next((GuidedSquat(e) for e in spec.get("equipment", []) if e["type"] == "guided-squat"), None)
     hip_machine = next((HipMachine(e) for e in spec.get("equipment", []) if e["type"] == "hip-machine"), None)
     calf = next((CalfStation(e) for e in spec.get("equipment", []) if e["type"] == "calf-station"), None)
     sled = next((LegSled(e) for e in spec.get("equipment", []) if e["type"] == "leg-sled"), None)
@@ -2403,7 +2529,7 @@ def bake(spec, keys):
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
         holds_handle = (barbell and not (rack_contact or cradle) or dumbbells and side in dumbbells.roots
-                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine or hip_machine)
+                        or landmine and side in landmine.handles or cables and side in cables.handles or calf and side in calf.handles or machine or hip_machine or guided_squat)
         if holds_handle and shape != "fist":
             raise ValueError("A handle needs a closed fist")
         if contact_load and shape == "fist":
@@ -2411,7 +2537,7 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or hip_machine or calf and calf.handles else {}
+    grips = {side: GripSurface(side) for side in SIDES} if barbell or dumbbells or contact_load or landmine or floor_hands or cables or machine or hip_machine or guided_squat or calf and calf.handles else {}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -2437,11 +2563,13 @@ def bake(spec, keys):
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
         key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "yaw", "side_bend") if field in a}
+        if guided_squat:
+            guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
         if "shoulder_y" in a:
             suspend_from_bar(span.sample("bar"), span.sample("grip_width", 0.25),
                              span.sample("shoulder_y"), pelvis)
-        elif "pelvis" not in a:
+        elif "pelvis" not in key:
             raise ValueError("A pose needs a pelvis position or a suspended shoulder_y")
         torso = Torso()
         if smith and isinstance(a.get("bar"), dict):
@@ -2473,6 +2601,8 @@ def bake(spec, keys):
             gaps = []
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
+        if guided_squat:
+            guided_squat.pose(torso, frame, gaps)
         if calf:
             calf.pose(span, torso, frame, gaps, problems)
         if barbell:
@@ -2723,7 +2853,7 @@ def bake(spec, keys):
             bone.keyframe_insert("location", frame=frame)
         update()
 
-        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or hip_machine or calf)
+        check_movement(checkpoints.get(frame, ()), frame, barbell, dumbbells, problems, first, contact_load, landmine, cables or machine or hip_machine or guided_squat or calf)
 
         # Nothing should jump between frames: a joint that moves more than 4 cm in a 30th of a second
         # is flicking between two poses.
@@ -2741,6 +2871,8 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if guided_squat:
+            guided_squat.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if hip_machine:
             hip_machine.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if calf:

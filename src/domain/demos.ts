@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "hack-squat",
+    views: ["front"],
+    cues: [
+      "Plant your feet on the platform and keep your back on the pad.",
+      "Bend your knees to lower the sled under control.",
+      "Press through your whole foot to stand.",
+    ],
+  },
+  {
+    slug: "pendulum-squat",
+    views: ["front"],
+    cues: [
+      "Set your shoulders against the pads and plant your feet.",
+      "Lower along the arc with your knees tracking over your toes.",
+      "Drive through the platform to return to standing.",
+    ],
+  },
+  {
     slug: "hip-abduction",
     views: ["front"],
     cues: [

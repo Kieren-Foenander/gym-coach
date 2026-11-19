@@ -419,3 +419,11 @@ the skin-facing pad distance as `pad_offset`, and key `hip_angle` in
 degrees within `travel`. The thigh pad and forefoot support turn together.
 The bake measures their skin contact, checks the backrest, and checks the
 rendered frame and linkages for clearance.
+
+A `guided-squat` holds the back and shoulder pads and hand grips on the
+same carriage. Set `at` and `lean` to its standing reference pose.
+With rails, `carriage` measures distance in metres along the incline.
+With a world `pivot`, `carriage` measures degrees around the axle.
+The fixed `footplate` gives its centre Y and top Z. Each frame checks
+pad contact, foot support, grip enclosure, and clearance of the fixed
+frame and moving linkages.

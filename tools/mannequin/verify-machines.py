@@ -87,3 +87,14 @@ spec["equipment"][0]["pad_offset"] += .03
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left thigh loses hip machine pad" in problems.found, list(problems.lines())
 print("HIP STATION REGRESSIONS PASSED")
+
+for slug in ("hack-squat", "pendulum-squat"):
+    spec = initial_pose(slug)
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert not problems.found, (slug, list(problems.lines()))
+
+spec = initial_pose("hack-squat")
+spec["equipment"][0]["shoulder_z"] += .05
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left shoulder pad contact" in problems.found, list(problems.lines())
+print("GUIDED SQUAT REGRESSIONS PASSED")
