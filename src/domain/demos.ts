@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dumbbell-calf-raise",
+    views: ["back"],
+    cues: [
+      "Stand tall with a dumbbell in each hand.",
+      "Rise onto the balls of both feet.",
+      "Lower your heels slowly to the floor.",
+    ],
+  },
+  {
     slug: "seal-row",
     views: ["back"],
     cues: [
