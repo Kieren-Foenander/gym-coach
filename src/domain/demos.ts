@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "farmers-carry",
+    views: ["front"],
+    cues: [
+      "Hold a dumbbell at each side and stand tall.",
+      "Take short, steady steps with the weights quiet.",
+      "Keep your shoulders level and your gaze forward.",
+    ],
+  },
+  {
+    slug: "suitcase-carry",
+    views: ["front"],
+    cues: [
+      "Hold one dumbbell at your side.",
+      "Brace and take steady steps with your shoulders level.",
+      "Repeat with the weight on the other side.",
+    ],
+  },
+  {
     slug: "landmine-twist",
     views: ["front"],
     cues: [
