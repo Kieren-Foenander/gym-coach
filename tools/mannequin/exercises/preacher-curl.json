@@ -4,7 +4,7 @@
   "camera": {"angle": 33, "elevation": 12},
   "keys": [
     {"at": 0, "pelvis": [0, 0, 0.585], "upper_arm": [0.09, 0.83, -0.55], "curl": 14, "grip": "supinated", "elbows": [0.09, 0.83, -0.55], "lean": 10, "spine": 0, "head": -5, "fixed_upper_arm": true, "flex_toward": [0, 0.55, 0.83]},
-    {"at": 0.44, "curl": 121},
+    {"at": 0.44, "curl": 99},
     {"at": 0.52},
     {"at": 0.94, "curl": 14}
   ],
@@ -12,6 +12,7 @@
   "checkpoints": [
     {"fixed_elbow_m": 0.005},
     {"at": 0, "elbow": [6, 26], "palm": {"direction": [0.15, -0.55, 0.8], "degrees": 25}, "position": {"point": "Hand", "z": [0.61, 0.68]}},
-    {"at": 0.48, "elbow": [98, 140], "palm": {"direction": [-0.22, 0.94, 0.24], "degrees": 25}, "position": {"point": "Hand", "z": [0.99, 1.06]}}
+    {"at": 0.48, "elbow": [98, 101], "palm": {"direction": [-0.24, 0.81, 0.53], "degrees": 25}, "position": {"point": "Hand", "y": [-0.42, -0.35], "z": [0.96, 1.005]}},
+    {"at": 0.48, "position": {"point": "handle", "z": [1.01, 1.075]}}
   ]
 }

@@ -104,7 +104,7 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     views: ["front"],
     cues: [
       "Set your upper arms against the pad.",
-      "Curl the EZ bar without lifting your elbows.",
+      "Curl toward chin height with your upper arms on the pad.",
       "Lower slowly until your arms are nearly straight.",
     ],
   },
@@ -113,7 +113,7 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     views: ["front"],
     cues: [
       "Set your upper arms against the pad, palms up.",
-      "Curl the dumbbells while keeping your elbows still.",
+      "Curl toward chin height while keeping your elbows still.",
       "Lower slowly to a comfortable stretch.",
     ],
   },
