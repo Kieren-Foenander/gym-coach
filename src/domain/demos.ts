@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-shrug",
+    views: ["front"],
+    cues: [
+      "Hold the bar with long arms.",
+      "Lift your shoulders straight toward your ears.",
+      "Lower your shoulders under control.",
+    ],
+  },
+  {
     slug: "cable-front-raise",
     views: ["front"],
     cues: [
