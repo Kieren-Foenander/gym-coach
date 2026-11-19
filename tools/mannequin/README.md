@@ -427,3 +427,8 @@ With a world `pivot`, `carriage` measures degrees around the axle.
 The fixed `footplate` gives its centre Y and top Z. Each frame checks
 pad contact, foot support, grip enclosure, and clearance of the fixed
 frame and moving linkages.
+
+Selectorized stations can use `pad_size: [width, length]` to size the
+chest or back pad, or omit `back_pad` when a separate preacher pad carries
+the upper arms. Optional `restraints` use the same contact-face geometry as
+the leg-machine pads. The pulldown uses a split thigh restraint.

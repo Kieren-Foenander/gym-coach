@@ -1541,15 +1541,18 @@ class SelectorMachine:
         self.pivot = Vector(config["pivot"])
         self.offset = Vector(config["grip_offset"])
         self.travel = config["travel"]
-        y, bottom, incline = config["back_pad"]
-        self.pad_rotation = Matrix.Rotation(math.radians(incline), 3, "X")
-        self.pad_face = Vector((0, y, bottom))
+        self.pad_face = None
+        self.pad_width, self.pad_length = config.get("pad_size", (.36, .57))
         self.pad_sign = -1 if config.get("support") == "chest" else 1
         self.metal = material("machine frame", (.085, .095, .11), .65, .43)
         pad = material("machine upholstery", PAD, .05, .65)
-        box("machine back pad", (.36, .09, .57),
-            self.pad_face + self.pad_rotation @ Vector((0, self.pad_sign * .045, .285)),
-            pad, rotation=self.pad_rotation.to_euler())
+        if "back_pad" in config:
+            y, bottom, incline = config["back_pad"]
+            self.pad_rotation = Matrix.Rotation(math.radians(incline), 3, "X")
+            self.pad_face = Vector((0, y, bottom))
+            box("machine back pad", (self.pad_width, .09, self.pad_length),
+                self.pad_face + self.pad_rotation @ Vector((0, self.pad_sign * .045, self.pad_length / 2)),
+                pad, rotation=self.pad_rotation.to_euler())
         fixed = [box("machine support", (.63, .72, .06), (0, .26, .03), self.metal)]
         for x in (.18, .42):
             fixed.append(box("machine stack rail", (.028, .028, .85), (x, .53, .46), self.metal))
@@ -1560,19 +1563,28 @@ class SelectorMachine:
         self.arms = {}
         self.links = {}
         self.parts = [(part, False) for part in fixed]
+        self.restraints = [SupportPad(name, cfg, pad, self.metal)
+                           for name, cfg in config.get("restraints", {}).items()]
+        self.parts.extend((mount, False) for restraint in self.restraints for mount in restraint.mounts)
         for side, sign in SIDES.items():
             bearing = self.pivot.copy()
             bearing.x *= sign
             support_y = .49 if config.get("motion") == "fly" else bearing.y
+            support_x = sign * config.get("bearing_support_width", abs(bearing.x))
             support = box("machine bearing support", (.075, .09, bearing.z),
-                          (bearing.x, support_y, bearing.z / 2), self.metal)
+                          (support_x, support_y, bearing.z / 2), self.metal)
             pin = cylinder("machine pivot", .045, .10, 0, self.metal, None)
             pin.location = bearing
             self.parts.extend(((support, False), (pin, False)))
             if config.get("motion") == "fly":
                 pin.rotation_euler = (0, 0, 0)
-                bracket = box("fly bearing bracket", (.08, support_y - bearing.y, .06),
-                              (bearing.x, (support_y + bearing.y) / 2, bearing.z + .06), self.metal)
+                if support_x == bearing.x:
+                    bracket = box("fly bearing bracket", (.08, support_y - bearing.y, .06),
+                                  (bearing.x, (support_y + bearing.y) / 2, bearing.z + .06), self.metal)
+                else:
+                    bracket = CableStation.part("fly bearing bracket", .033, self.metal)
+                    set_segment(bracket, Vector((support_x, support_y, bearing.z)),
+                                bearing + Vector((0, 0, .055)), 1)
                 self.parts.append((bracket, False))
             self.arms[side] = CableStation.part("machine lever", .023, self.metal)
             self.links[side] = CableStation.part("machine handle return", .019, self.metal)
@@ -1596,19 +1608,23 @@ class SelectorMachine:
             gap = pose_arm(side, grip, pole, span.keys[1].get("grip", "pronated"), torso, axis)
             gaps.append((side + " machine grip", gap))
             set_segment(self.handles[side], grip - axis * .076, grip + axis * .076, frame)
-            elbow = Vector((pivot.x, grip.y, grip.z))
+            outside = grip + axis * .076 * sign
+            elbow = Vector((pivot.x, outside.y, outside.z))
             set_segment(self.arms[side], pivot, elbow, frame)
-            set_segment(self.links[side], elbow, grip + axis * .076 * sign, frame)
+            set_segment(self.links[side], elbow, outside, frame)
 
     def check(self, points, faces, hands, grips, frame, problems, samples):
-        # Measure skin against the front plane of the upholstery in pad coordinates.
-        local = (points - np.array(self.pad_face)) @ np.array(self.pad_rotation)
-        on_pad = (np.abs(local[:, 0]) < .18) & (local[:, 2] > 0) & (local[:, 2] < .57)
-        depth = (self.pad_sign * local[on_pad, 1]).max(initial=-1)
-        if depth < -.035:
-            problems.add(frame, "back loses machine pad contact", -depth)
-        if depth > .025:
-            problems.add(frame, "the body sinks into the machine pad", depth)
+        if self.pad_face is not None:
+            # Measure skin against the front plane of the upholstery in pad coordinates.
+            local = (points - np.array(self.pad_face)) @ np.array(self.pad_rotation)
+            on_pad = (np.abs(local[:, 0]) < self.pad_width / 2) & (local[:, 2] > 0) & (local[:, 2] < self.pad_length)
+            depth = (self.pad_sign * local[on_pad, 1]).max(initial=-1)
+            if depth < -.035:
+                problems.add(frame, "back loses machine pad contact", -depth)
+            if depth > .025:
+                problems.add(frame, "the body sinks into the machine pad", depth)
+        for restraint in self.restraints:
+            restraint.check(points, frame, problems)
         check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
         samples.append(np.array([part.matrix_world @ Vector(corner)
                                  for part, _ in self.parts for corner in part.bound_box]))

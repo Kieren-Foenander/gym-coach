@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-high-row",
+    views: ["back"],
+    cues: [
+      "Reach up to the handles with your chest on the pad.",
+      "Pull your elbows down and back.",
+      "Return slowly until your arms are long.",
+    ],
+  },
+  {
+    slug: "chest-supported-machine-row",
+    views: ["back"],
+    cues: [
+      "Set your chest against the angled pad.",
+      "Draw the handles toward your ribs with your elbows back.",
+      "Reach forward again without lifting your chest.",
+    ],
+  },
+  {
     slug: "leg-curl",
     views: ["front"],
     cues: [
