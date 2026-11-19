@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "reverse-pec-deck",
+    views: ["back"],
+    cues: [
+      "Set your chest against the pad and reach forward.",
+      "Open your arms out to the sides with soft elbows.",
+      "Bring the handles forward under control.",
+    ],
+  },
+  {
     slug: "machine-lat-pulldown",
     views: ["back"],
     cues: [
