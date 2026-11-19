@@ -1,0 +1,111 @@
+{
+  "equipment": [
+    {
+      "type": "selector-machine",
+      "pivot": [
+        0.64,
+        -0.5,
+        0.42
+      ],
+      "grip_offset": [
+        -0.29,
+        0.43,
+        0.006
+      ],
+      "travel": [
+        -2,
+        13
+      ],
+      "back_pad": [
+        0.157,
+        0.455,
+        0
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.09,
+        0.425
+      ],
+      "length": 0.46
+    }
+  ],
+  "stance": {
+    "width": 0.39,
+    "y": -0.24,
+    "toe_out": 15
+  },
+  "camera": {
+    "angle": 38
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.575
+      ],
+      "lean": 0,
+      "lever_angle": 0,
+      "elbows": [
+        0.15,
+        -0.3,
+        -1
+      ],
+      "grip": "pronated",
+      "clavicle": [
+        0,
+        0
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "lever_angle": 10,
+      "elbows": [
+        0.9,
+        -0.55,
+        -0.37
+      ],
+      "clavicle": [
+        0,
+        24
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        0,
+        40
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        0,
+        40
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "Arm",
+        "z": [
+          1.0,
+          1.09
+        ]
+      }
+    }
+  ]
+}

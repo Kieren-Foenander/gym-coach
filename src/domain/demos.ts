@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-shrug",
+    views: ["front"],
+    cues: [
+      "Hold both handles with your arms long.",
+      "Lift your shoulders toward your ears.",
+      "Lower the handles without rolling your shoulders.",
+    ],
+  },
+  {
     slug: "decline-machine-press",
     views: ["front"],
     cues: [
