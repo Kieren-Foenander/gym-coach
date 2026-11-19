@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "preacher-curl",
+    views: ["front"],
+    cues: [
+      "Set your upper arms against the pad.",
+      "Curl the EZ bar without lifting your elbows.",
+      "Lower slowly until your arms are nearly straight.",
+    ],
+  },
+  {
+    slug: "dumbbell-preacher-curl",
+    views: ["front"],
+    cues: [
+      "Set your upper arms against the pad, palms up.",
+      "Curl the dumbbells while keeping your elbows still.",
+      "Lower slowly to a comfortable stretch.",
+    ],
+  },
+  {
+    slug: "zottman-curl",
+    views: ["front"],
+    cues: [
+      "Curl with your palms up and elbows still.",
+      "Turn your palms down at the top.",
+      "Lower slowly, then turn your palms up again.",
+    ],
+  },
+  {
     slug: "overhead-squat",
     views: ["front"],
     cues: [
