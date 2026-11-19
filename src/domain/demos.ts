@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-curl",
+    views: ["front"],
+    cues: [
+      "Face the low pulley with palms up.",
+      "Keep your elbows still as you curl the bar.",
+      "Lower the bar without leaning back.",
+    ],
+  },
+  {
+    slug: "rope-hammer-curl",
+    views: ["front"],
+    cues: [
+      "Hold the rope with your palms facing in.",
+      "Curl the ends up while keeping your elbows still.",
+      "Lower slowly until your arms are nearly straight.",
+    ],
+  },
+  {
     slug: "triceps-pushdown",
     views: ["back"],
     cues: [
