@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "snatch",
+    views: ["front"],
+    cues: [
+      "Push through the floor with the bar close.",
+      "Extend fast and pull under the bar.",
+      "Catch in an overhead squat and stand with the bar steady.",
+    ],
+  },
+  {
+    slug: "hang-snatch",
+    views: ["front"],
+    cues: [
+      "Hinge with a wide grip and the bar near knee height.",
+      "Extend through your legs and keep the bar close.",
+      "Catch overhead with straight arms, then stand.",
+    ],
+  },
+  {
+    slug: "power-snatch",
+    views: ["front"],
+    cues: [
+      "Start from the floor with a wide grip.",
+      "Extend quickly, then guide the bar overhead.",
+      "Catch above parallel with straight arms and stand.",
+    ],
+  },
+  {
     slug: "push-jerk",
     views: ["front"],
     cues: [

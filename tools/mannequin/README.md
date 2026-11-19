@@ -354,3 +354,12 @@ For bodyweight moves with both palms flat, use the `support` hand shape
 on both sides. Set `floor_hands` to the left wrist's world coordinates.
 The right wrist mirrors across X. The palms are checked against the floor
 on every frame.
+
+### Bar turnover
+
+A straight-bar spec may key `grip_pitch` to control hand rotation around the
+shaft. Zero points the hand forward, −90° points it down, and 90° points it up.
+With `arm_arc: [elbow_x, upper_pitch]`, the solver derives the bar position
+from the mirrored elbow targets and the limb lengths. The upper-arm pitch
+uses the same world-space convention as the grip pitch. The regular grip,
+wrist, skin and equipment checks still run on every frame.

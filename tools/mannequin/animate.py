@@ -1046,6 +1046,27 @@ def supported_wrist(spec, span, side):
     return wrist + along*GRIP[side][0] + palm*GRIP[side][1], (along, palm)
 
 
+def planar_grip(pitch):
+    """A pronated hand rotating around the shaft as it turns over."""
+    angle = math.radians(pitch)
+    along = Vector((0, -math.cos(angle), math.sin(angle)))
+    return along, Vector((1, 0, 0)).cross(along)
+
+
+def arm_arc_target(side, elbow_x, upper_pitch, grip_x, hand_frame):
+    """Keep the elbow on an authored arc and derive the grip from both limb lengths."""
+    shoulder = head(side + "Arm")
+    upper, fore = segment(side + "Arm", side + "ForeArm", side + "Hand")
+    dx, fore_x = elbow_x - shoulder.x, grip_x - elbow_x
+    upper_radius = math.sqrt(upper ** 2 - dx ** 2)
+    angle = math.radians(upper_pitch)
+    pole = Vector((dx, -upper_radius * math.cos(angle), upper_radius * math.sin(angle)))
+    along, palm = hand_frame
+    wrist = shoulder + pole + Vector((fore_x, 0, 0)) + along * math.sqrt(fore ** 2 - fore_x ** 2)
+    grip = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+    return grip, pole
+
+
 def bar_centre(target, torso):
     if isinstance(target, list):
         return Vector(target)
@@ -1617,7 +1638,14 @@ def bake(spec, keys):
                 key[field] = span.sample(field)
         gaps = pose_legs(spec, {**a, **key}, pelvis)
         if barbell:
-            if "wrist_rest" in a:
+            arc_pole = None
+            if "arm_arc" in a:
+                width = span.sample("grip_width", .25)
+                elbow_x, upper_pitch = span.sample("arm_arc")
+                frame_axes = planar_grip(span.sample("grip_pitch"))
+                grip, arc_pole = arm_arc_target("Left", elbow_x, upper_pitch, width, frame_axes)
+                centre = Vector((0, grip.y, grip.z))
+            elif "wrist_rest" in a:
                 target, _ = supported_wrist(a, span, "Left")
                 centre = Vector((0,target.y,target.z))
             elif "overhead_y" in a:
@@ -1682,7 +1710,12 @@ def bake(spec, keys):
                 if isinstance(barbell, BentBar):
                     grip_point, axis = barbell.grip(side)
                 hand_frame = supported_wrist(a, span, side)[1] if "wrist_rest" in a else None
-                gap = pose_arm(side, grip_point, torso.direction(elbows, sign), a.get("grip", "pronated"), torso, axis, hand_frame)
+                if "grip_pitch" in a:
+                    hand_frame = planar_grip(span.sample("grip_pitch"))
+                pole = torso.direction(elbows, sign)
+                if arc_pole is not None:
+                    pole = Vector((sign * arc_pole.x, arc_pole.y, arc_pole.z))
+                gap = pose_arm(side, grip_point, pole, a.get("grip", "pronated"), torso, axis, hand_frame)
                 gaps.append((f"{side} hand", gap))
                 # The bar has to sit in the palm, where the fingers can close round it.
                 hand = world_rotation(f"{side}Hand")
