@@ -2003,6 +2003,107 @@ class HipThrustStation:
                                  for part,_ in self.parts for v in part.bound_box]))
 
 
+class BeltSquatStation:
+    """The waist belt tensions a cable to the load below a split foot platform."""
+
+    def __init__(self, config):
+        self.platform_y, self.platform_z = config["footplate"]
+        self.radii = np.array(config["belt_radii"])
+        self.half_width = .031
+        self.anchor = Vector(config["anchor"])
+        self.grip = Vector(config["grip"])
+        steel = material("belt squat frame", IRON, .55, .43)
+        fabric = material("belt squat webbing", PAD, .05, .72)
+        for sign in (-1, 1):
+            box("belt squat platform",(.40, .71, self.platform_z),
+                (sign*.286, self.platform_y, self.platform_z/2), steel)
+        self.parts, self.handles = [],{}
+        for side, sign in SIDES.items():
+            target = Vector((sign*self.grip.x, self.grip.y, self.grip.z))
+            axis = Vector((1, 0, 0))
+            handle = CableStation.part("belt squat grip", Barbell.SHAFT, steel)
+            set_segment(handle, target-axis*.077, target+axis*.077, 1)
+            outer_x = (self.grip.x+.077)*sign
+            column=box("belt squat handle post",(.07, .078, self.grip.z),
+                       (outer_x, self.grip.y, self.grip.z/2), steel)
+            self.handles[side] = handle
+            self.parts.extend(((column, False),(handle, True)))
+        self.cable = CableStation.part("belt squat cable", .005, steel)
+        self.buckle = CableStation.part("belt squat load buckle", .011, steel)
+        self.parts.extend(((self.cable, False),(self.buckle, False)))
+        self.ring=bpy.data.objects.new("belt squat waist belt", self.make_belt())
+        scene.collection.objects.link(self.ring)
+        self.ring.data.materials.append(fabric)
+        self.bounds = [Vector((sign*.49, y, z)) for sign in (-1, 1)
+                     for y, z in ((self.platform_y+.36, 0),(self.grip.y, self.grip.z))]
+
+    def make_belt(self):
+        width = 64
+        vertices = []
+        for thickness, sign in ((0, -1), (0, 1), (.012, 1), (.012, -1)):
+            z = sign * self.half_width
+            for i in range(width):
+                angle = math.tau*i/width
+                vertices.append(((self.radii[0]+thickness)*math.cos(angle),
+                                 (self.radii[1]+thickness)*math.sin(angle), z))
+        faces = []
+        for layer in range(4):
+            next_layer = (layer+1)%4
+            for index in range(width):
+                next_index = (index+1)%width
+                faces.append((layer*width+index, layer*width+next_index,
+                              next_layer*width+next_index, next_layer*width+index))
+        mesh=bpy.data.meshes.new("belt squat strap mesh")
+        mesh.from_pydata(vertices,[], faces)
+        mesh.update()
+        return mesh
+
+    def pose(self, torso, frame, gaps):
+        self.rotation = Matrix((torso.left, -torso.forward, torso.up)).transposed()
+        self.centre = head("Hips") + self.rotation @ Vector((0, -.024, .122))
+        self.ring.location = self.centre
+        self.ring.rotation_euler = self.rotation.to_euler()
+        self.ring.keyframe_insert("location", frame=frame)
+        self.ring.keyframe_insert("rotation_euler", frame=frame)
+        end = self.centre + self.rotation @ Vector((0, -self.radii[1] - .055, -.040))
+        set_segment(self.buckle, self.centre + self.rotation @ Vector((0, -self.radii[1] - .015, -.031)), end, frame)
+        set_segment(self.cable, self.anchor, end, frame)
+        axis = Vector((1, 0, 0))
+        for side, sign in SIDES.items():
+            target = Vector((sign*self.grip.x, self.grip.y, self.grip.z))
+            gap=pose_arm(side, target, torso.direction([.57, -.30, -.35], sign), "pronated", torso, axis)
+            gaps.append((side+" belt squat grip", gap))
+
+    def check(self, points, contact, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
+        local = (points - np.array(self.centre)) @ np.array(self.rotation)
+        trunk = local[contact.trunk_vertices]
+        waist = trunk[abs(trunk[:, 2]) < self.half_width, :2]
+        rim = (np.linalg.norm(waist / self.radii, axis = 1) - 1) * min(self.radii)
+        gap = -rim.max(initial = -1)
+        if gap > .014 or gap < -.009:
+            problems.add(frame, "waist belt contact", abs(gap))
+        # Adjacent glute vertices can rest against the belt, but the strap must
+        # remain clear of the leg as the thigh travels forward below the hips.
+        self.ring.data.calc_loop_triangles()
+        webbing = BVHTree.FromPolygons(
+            [self.ring.matrix_world @ v.co for v in self.ring.data.vertices],
+            [tuple(t.vertices) for t in self.ring.data.loop_triangles],
+            all_triangles = True,
+        )
+        thighs = contact.vertices[np.isin(contact.part, ("Left thigh", "Right thigh"))]
+        leg_skin = BVHTree.FromPolygons(points, thighs, all_triangles = True)
+        if webbing.overlap(leg_skin):
+            problems.add(frame, "waist belt crosses the thighs", .001)
+        for side, sign in SIDES.items():
+            over = (abs(points[:, 0]-sign*.286)<.20)&(abs(points[:, 1]-self.platform_y)<.355)
+            gap = points[over, 2].min(initial = 1)-self.platform_z
+            if abs(gap)>.014:
+                problems.add(frame, side+" foot loses belt squat platform", abs(gap))
+        samples.append(np.array(self.bounds))
+
+
 class LegRollerMachine:
     """A knee-height axle drives padded rollers through a fixed arc."""
 
@@ -3072,7 +3173,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rotary-torso", "thrust-station"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3095,6 +3196,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
@@ -3124,7 +3226,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        cycle, rotary, hip_thrust, calf, roller,
+        cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3217,6 +3319,8 @@ def bake(spec, keys):
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
         gaps.extend(activity_gaps)
+        if belt_squat:
+            belt_squat.pose(torso,frame,gaps)
         if rotary:
             rotary.pose(span,torso,frame,gaps,problems)
         if hip_thrust:
@@ -3495,6 +3599,8 @@ def bake(spec, keys):
             section.check(frame, everything, problems)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if belt_squat:
+            belt_squat.check(everything,contact,hands,grips,frame,problems,samples)
         if rotary:
             rotary.check(everything,contact,hands,grips,frame,problems,samples)
         if hip_thrust:

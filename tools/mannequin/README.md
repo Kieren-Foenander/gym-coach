@@ -449,6 +449,11 @@ the leg-machine pads. The pulldown uses a split thigh restraint.
   The shaft rotates with the lever and its actual transform drives the grip
   check.
 
+- A `belt-squat` has split platforms and a cable from the waist belt
+  to a fixed `anchor`. Set `footplate` to the centre Y and top Z,
+  `belt_radii` to the strap's lateral and front-to-back radii, and `grip`
+  to the left handle centre. The belt follows the torso and is checked
+  against the waist and thighs through the full squat.
 - A `rotary-torso` station carries its chest pad and grips around the
   seat's vertical axis. `torso_twist` turns the spine and frame together.
   Set `pivot`, `pad_y` for the pad face in the rotating frame, and angular

@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "belt-squat",
+    views: ["front"],
+    cues: [
+      "Fasten the belt around your hips and plant both feet.",
+      "Sit down between your feet with your knees following your toes.",
+      "Drive through your whole foot to stand tall.",
+    ],
+  },
+  {
     slug: "machine-torso-rotation",
     views: ["front"],
     cues: [
