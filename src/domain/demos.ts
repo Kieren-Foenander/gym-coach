@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "single-arm-cable-row",
+    views: ["back"],
+    cues: [
+      "Stand tall and reach toward the cable.",
+      "Draw your elbow back and pull the handle toward your side.",
+      "Reach forward again without turning your torso.",
+    ],
+  },
+  {
     slug: "cable-shrug",
     views: ["front"],
     cues: [
