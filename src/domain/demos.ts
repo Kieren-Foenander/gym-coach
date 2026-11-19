@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-preacher-curl",
+    views: ["front"],
+    cues: [
+      "Rest your upper arms on the angled pad.",
+      "Curl the handles without lifting your elbows.",
+      "Lower until your arms are long.",
+    ],
+  },
+  {
+    slug: "machine-biceps-curl",
+    views: ["front"],
+    cues: [
+      "Hold the handles with your palms up and arms supported.",
+      "Curl by bending only your elbows.",
+      "Lower slowly and keep your upper arms on the pad.",
+    ],
+  },
+  {
+    slug: "machine-triceps-extension",
+    views: ["front"],
+    cues: [
+      "Rest your upper arms on the pad with your elbows bent.",
+      "Press the handles away and straighten your elbows.",
+      "Return the handles slowly without lifting your upper arms.",
+    ],
+  },
+  {
     slug: "machine-high-row",
     views: ["back"],
     cues: [
