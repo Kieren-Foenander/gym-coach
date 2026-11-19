@@ -385,3 +385,20 @@ and the arms solve against those moving grips. Levers stay in the plane
 of each outer bearing and turn inward at the grip. The bake checks lever
 travel, overlaps between the rendered moving hardware and the posed skin,
 grip enclosure, and contact with the back pad.
+
+### Leg machines and Smith guides
+
+- A `leg-roller` keeps the thigh at `thigh_pitch` and rotates the lower leg
+  and roller together around the knee-height axle. The `roller_offset` is
+  measured from the knee at zero `lever_angle`. Both rollers are checked
+  for skin contact and penetration, and the moving linkage must clear the body.
+- A `leg-sled` uses an inclined foot plate on fixed guides. Set its plate
+  `origin`, optional `pitch`, and travel limits in metres. The `sled` key
+  sets displacement along the guide. Set `side` for single-leg work. The
+  plate must stay against the working soles and the carriage must clear skin.
+- Setting `motion: "fly"` on a selectorized station uses overhead vertical
+  bearings and a suspended grip on each arm.
+- Add `smith-rails` to a straight bar with fixed world `y` and vertical
+  `travel`. A landmark-based bar target translates the torso to the guide
+  while leaving bar height driven by the pose. The guides constrain the bar
+  throughout the loop and the carriages are checked against skin.

@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "leg-extension",
+    views: ["front"],
+    cues: [
+      "Sit with your knees in line with the axle and the rollers on the front of your shins.",
+      "Straighten your knees without lifting your hips.",
+      "Lower the rollers under control.",
+    ],
+  },
+  {
+    slug: "seated-leg-curl",
+    views: ["front"],
+    cues: [
+      "Sit with the rollers behind your lower legs.",
+      "Curl your heels under the seat while keeping your thighs still.",
+      "Straighten your legs slowly.",
+    ],
+  },
+  {
+    slug: "lying-leg-curl",
+    views: ["front"],
+    cues: [
+      "Lie face down with the rollers above your heels.",
+      "Curl your heels toward your glutes without lifting your hips.",
+      "Lower until your legs are long.",
+    ],
+  },
+  {
     slug: "machine-shoulder-press",
     views: ["front"],
     cues: [

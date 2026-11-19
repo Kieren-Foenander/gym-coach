@@ -261,7 +261,7 @@ def pose_legs(spec, key, pelvis):
         swing(f"{side}Leg", ankle - head(f"{side}Leg"))
         place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
         if stride is not None:
-            place(side + "ToeBase", turned @ REST[side + "ToeBase"])
+            place(side + "ToeBase", turned @ (pitch if side in key.get("sled_feet", ()) else Matrix.Identity(3)) @ REST[side + "ToeBase"])
         gaps.append((f"{side} ankle", gap))
     return gaps
 
@@ -945,6 +945,7 @@ def check_rendered_grips(handles, grips, frame, problems):
 def check_moving_parts(parts, points, faces, hands, grips, frame, problems):
     """Check the rendered mechanism against posed skin, including actual fists."""
     skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
+    skin_min, skin_max = points.min(axis=0), points.max(axis=0)
     outside_hands = BVHTree.FromPolygons(
         points, [face for face in faces if not any(hands[index] for index in face)],
         all_triangles=True,
@@ -962,10 +963,181 @@ def check_moving_parts(parts, points, faces, hands, grips, frame, problems):
         surfaces = (outside_hands,) if held else (skin, *fist_surfaces)
         for surface in surfaces:
             nearest, normal, _, distance = surface.find_nearest(part.matrix_world.translation)
-            if surface.overlap(hardware) or (nearest is not None and
-                    (part.matrix_world.translation - nearest).dot(normal) < 0 and surface == skin):
+            centre = np.array(part.matrix_world.translation)
+            inside = (surface is skin and nearest is not None and
+                      np.all((skin_min <= centre) & (centre <= skin_max)) and
+                      (part.matrix_world.translation - nearest).dot(normal) < 0)
+            if surface.overlap(hardware) or inside:
                 problems.add(frame, part.name.split(".")[0] + " crosses the body", .001)
                 break
+
+
+class SmithRails:
+    """The bar's sleeves travel on two fixed vertical guides."""
+
+    def __init__(self, config):
+        self.y = config["y"]
+        self.travel = config.get("travel", [.27, 1.95])
+        self.width = .96
+        steel = material("Smith guide steel", STEEL, .83, .34)
+        frame = material("Smith frame", IRON, .55, .45)
+        self.blocks = []
+        self.bounds = []
+        for sign in (-1, 1):
+            x = sign * self.width
+            guide = cylinder("Smith guide rail", .018, 2.10, 0, steel, None)
+            guide.rotation_euler = (0, 0, 0)
+            guide.location = (x, self.y, 1.12)
+            box("Smith base", (.15, .70, .06), (x, self.y + .04, .03), frame)
+            box("Smith upright", (.095, .085, 2.17), (x, self.y + .16, 1.085), frame)
+            box("Smith upper bracket", (.14, .22, .065), (x, self.y + .06, 2.12), frame)
+            block = box("Smith sleeve carriage", (.087, .091, .103), (0, 0, 0), frame)
+            block.location = (x, self.y, 1)
+            self.blocks.append(block)
+            self.bounds.extend((Vector((x, self.y, 2.2)), Vector((x, self.y, 0))))
+
+    def move(self, bar, frame, problems):
+        centre = bar.centre
+        minimum, maximum = self.travel
+        if abs(centre.y - self.y) > .001:
+            problems.add(frame, "Smith bar leaves its guides", abs(centre.y - self.y))
+        if not minimum <= centre.z <= maximum:
+            problems.add(frame, "Smith bar outside guide travel",
+                         max(minimum-centre.z, centre.z-maximum))
+        for block in self.blocks:
+            block.location.z = centre.z
+            block.keyframe_insert("location", frame=frame)
+
+    def check(self, points, faces, hands, frame, problems, samples):
+        check_moving_parts([(block, False) for block in self.blocks],
+                           points, faces, hands, {}, frame, problems)
+        samples.append(np.array(self.bounds))
+
+
+class LegSled:
+    """A foot plate follows inclined rails while the legs reach to its face."""
+
+    def __init__(self, config):
+        self.origin = Vector(config["origin"])
+        self.travel = config["travel"]
+        self.side = config.get("side")
+        self.pitch = config.get("pitch", -47)
+        self.rotation = Matrix.Rotation(math.radians(self.pitch), 3, "X")
+        self.direction = Vector((0, -1, 1)).normalized()
+        metal = material("leg sled frame", IRON, .6, .43)
+        grip = material("leg sled foot plate", (.11, .12, .14), .55, .48)
+        self.plate = box("leg sled foot plate", (.59, .38, .045), (0, 0, 0), grip)
+        self.plate.rotation_euler = self.rotation.to_euler()
+        self.carriage = box("leg sled carriage", (.71, .20, .10), (0, 0, 0), metal)
+        self.carriage.rotation_euler = self.rotation.to_euler()
+        self.parts = [(self.carriage, False)]
+        self.rails = []
+        for sign in (-1, 1):
+            start = self.origin + Vector((sign * .38, .09, -.13))
+            end = start + self.direction * (self.travel[1] + .24)
+            rail = CableStation.part("leg sled rail", .024, metal)
+            set_segment(rail, start, end, 1)
+            self.rails.extend((start, end))
+            box("leg sled upright", (.09, .12, end.z), (end.x, end.y, end.z / 2), metal)
+            box("leg sled foot", (.17, .34, .04), (end.x, end.y, .02), metal)
+
+    def pose(self, spec, span, key, frame, problems):
+        distance = span.sample("sled")
+        lo, hi = self.travel
+        if not lo <= distance <= hi:
+            problems.add(frame, "foot plate travels beyond the rails", max(lo-distance, distance-hi))
+        self.face = self.origin + self.direction * distance
+        self.plate.location = self.face - self.rotation @ Vector((0, 0, .0225))
+        self.carriage.location = self.face - self.rotation @ Vector((0, 0, .155))
+        for part in (self.plate, self.carriage):
+            part.keyframe_insert("location", frame=frame)
+        key["sled_feet"] = (self.side,) if self.side else tuple(SIDES)
+        for side, (ankle, yaw) in ankles(spec, key).items():
+            if self.side and self.side != side:
+                continue
+            foot = rig.data.bones[side + "Foot"].head_local
+            toe = rig.data.bones[side + "ToeBase"].head_local
+            turned = Matrix.Rotation(math.radians(yaw), 3, "Z")
+            correction = turned @ (self.rotation @ (foot - toe) - (foot - toe))
+            target = self.face + Vector((ankle.x, 0, 0)) + self.rotation @ Vector((0, .057, FLOOR_ANKLE))
+            stride = target - ankle - correction
+            key["foot_" + side.lower()] = [stride.y, stride.z, self.pitch, stride.x]
+
+    def check(self, points, faces, hands, frame, problems, samples):
+        check_moving_parts(self.parts, points, faces, hands, {}, frame, problems)
+        local = (points - np.array(self.face)) @ np.array(self.rotation)
+        on_plate = (np.abs(local[:, 0]) < .295) & (np.abs(local[:, 1]) < .19)
+        if local[on_plate, 2].min(initial=1) < -.010:
+            problems.add(frame, "foot plate crosses the body", -local[on_plate, 2].min())
+        for side, sign in SIDES.items():
+            if self.side and self.side != side:
+                continue
+            sole = local[on_plate & (sign * local[:, 0] > 0), 2].min(initial=1)
+            if abs(sole) > .014:
+                problems.add(frame, side + " foot loses foot plate contact", abs(sole))
+        samples.append(np.array(self.rails + [self.face]))
+
+
+class LegRollerMachine:
+    """A knee-height axle drives padded rollers through a fixed arc."""
+
+    def __init__(self, config):
+        self.offset = Vector(config["roller_offset"])
+        self.range = config["travel"]
+        self.thigh_pitch = config.get("thigh_pitch", 0)
+        self.radius = .057
+        self.half = .092
+        self.axes, self.pad_centres = {}, {}
+        metal = material("leg machine frame", IRON, .55, .42)
+        pad = material("roller upholstery", PAD, .05, .67)
+        self.levers = {side: CableStation.part("roller lever", .022, metal) for side in SIDES}
+        self.returns = {side: CableStation.part("roller return", .018, metal) for side in SIDES}
+        self.rollers = {side: CableStation.part("shin roller", self.radius, pad) for side in SIDES}
+        self.bearings = {side: cylinder("roller axle", .041, .08, 0, metal, None) for side in SIDES}
+        self.columns = {side: box("roller support", (.07, .12, 1), (0, 0, 0), metal) for side in SIDES}
+        self.parts = [(part, False) for part in (*self.levers.values(), *self.returns.values())]
+
+    def pose_legs(self, span, frame, problems):
+        angle = span.sample("lever_angle")
+        lo, hi = self.range
+        if not lo <= angle <= hi:
+            problems.add(frame, "roller outside its travel", max(lo-angle, angle-hi), "degrees")
+        axis = Vector((1, 0, 0))
+        rotation = Matrix.Rotation(math.radians(angle), 3, "X")
+        thigh_angle = math.radians(self.thigh_pitch)
+        thigh = Vector((0, -math.cos(thigh_angle), math.sin(thigh_angle)))
+        for side, sign in SIDES.items():
+            swing(side + "UpLeg", thigh)
+            knee = head(side + "Leg")
+            swing(side + "Leg", rotation @ Vector((0, 0, -1)))
+            place(side + "Foot", rotation @ REST[side + "Foot"])
+            outside = Vector((sign * .44, knee.y, knee.z))
+            centre = knee + rotation @ self.offset
+            elbow = Vector((outside.x, centre.y, centre.z))
+            inside = centre + axis * self.half * sign
+            set_segment(self.levers[side], outside, elbow, frame)
+            set_segment(self.returns[side], elbow, inside, frame)
+            set_segment(self.rollers[side], centre - axis * self.half, centre + axis * self.half, frame)
+            self.pad_centres[side] = centre
+            if frame == 1:
+                self.axes[side] = outside
+                self.bearings[side].location = outside
+                column = self.columns[side]
+                column.location = (outside.x, outside.y, outside.z / 2)
+                column.scale.z = outside.z
+            if (outside - self.axes[side]).length > .002:
+                problems.add(frame, "knee leaves the fixed roller axle", (outside - self.axes[side]).length)
+
+    def check(self, points, faces, hands, frame, problems, samples):
+        check_moving_parts(self.parts, points, faces, hands, {}, frame, problems)
+        for side, centre in self.pad_centres.items():
+            local = points - np.array(centre)
+            inside_width = np.abs(local[:, 0]) < self.half
+            gap = np.linalg.norm(local[inside_width, 1:], axis=1).min(initial=1) - self.radius
+            if gap < -.006 or gap > .012:
+                problems.add(frame, side + " roller contact", abs(gap))
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part in self.rollers.values() for corner in part.bound_box]))
 
 
 class SelectorMachine:
@@ -978,10 +1150,11 @@ class SelectorMachine:
         y, bottom, incline = config["back_pad"]
         self.pad_rotation = Matrix.Rotation(math.radians(incline), 3, "X")
         self.pad_face = Vector((0, y, bottom))
+        self.pad_sign = -1 if config.get("support") == "chest" else 1
         self.metal = material("machine frame", (.085, .095, .11), .65, .43)
         pad = material("machine upholstery", PAD, .05, .65)
         box("machine back pad", (.36, .09, .57),
-            self.pad_face + self.pad_rotation @ Vector((0, .045, .285)),
+            self.pad_face + self.pad_rotation @ Vector((0, self.pad_sign * .045, .285)),
             pad, rotation=self.pad_rotation.to_euler())
         box("machine support", (.63, .72, .06), (0, .26, .03), self.metal)
         for x in (.18, .42):
@@ -997,10 +1170,15 @@ class SelectorMachine:
         for side, sign in SIDES.items():
             bearing = self.pivot.copy()
             bearing.x *= sign
+            support_y = .49 if config.get("motion") == "fly" else bearing.y
             box("machine bearing support", (.075, .09, bearing.z),
-                (bearing.x, bearing.y, bearing.z / 2), self.metal)
+                (bearing.x, support_y, bearing.z / 2), self.metal)
             pin = cylinder("machine pivot", .045, .10, 0, self.metal, None)
             pin.location = bearing
+            if config.get("motion") == "fly":
+                pin.rotation_euler = (0, 0, 0)
+                box("fly bearing bracket", (.08, support_y - bearing.y, .06),
+                    (bearing.x, (support_y + bearing.y) / 2, bearing.z + .06), self.metal)
             self.arms[side] = CableStation.part("machine lever", .023, self.metal)
             self.links[side] = CableStation.part("machine handle return", .019, self.metal)
             self.handles[side] = CableStation.part("machine grip", Barbell.SHAFT, self.metal)
@@ -1031,7 +1209,7 @@ class SelectorMachine:
         # Measure skin against the front plane of the upholstery in pad coordinates.
         local = (points - np.array(self.pad_face)) @ np.array(self.pad_rotation)
         on_pad = (np.abs(local[:, 0]) < .18) & (local[:, 2] > 0) & (local[:, 2] < .57)
-        depth = local[on_pad, 1].max(initial=-1)
+        depth = (self.pad_sign * local[on_pad, 1]).max(initial=-1)
         if depth < -.035:
             problems.add(frame, "back loses machine pad contact", -depth)
         if depth > .025:
@@ -1039,6 +1217,34 @@ class SelectorMachine:
         check_moving_parts(self.parts, points, faces, hands, grips, frame, problems)
         samples.append(np.array([part.matrix_world @ Vector(corner)
                                  for part, _ in self.parts for corner in part.bound_box]))
+
+
+class FlyMachine(SelectorMachine):
+    """Overhead vertical bearings drive suspended handles around the chest."""
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.drops = {side: CableStation.part("fly handle drop", .018, self.metal) for side in SIDES}
+        self.parts.extend((part, False) for part in self.drops.values())
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        angle = span.sample("lever_angle")
+        lo, hi = self.travel
+        if not lo <= angle <= hi:
+            problems.add(frame, "fly arm outside its travel", max(lo-angle, angle-hi), "degrees")
+        axis = Vector((0, 0, 1))
+        for side, sign in SIDES.items():
+            pivot = self.pivot.copy()
+            pivot.x *= sign
+            rotation = Matrix.Rotation(math.radians(angle * sign), 3, "Z")
+            grip = pivot + rotation @ Vector((sign * self.offset.x, self.offset.y, self.offset.z))
+            gap = pose_arm(side, grip, torso.direction(span.sample("elbows"), sign), "neutral", torso, axis)
+            gaps.append((side + " fly grip", gap))
+            top = Vector((grip.x, grip.y, pivot.z))
+            set_segment(self.arms[side], pivot, top, frame)
+            set_segment(self.links[side], top, top - axis * .05, frame)
+            set_segment(self.drops[side], top - axis * .05, grip + axis * .078, frame)
+            set_segment(self.handles[side], grip - axis * .068, grip + axis * .078, frame)
 
 
 class ContactLoad:
@@ -1878,8 +2084,8 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine"}
-    if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins"}) > 1:
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails"}
+    if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
     for item in spec.get("equipment", []):
@@ -1901,7 +2107,12 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
-    machine = next((SelectorMachine(e) for e in spec.get("equipment", []) if e["type"] == "selector-machine"), None)
+    sled = next((LegSled(e) for e in spec.get("equipment", []) if e["type"] == "leg-sled"), None)
+    roller = next((LegRollerMachine(e) for e in spec.get("equipment", []) if e["type"] == "leg-roller"), None)
+    machine = next(((FlyMachine if e.get("motion") == "fly" else SelectorMachine)(e) for e in spec.get("equipment", []) if e["type"] == "selector-machine"), None)
+    smith = next((SmithRails(e) for e in spec.get("equipment", []) if e["type"] == "smith-rails"), None)
+    if smith and type(barbell) is not Barbell:
+        raise ValueError("Smith rails require a straight bar")
     station = next((PullStation(e) for e in spec.get("equipment", []) if e["type"] in ("platform","rack-pins")), None)
     if station and not barbell:
         raise ValueError("Pull stations need a barbell")
@@ -1961,6 +2172,12 @@ def bake(spec, keys):
         elif "pelvis" not in a:
             raise ValueError("A pose needs a pelvis position or a suspended shoulder_y")
         torso = Torso()
+        if smith and isinstance(a.get("bar"), dict):
+            target = span.sample("bar", resolve=lambda value: bar_centre(value, torso))
+            hips = head("Hips")
+            hips.y += smith.y - target[1]
+            place("Hips", world_rotation("Hips"), hips)
+            torso = Torso()
         # Set the shoulder girdle before solving hand contact. Retracting
         # the clavicles seats the upper back under a squat bar.
         if pose_clavicles:
@@ -1974,7 +2191,13 @@ def bake(spec, keys):
         for field in ("foot_left", "foot_right"):
             if field in a:
                 key[field] = span.sample(field)
-        gaps = pose_legs(spec, {**a, **key}, pelvis)
+        if sled:
+            sled.pose(spec, span, key, frame, problems)
+        if roller:
+            roller.pose_legs(span, frame, problems)
+            gaps = []
+        else:
+            gaps = pose_legs(spec, {**a, **key}, pelvis)
         if barbell:
             arc_pole = None
             if "arm_arc" in a:
@@ -2024,6 +2247,8 @@ def bake(spec, keys):
             else:
                 centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
             barbell.move(Vector(centre), frame)
+            if smith:
+                smith.move(barbell, frame, problems)
             width = a["wrist_rest"][0] if "wrist_rest" in a else span.sample("grip_width", 0.25)
             elbows = span.sample("elbows", [0.4, -0.6, -0.5])
             for side, sign in SIDES.items():
@@ -2237,6 +2462,12 @@ def bake(spec, keys):
         everything, hands = evaluated_points(body)
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
+        if smith:
+            smith.check(everything, contact.faces, hands, frame, problems, samples)
+        if sled:
+            sled.check(everything, contact.faces, hands, frame, problems, samples)
+        if roller:
+            roller.check(everything, contact.faces, hands, frame, problems, samples)
         if machine:
             check_rendered_grips(machine.handles, grips, frame, problems)
             machine.check(everything, contact.faces, hands, grips, frame, problems, samples)
