@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "machine-dip",
+    views: ["front"],
+    cues: [
+      "Sit tall with a neutral grip and your hands beside your hips.",
+      "Press the handles down until your arms are long.",
+      "Return slowly without shrugging your shoulders.",
+    ],
+  },
+  {
     slug: "assisted-dip",
     views: ["front"],
     cues: [
