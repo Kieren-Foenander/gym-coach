@@ -6,6 +6,7 @@ import { useEffect } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { Muscle } from "~/domain/catalog"
+import { TABS, testIds } from "~/domain/test-ids"
 import { rememberUser, useSession } from "@/api/session"
 import { TabIcon, type TabName } from "@/components/icons"
 import { Text } from "@/components/ui"
@@ -99,6 +100,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
             return (
               <Pressable
                 key={route.key}
+                testID={testIds.nav.tab(TABS[index] ?? "today")}
                 accessibilityRole="tab"
                 accessibilityLabel={tab}
                 accessibilityState={{ selected: focused }}

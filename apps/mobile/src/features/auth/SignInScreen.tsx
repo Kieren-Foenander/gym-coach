@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { View } from "react-native"
+import { testIds } from "~/domain/test-ids"
 import { describeError } from "@/api/client"
 import { signIn, useSession } from "@/api/session"
 import { Button, ErrorNote, Field, Text, TextInput } from "@/components/ui"
@@ -32,6 +33,7 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
       <View className="gap-4">
         <Field label="Email">
           <TextInput
+            testID={testIds.login.email}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -44,6 +46,7 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
         </Field>
         <Field label="Password">
           <TextInput
+            testID={testIds.login.password}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -53,9 +56,14 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
             onSubmitEditing={submit}
           />
         </Field>
-        <ServerField value={serverUrl} onChange={setServerUrl} />
+        <ServerField value={serverUrl} onChange={setServerUrl} testID={testIds.login.server} />
         <ErrorNote message={error} />
-        <Button variant="primary" disabled={pending || email === "" || password === "" || serverUrl === ""} onPress={submit}>
+        <Button
+          testID={testIds.login.submit}
+          variant="primary"
+          disabled={pending || email === "" || password === "" || serverUrl === ""}
+          onPress={submit}
+        >
           {pending ? "Signing in…" : "Sign in"}
         </Button>
       </View>

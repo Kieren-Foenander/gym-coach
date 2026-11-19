@@ -1,0 +1,157 @@
+name: iOS tour
+
+# Builds the iPhone app for the iOS Simulator on a GitHub macOS runner, signs in to a local server loaded with
+# seed/training-history.json, taps through the main screens (apps/mobile/e2e/tour.yaml) and keeps a screen
+# recording and a screenshot of each screen as the "ios-tour" artifact.
+#
+# macOS runners cost nothing on a public repository. Simulator builds are unsigned, so no Apple account is needed.
+# The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/mobile/**
+      - src/domain/**
+      - src/server/**
+      - migrations/**
+      - .github/workflows/ios-tour.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-tour-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_VARIANT: preview
+  APP_ID: com.kierenfoenander.gym.preview
+  # The build's default server address. The simulator shares the runner's network, so this is the server below.
+  EXPO_PUBLIC_GYM_SERVER_URL: http://localhost:1337
+  TOUR_EMAIL: tour@example.com
+  TOUR_PASSWORD: tour-password-not-secret
+  OUT: ${{ github.workspace }}/tour-output
+  MAESTRO_CLI_NO_ANALYTICS: "1"
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+
+jobs:
+  tour:
+    name: Build and tour the iPhone app
+    # The local server is `alchemy dev`, which keeps its state in the Cloudflare account, so it needs the secrets
+    # that pull requests from forks don't get.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: apps/mobile
+
+      - name: Start the server
+        run: |
+          mkdir -p "$OUT"
+          nohup bun run dev --no-input --stage ci-ios-tour > "$OUT/server.log" 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -X POST http://localhost:1337/api/v1/account/signup-status > /dev/null && exit 0
+            sleep 2
+          done
+          cat "$OUT/server.log"
+          exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Make the tour account and load the seed history
+        run: |
+          curl -sf -X POST http://localhost:1337/api/v1/account/sign-up \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
+          bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
+
+      - name: Generate the iOS project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --clean
+        env:
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+
+      - name: Build for the simulator
+        working-directory: apps/mobile
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace ios/GymPreview.xcworkspace -scheme GymPreview \
+            -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build | xcbeautify
+          APP=ios/build/Build/Products/Release-iphonesimulator/GymPreview.app
+          test -d "$APP"
+          echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
+          tar -czf "$OUT/gym-preview-simulator.tar.gz" -C "$(dirname "$APP")" GymPreview.app
+
+      - name: Boot an iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Tour the app
+        working-directory: tour-output
+        run: |
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force tour.mp4 &
+          echo $! > recorder.pid
+          sleep 2
+          maestro --device "$UDID" test ../apps/mobile/e2e/tour.yaml \
+            --test-output-dir maestro \
+            --format junit --output maestro/report.xml \
+            -e APP_ID="$APP_ID" -e EMAIL="$TOUR_EMAIL" -e PASSWORD="$TOUR_PASSWORD" -e SERVER="$EXPO_PUBLIC_GYM_SERVER_URL"
+
+      - name: Stop the recording
+        if: always()
+        working-directory: tour-output
+        run: |
+          if [ -f recorder.pid ]; then
+            kill -INT "$(cat recorder.pid)" || true
+            # The recorder writes the end of the file after it is told to stop.
+            for i in $(seq 1 20); do kill -0 "$(cat recorder.pid)" 2> /dev/null || break; sleep 1; done
+            rm recorder.pid
+          fi
+          find . -name '*.png' -path '*takeScreenshot*' -exec cp {} . \;
+          ls -la
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### iOS tour"
+            echo
+            echo "Download the **ios-tour** artifact below for \`tour.mp4\`, a screenshot of each screen and the simulator build."
+            echo
+            ls "$OUT"/*.png 2> /dev/null | xargs -n1 basename | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-tour
+          path: tour-output
+          retention-days: 14

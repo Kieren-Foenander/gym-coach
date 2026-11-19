@@ -218,12 +218,13 @@ export function Loading({ error }: { readonly error: string | null }) {
 interface BackLinkProps {
   readonly label?: string
   readonly onPress: () => void
+  readonly testID?: string
 }
 
 /** The way back at the top of a page pushed over the tabs. Swiping from the edge does the same. */
-export function BackLink({ label = "Back", onPress }: BackLinkProps) {
+export function BackLink({ label = "Back", onPress, testID }: BackLinkProps) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={8} onPress={onPress} className="min-h-11 flex-row items-center self-start">
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} onPress={onPress} className="min-h-11 flex-row items-center self-start">
       <Eyebrow className="text-accent">‹ {label}</Eyebrow>
     </Pressable>
   )

@@ -1,0 +1,69 @@
+# Finds elements by the ids in src/domain/test-ids.ts, as CLAUDE.md asks of every test.
+# A tour of the main screens: sign in, then every tab, with a screenshot of each.
+# .github/workflows/ios-preview.yml runs it on an iOS Simulator and records the screen while it does.
+# Run it yourself with:
+#   maestro test e2e/tour.yaml -e APP_ID=<bundle id> -e EMAIL=<email> -e PASSWORD=<password> -e SERVER=http://localhost:1337
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+
+- extendedWaitUntil:
+    visible:
+      id: login.email
+    timeout: 120000
+- takeScreenshot: 01-sign-in
+
+# The build sets the server (EXPO_PUBLIC_GYM_SERVER_URL). Stop here unless it is the one with the test account.
+# A text field shows its value only as text, so this is the one check that reads words.
+- assertVisible:
+    id: login.server
+    text: ${SERVER}
+- tapOn:
+    id: login.email
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: login.password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: login.submit
+
+- extendedWaitUntil:
+    visible:
+      id: "nav.tab:today"
+    timeout: 60000
+- waitForAnimationToEnd
+- takeScreenshot: 02-today
+- scroll
+
+- tapOn:
+    id: "nav.tab:plan"
+- waitForAnimationToEnd
+- takeScreenshot: 03-plan
+
+- tapOn:
+    id: "nav.tab:exercises"
+- waitForAnimationToEnd
+- takeScreenshot: 04-exercises
+- tapOn:
+    id: "exercises.muscle:chest"
+- waitForAnimationToEnd
+- takeScreenshot: 05-chest
+- tapOn:
+    id: muscle-group.back
+
+- tapOn:
+    id: "nav.tab:history"
+- waitForAnimationToEnd
+- takeScreenshot: 06-history
+- scroll
+- takeScreenshot: 07-history-scrolled
+
+- tapOn:
+    id: "nav.tab:settings"
+- waitForAnimationToEnd
+- takeScreenshot: 08-settings

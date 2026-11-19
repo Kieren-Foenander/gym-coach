@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { View } from "react-native"
 import { EQUIPMENT, mergeLibrary, type Equipment } from "~/domain/catalog"
+import { testIds } from "~/domain/test-ids"
 import { BackLink, Chip, ChipRow, Display, Screen } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import type { AppScreenProps } from "@/navigation"
@@ -17,7 +18,7 @@ export function MuscleGroupScreen({ navigation, route }: AppScreenProps<"MuscleG
 
   return (
     <Screen>
-      <BackLink label="All muscles" onPress={navigation.goBack} />
+      <BackLink label="All muscles" onPress={navigation.goBack} testID={testIds.muscleGroup.back} />
       <Display accessibilityRole="header" className="pb-2 text-5xl">
         {muscle}
       </Display>
