@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import runpy
 
+import bpy
+
 from mathutils import Vector
 
 here = Path(__file__).parent
@@ -26,3 +28,31 @@ spec["keys"][0]["lever_angle"] = spec["equipment"][0]["travel"][0] - 5
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "machine lever outside its stops" in problems.found, list(problems.lines())
 print("MACHINE REGRESSIONS PASSED")
+
+def initial_pose(slug):
+    # Give each apparatus the original Blender scene, without baked curves
+    # and corrective modifiers from the preceding fixture.
+    global api
+    bpy.ops.wm.open_mainfile(filepath=bpy.data.filepath)
+    api = runpy.run_path(str(here / "animate.py"))
+    spec = json.loads((here / f"exercises/{slug}.json").read_text())
+    spec.update(frames=1, keys=spec["keys"][:1],
+                checkpoints=[check for check in spec["checkpoints"] if check.get("at", 0) == 0])
+    return spec
+
+
+for slug in ("leg-extension", "leg-press", "smith-machine-squat"):
+    spec = initial_pose(slug)
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert not problems.found, (slug, list(problems.lines()))
+
+spec = initial_pose("leg-extension")
+spec["equipment"][0]["roller_offset"][1] -= .08
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left roller contact" in problems.found, list(problems.lines())
+
+spec = initial_pose("smith-machine-squat")
+spec["keys"][0]["bar"] = [0, .20, 1.2]
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Smith bar leaves its guides" in problems.found, list(problems.lines())
+print("LEG STATION AND SMITH REGRESSIONS PASSED")

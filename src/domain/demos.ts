@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "smith-machine-squat",
+    views: ["front"],
+    cues: [
+      "Set the bar across your upper back.",
+      "Bend your hips and knees as the bar slides down the guides.",
+      "Drive through your feet and stand tall.",
+    ],
+  },
+  {
     slug: "machine-shrug",
     views: ["front"],
     cues: [
