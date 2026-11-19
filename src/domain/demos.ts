@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "standing-leg-curl",
+    views: ["front"],
+    cues: [
+      "Plant one foot and set the roller behind the other lower calf.",
+      "Curl your heel back without shifting your hips.",
+      "Lower the roller slowly.",
+    ],
+  },
+  {
+    slug: "reverse-hyperextension",
+    views: ["front"],
+    cues: [
+      "Support your torso on the bench and grip the handles.",
+      "Lift your legs until they are in line with your torso.",
+      "Lower slowly without swinging.",
+    ],
+  },
+  {
     slug: "machine-dip",
     views: ["front"],
     cues: [
