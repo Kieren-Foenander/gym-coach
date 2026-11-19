@@ -41,7 +41,7 @@
     }
   },
   "camera": {
-    "angle": 52
+    "angle": 100
   },
   "touching": [
     "bench"
