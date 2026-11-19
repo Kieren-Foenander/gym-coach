@@ -6,7 +6,8 @@ import { isExerciseMedia, serveExerciseMedia, type MediaBucket, type MediaObject
 
 const BYTES = new Uint8Array(Array.from({ length: 100 }, (_, i) => i))
 
-type Range = { offset: number; length?: number } | { suffix: number }
+// Shaped as R2 returns it: every field present, the ones that do not apply undefined.
+type Range = { offset: number | undefined; length: number | undefined; suffix: number | undefined }
 
 const metadata = (range?: Range): MediaObject => ({
   size: BYTES.length,
@@ -19,9 +20,9 @@ const metadata = (range?: Range): MediaObject => ({
 const withBody = (range?: Range): MediaObjectBody => {
   const span = !range
     ? BYTES
-    : "suffix" in range
+    : range.suffix !== undefined
       ? BYTES.slice(-range.suffix)
-      : BYTES.slice(range.offset, range.length === undefined ? undefined : range.offset + range.length)
+      : BYTES.slice(range.offset ?? 0, range.length === undefined ? undefined : (range.offset ?? 0) + range.length)
 
   return { ...metadata(range), body: new Blob([span]).stream() }
 }
@@ -48,9 +49,9 @@ const bucket = (keys = ["exercises/squat.mp4"]): MediaBucket & { asked: string[]
 
       if (Number(from) >= BYTES.length) throw new Error("InvalidRange")
 
-      if (from === "") return withBody({ suffix: Number(to) })
+      if (from === "") return withBody({ offset: undefined, length: undefined, suffix: Number(to) })
 
-      return withBody({ offset: Number(from), length: to === "" ? undefined : Number(to) - Number(from) + 1 })
+      return withBody({ offset: Number(from), length: to === "" ? undefined : Number(to) - Number(from) + 1, suffix: undefined })
     },
   }
 }

@@ -19,7 +19,8 @@ const CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400"
 export interface MediaObject {
   readonly size: number
   readonly httpEtag: string
-  readonly range?: R2Range
+  // R2 sends every field of the range it read, with the ones that do not apply left undefined.
+  readonly range?: { readonly offset?: number; readonly length?: number; readonly suffix?: number }
   writeHttpMetadata(headers: Headers): void
 }
 
@@ -50,8 +51,9 @@ const headersFor = (object: MediaObject, extension: keyof typeof CONTENT_TYPES) 
 }
 
 /** The first and last byte a ranged read returned, for the Content-Range header. */
-const byteSpan = (range: R2Range, size: number) => {
-  if ("suffix" in range) return { start: Math.max(0, size - range.suffix), end: size - 1 }
+const byteSpan = (range: NonNullable<MediaObject["range"]>, size: number) => {
+  if (range.suffix !== undefined) return { start: Math.max(0, size - range.suffix), end: size - 1 }
+
   const start = range.offset ?? 0
 
   return { start, end: range.length === undefined ? size - 1 : start + range.length - 1 }
