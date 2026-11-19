@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "face-pull",
+    views: ["back"],
+    cues: [
+      "Set the pulley near shoulder height.",
+      "Pull the rope toward your face with elbows wide.",
+      "Extend your arms slowly to reset.",
+    ],
+  },
+  {
     slug: "seated-cable-row",
     views: ["back"],
     cues: [
