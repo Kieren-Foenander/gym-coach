@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "pec-deck",
+    views: ["front"],
+    cues: [
+      "Sit with your back on the pad and elbows softly bent.",
+      "Bring the handles together in front of your chest.",
+      "Open your arms under control.",
+    ],
+  },
+  {
     slug: "standing-calf-raise",
     views: ["back"],
     cues: [

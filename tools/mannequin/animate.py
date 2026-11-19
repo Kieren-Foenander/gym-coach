@@ -1382,7 +1382,7 @@ class FlyMachine(SelectorMachine):
             pivot.x *= sign
             rotation = Matrix.Rotation(math.radians(angle * sign), 3, "Z")
             grip = pivot + rotation @ Vector((sign * self.offset.x, self.offset.y, self.offset.z))
-            gap = pose_arm(side, grip, torso.direction(span.sample("elbows"), sign), "neutral", torso, axis)
+            gap = pose_arm(side, grip, torso.direction(span.sample("elbows"), sign), "thumb-forward", torso, axis)
             gaps.append((side + " fly grip", gap))
             top = Vector((grip.x, grip.y, pivot.z))
             set_segment(self.arms[side], pivot, top, frame)
