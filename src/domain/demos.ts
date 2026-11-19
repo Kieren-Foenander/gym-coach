@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "kettlebell-swing",
+    views: ["front"],
+    cues: [
+      "Hinge and let the bell travel back between your thighs.",
+      "Snap your hips forward to float the bell to chest height.",
+      "Guide it back into the next hinge.",
+    ],
+  },
+  {
     slug: "single-leg-romanian-deadlift",
     views: ["back"],
     cues: [

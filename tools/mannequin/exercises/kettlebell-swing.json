@@ -1,0 +1,18 @@
+{
+  "equipment": [{"type": "kettlebells", "side": "Right"}],
+  "stance": {"width": 0.705, "toe_out": 24},
+  "camera": {"angle": 69},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.17, 0.753], "lean": 50, "head": -13, "grip": "pronated", "bell_roll": 48, "upper_arm": [-0.27, 0.415, -1], "curl": 19, "fixed_upper_arm": true, "flex_toward": [-1, 0.36, 0]},
+    {"at": 0.19, "pelvis": [0, 0.1, 0.81], "lean": 30, "upper_arm": [-0.22, 0.57, -0.82], "bell_roll": -10, "curl": 17, "flex_toward": [-0.87, 0.48, 0]},
+    {"at": 0.44, "pelvis": [0, 0, 0.893], "lean": 0, "head": 0, "bell_roll": -78, "upper_arm": [0.13, 1, -0.18], "curl": 8, "flex_toward": [0, 0, 1]},
+    {"at": 0.52},
+    {"at": 0.77, "pelvis": [0, 0.1, 0.81], "lean": 30, "upper_arm": [-0.22, 0.57, -0.82], "bell_roll": -10, "curl": 17, "flex_toward": [-0.87, 0.48, 0]},
+    {"at": 0.95, "pelvis": [0, 0.17, 0.753], "lean": 50, "head": -13, "bell_roll": 48, "upper_arm": [-0.27, 0.415, -1], "curl": 19, "flex_toward": [-1, 0.36, 0]}
+  ],
+  "checkpoints": [
+    {"side": "Right", "elbow": [0, 30], "handle_axis": {"direction": [1, 0, 0], "degrees": 8}},
+    {"at": 0.48, "side": "Right", "position": {"point": "handle", "z": [1.15, 1.27]}}
+  ],
+  "frames": 132
+}
