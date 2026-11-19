@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "ez-bar-overhead-triceps-extension",
+    views: ["back", "front"],
+    cues: [
+      "Hold the EZ bar overhead with your ribs down.",
+      "Keep your upper arms still as the bar lowers behind your head.",
+      "Straighten your elbows to return overhead.",
+    ],
+  },
+  {
     slug: "arnold-press",
     views: ["front"],
     cues: [

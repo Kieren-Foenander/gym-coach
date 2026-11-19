@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "ez-bar", "plate_radius": 0.12}],
+  "stance": {"width": 0.3, "toe_out": 10},
+  "camera": {"angle": 65, "elevation": 14},
+  "keys": [
+    {"pelvis": [0, 0, 0.925], "upper_arm": [0.06, -0.25, 1], "elbows": [0.06, -0.25, 1], "flex_toward": [0, -1, -0.25], "grip": "pronated", "clavicle": [0, 10], "fixed_upper_arm": true, "curl": 11, "at": 0},
+    {"at": 0.44, "curl": 92},
+    {"at": 0.52},
+    {"at": 0.94, "curl": 11}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 25]},
+    {"at": 0.48, "elbow": [80, 110]},
+    {"fixed_elbow_m": 0.008}
+  ],
+  "shoulder_smoothing": {"radius": 0.21}
+}
