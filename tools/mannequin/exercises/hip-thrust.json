@@ -1,6 +1,6 @@
 {
   "equipment": [{"type": "barbell", "plate_radius": 0.16}, {"type": "bench", "at": [0, 0.58, 0.42], "length": 0.28}],
-  "stance": {"width": 0.38, "y": -0.49, "toe_out": 15},
+  "stance": {"width": 0.38, "y": -0.32, "toe_out": 15},
   "camera": {"angle": 125},
   "keys": [
     {"at": 0, "pelvis": [0, 0.17, 0.31], "lean": -49, "head": 6, "bar": [0, 0.0913, 0.42760000000000004], "grip_width": 0.3, "grip": "pronated", "elbows": [0.65, -0.1, -0.55]},
@@ -10,7 +10,7 @@
   ],
   "checkpoints": [
     {"at": 0, "position": {"point": "Hips", "z": [0.295, 0.325]}},
-    {"at": 0.48, "position": {"point": "Hips", "z": [0.525, 0.555]}},
+    {"at": 0.48, "position": {"point": "Hips", "z": [0.525, 0.555]}, "knee": [85, 97], "shin_vertical": 7},
     {"handle_axis": {"direction": [1, 0, 0], "degrees": 8}}
   ],
   "touching": ["bar", "bench"]
