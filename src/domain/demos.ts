@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "straight-arm-pulldown",
+    views: ["back"],
+    cues: [
+      "Hinge slightly and start with your arms out in front.",
+      "Sweep the bar toward your thighs with soft elbows.",
+      "Let your arms rise slowly without standing up.",
+    ],
+  },
+  {
     slug: "single-arm-cable-row",
     views: ["back"],
     cues: [
