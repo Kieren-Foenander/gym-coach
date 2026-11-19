@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "hip-thrust",
+    views: ["back"],
+    cues: [
+      "Rest your upper back on the bench and centre the bar across your hips.",
+      "Drive through your feet until your thighs and torso line up.",
+      "Lower your hips under control.",
+    ],
+  },
+  {
+    slug: "barbell-glute-bridge",
+    views: ["back"],
+    cues: [
+      "Lie with knees bent and the bar across your hips.",
+      "Press through your feet and squeeze your glutes to lift your hips.",
+      "Lower slowly while keeping your shoulders planted.",
+    ],
+  },
+  {
+    slug: "glute-bridge",
+    views: ["front"],
+    cues: [
+      "Lie on your back with your feet flat and knees bent.",
+      "Press through your feet to lift your hips.",
+      "Pause at the top, then lower slowly.",
+    ],
+  },
+  {
     slug: "dumbbell-calf-raise",
     views: ["back"],
     cues: [
