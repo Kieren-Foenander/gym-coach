@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "smith-machine-bench-press",
+    views: ["front"],
+    cues: [
+      "Set the bench so the bar lowers over your chest.",
+      "Lower the bar under control with your feet planted.",
+      "Press it up the guides until your arms are long.",
+    ],
+  },
+  {
+    slug: "smith-machine-incline-press",
+    views: ["front"],
+    cues: [
+      "Set the incline bench so the bar lowers over your upper chest.",
+      "Keep your back on the pad as you lower.",
+      "Press straight up the guides.",
+    ],
+  },
+  {
+    slug: "smith-machine-shoulder-press",
+    views: ["front"],
+    cues: [
+      "Sit with the bar just in front of your shoulders.",
+      "Press up the guides without arching your back.",
+      "Lower to shoulder height under control.",
+    ],
+  },
+  {
     slug: "smith-machine-squat",
     views: ["front"],
     cues: [

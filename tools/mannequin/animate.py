@@ -1676,7 +1676,7 @@ def bar_centre(target, torso):
     if target["at"] == "lockout":
         shoulder = head("LeftArm")
         y = target["y"]
-        height = vertical_arm_reach(target["grip_width"] - shoulder.x, y - shoulder.y, .0003)
+        height = vertical_arm_reach(target["grip_width"] - shoulder.x, y - shoulder.y, target.get("slack", .0003))
         return Vector((0, y, shoulder.z + height))
     return torso.point(LANDMARKS[target["at"]]) + torso.point(target.get("offset", (0, 0, 0))) - torso.origin + Vector(target.get("world_offset", (0, 0, 0)))
 
