@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-lateral-raise",
+    views: ["front"],
+    cues: [
+      "Stand sideways to the low pulley.",
+      "Lead with your elbow to raise your arm to shoulder height.",
+      "Lower the handle slowly without leaning.",
+    ],
+  },
+  {
     slug: "face-pull",
     views: ["back"],
     cues: [
