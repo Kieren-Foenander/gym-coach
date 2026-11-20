@@ -301,7 +301,7 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
         leg_pitch = key.get("supine_leg_" + side.lower(), key.get("free_leg_" + side.lower()))
         if leg_pitch is not None:
             thigh_pitch, knee_bend = leg_pitch
-            prone = bool(spec.get("prone_support"))
+            prone = bool(spec.get("prone_support") or "swimming" in spec)
             shin_pitch = thigh_pitch + knee_bend if prone else thigh_pitch - knee_bend
             for bone, pitch in (("UpLeg", thigh_pitch), ("Leg", shin_pitch)):
                 angle = math.radians(pitch)
@@ -1817,6 +1817,36 @@ class LateralRaiseStation:
                 problems.add(frame, side + " lateral elbow pad contact", abs(gap))
         samples.append(np.array([part.matrix_world @ Vector(corner)
                                  for part, _ in self.parts for corner in part.bound_box]))
+
+
+def pose_swim_stroke(keys, phase, torso, gaps):
+    """Alternate the arm path so each underwater pull has an overwater recovery."""
+    for side, sign in SIDES.items():
+        stroke = PoseSpan(keys, phase + (0 if side == "Left" else .5))
+        shoulder = head(side + "Arm")
+        wrist = shoulder + torso.point(stroke.sample("stroke"), sign) - torso.origin
+        pole = torso.direction(stroke.sample("stroke_elbow"), sign)
+        upper, forearm = segment(side + "Arm", side + "ForeArm", side + "Hand")
+        elbow, _ = bend(shoulder, wrist, upper, forearm, pole)
+        along = (wrist - elbow).normalized()
+        down = torso.direction(stroke.sample("stroke_palm"), sign)
+        palm = (down - along * down.dot(along)).normalized()
+        target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+        gaps.append((side + " swimming reach",
+                     pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))))
+
+
+def swim_surface(height):
+    """Frame the swimmer's waterline with a translucent pool lane."""
+    water = material("pool water", (.040, .13, .19), .11, .26)
+    water.surface_render_method = "BLENDED"
+    water.node_tree.nodes.get("Principled BSDF").inputs["Alpha"].default_value = .18
+    length, centre = 2.48, .046
+    box("pool waterline", (1.64, length, .004), (0, centre, height), water)
+    lane = material("pool lane markings", (.035, .095, .115), .10, .46)
+    for sign in (-1, 1):
+        line = box("pool lane edge", (.015, length, .006), (sign * .82, centre, height - .006), lane)
+        yield np.array([line.matrix_world @ Vector(corner) for corner in line.bound_box])
 
 
 def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0):
@@ -4268,6 +4298,9 @@ def bake(spec, keys):
                                  if obj.name.startswith("bench ") for corner in obj.bound_box]))
     ground_gait = spec.get("ground_gait")
     gait_contacts = {}
+    waterline = spec.get("swimming")
+    if waterline is not None:
+        samples.extend(swim_surface(waterline))
     for frame in range(1, frames + 1):
         scene.frame_set(frame)
         for mod in correctives.values():
@@ -4322,6 +4355,8 @@ def bake(spec, keys):
         if sled:
             sled.pose(spec, span, key, frame, problems)
         activity_gaps = []
+        if waterline is not None:
+            pose_swim_stroke(keys, phase, torso, activity_gaps)
         if ground_gait is not None:
             pose_gait(keys, gait_phase, key, torso, activity_gaps, gait_contacts)
         if standing_cardio:
@@ -4803,6 +4838,14 @@ def bake(spec, keys):
                 clearance = everything[contact.foot_vertices[side], 2].min()
                 if planted and not -.010 <= clearance <= .012:
                     problems.add(frame, side + " stance foot loses ground contact", abs(clearance))
+        if waterline is not None:
+            for side in SIDES:
+                local = (phase + (0 if side == "Left" else .5)) % 1
+                wrist = head(side + "Hand").z
+                if .16 <= local <= .39 and wrist > waterline - .045:
+                    problems.add(frame, side + " swimming pull leaves the water", wrist - waterline + .045)
+                if .64 <= local <= .83 and wrist < waterline + .035:
+                    problems.add(frame, side + " swimming recovery remains underwater", waterline + .035 - wrist)
         if spec.get("side_lying"):
             for label, vertices in (("lower hip", contact.pelvis_vertices),
                                     ("lower leg", contact.foot_vertices["Left"])):

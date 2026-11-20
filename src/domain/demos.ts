@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "swimming",
+    views: ["front"],
+    cues: [
+      "Reach one arm forward while the other finishes its pull.",
+      "Pull under the surface and recover the arm over the water.",
+      "Keep a steady flutter kick and breathe to the side.",
+    ],
+  },
+  {
     slug: "inverted-row",
     views: ["front"],
     cues: [
