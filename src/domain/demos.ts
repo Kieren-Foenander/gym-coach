@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "mountain-climber",
+    views: ["front"],
+    cues: [
+      "Start in a high plank with your palms planted.",
+      "Drive one knee forward while keeping your hips steady.",
+      "Return that foot and switch sides.",
+    ],
+  },
+  {
     slug: "burpee",
     views: ["front"],
     cues: [
