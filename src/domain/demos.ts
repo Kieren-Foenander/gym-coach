@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-reverse-fly",
+    views: ["back"],
+    cues: [
+      "Reach toward the pulleys with both arms long.",
+      "Open your arms out to the sides without shrugging.",
+      "Return slowly without changing your elbow bend.",
+    ],
+  },
+  {
+    slug: "low-to-high-cable-fly",
+    views: ["front"],
+    cues: [
+      "Start with the pulleys low and your elbows softly bent.",
+      "Sweep the handles up and together in front of your chest.",
+      "Lower and open your arms under control.",
+    ],
+  },
+  {
+    slug: "high-to-low-cable-fly",
+    views: ["front"],
+    cues: [
+      "Start with the pulleys high and a soft bend in your elbows.",
+      "Sweep the handles down and together in front of your waist.",
+      "Open your arms slowly along the same path.",
+    ],
+  },
+  {
     slug: "single-arm-lat-pulldown",
     views: ["back"],
     cues: [
