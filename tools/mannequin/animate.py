@@ -1487,6 +1487,97 @@ def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems
                 break
 
 
+class HandGripper:
+    """Opposed handles on a torsion spring, with the opening carried by the fingers."""
+
+    def __init__(self, config):
+        self.target = Vector(config["grip"])
+        self.radius = .0065
+        steel = material("gripper spring", STEEL, .8, .34)
+        rubber = material("gripper handles", (.07, .078, .088), .25, .46)
+        self.levers = [CableStation.part("gripper handle", self.radius, rubber) for _ in range(2)]
+        self.arms = [CableStation.part("spring arm", .0038, steel) for _ in range(2)]
+        self.spring = bpy.data.objects.new("gripper spring axle", None)
+        scene.collection.objects.link(self.spring)
+        self.coils = []
+        for offset in (-.0075, -.0025, .0025, .0075):
+            bpy.ops.mesh.primitive_torus_add(major_segments=32, minor_segments=8,
+                                             major_radius=.0125, minor_radius=.0027)
+            coil = bpy.context.object
+            coil.name = "gripper spring turn"
+            coil.data.materials.append(steel)
+            coil.parent = self.spring
+            coil.location.z = offset
+            bpy.ops.object.shade_smooth()
+            self.coils.append(coil)
+
+    def bind(self, grip):
+        self.surface = grip
+        self.forward = REST["LeftHand"].col[1]
+        if grip.skin.data.shape_keys is None:
+            grip.skin.shape_key_add(name="Basis")
+        self.finger_shape = grip.skin.shape_key_add(name="Gripper opening")
+        marker = grip.skin.vertex_groups["GripSurface.Left"].index
+        offsets = []
+        for vertex in grip.skin.data.vertices:
+            if not any(group.group == marker for group in vertex.groups):
+                continue
+            relative = vertex.co - grip.origin
+            separation = max(0, min(1, (relative.dot(self.forward) + .007) / .021))
+            lever = max(0, .103 - relative.dot(grip.axis))
+            displacement = self.forward * (separation * lever)
+            self.finger_shape.data[vertex.index].co += displacement
+            offsets.append(tuple(displacement))
+        self.offsets = np.array(offsets)
+
+    def pose(self, span, torso, frame, gaps):
+        axis = Vector((0, 0, 1))
+        pole = torso.direction([.19, -.12, -1])
+        gaps.append(("gripper hand", pose_arm("Left", self.target, pole, "thumb-forward", torso, axis)))
+        # The distal skin follows the finger-side spring handle while the palm stays planted.
+        grip = self.surface
+        transform = grip.transform
+        grip_axis = (transform.to_3x3() @ grip.axis).normalized()
+        forward = (transform.to_3x3() @ self.forward).normalized()
+        centre = transform @ grip.origin
+        spread = span.sample("spring_opening")
+        self.finger_shape.value = spread
+        self.finger_shape.keyframe_insert("value", frame=frame)
+        hinge = centre + grip_axis * .103
+        positions = []
+        for index, side in enumerate((-1, 1)):
+            transverse = forward * (.0074 * side)
+            tilt = spread if side == 1 else 0
+            direction = -grip_axis + forward * tilt
+            start = hinge + transverse + direction * .058
+            end = hinge + transverse + direction * .156
+            set_segment(self.levers[index], start, end, frame)
+            set_segment(self.arms[index], hinge + transverse, start, frame)
+            positions.append((transform.inverted() @ start, transform.inverted().to_3x3() @ direction))
+        normal = grip_axis.cross(forward).normalized()
+        self.spring.location = hinge
+        self.spring.rotation_euler = normal.to_track_quat("Z", "Y").to_euler()
+        for channel in ("location", "rotation_euler"):
+            self.spring.keyframe_insert(channel, frame=frame)
+        self.opening, self.positions = spread, positions
+
+    def check(self, points, faces, hands, frame, problems):
+        grip = self.surface
+        original = grip.points
+        grip.points = original + self.offsets * self.opening
+        try:
+            for centre, axis in self.positions:
+                gap = grip.shaft_distance(centre, axis.normalized()) - self.radius
+                if not -.0015 <= gap <= .006:
+                    problems.add(frame, "gripper handle loses skin fit", abs(gap))
+            hardware = [(lever, True) for lever in self.levers]
+            hardware.extend((part, False) for part in (*self.arms, *self.coils))
+            check_hardware_clearance(hardware, points, faces, hands, {"Left": grip}, frame, problems)
+        finally:
+            grip.points = original
+        grip.check_wrist(frame, problems)
+
+
 class PushSled:
     """A low prowler chassis with vertical grips and a loaded centre post."""
 
@@ -3931,6 +4022,11 @@ def frame_camera(spec, view, angle, samples):
         angle = spec.get("camera", {}).get("angle", 30) + (180 if view == "back" else 0)
     angle = math.radians(angle)
     elevation = math.radians(spec.get("camera", {}).get("elevation", 12))
+    bounds = spec.get("camera", {}).get("bounds")
+    if bounds:
+        low, high = bounds
+        samples = np.array([(x, y, z) for x in (low[0], high[0])
+                            for y in (low[1], high[1]) for z in (low[2], high[2])])
     lo, hi = samples.min(axis=0), samples.max(axis=0)
     centre = Vector((lo + hi) / 2)
     direction = Vector((-math.sin(angle) * math.cos(elevation), -math.cos(angle) * math.cos(elevation), math.sin(elevation)))
@@ -4630,7 +4726,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4656,6 +4752,7 @@ def bake(spec, keys):
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
+    gripper = next((HandGripper(e) for e in spec.get("equipment", []) if e["type"] == "hand-gripper"), None)
     push_sled = next((PushSled(e) for e in spec.get("equipment", []) if e["type"] == "push-sled"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
     tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand, "ankle-cable": AnkleCable}
@@ -4730,8 +4827,10 @@ def bake(spec, keys):
     if elevated_palms and (not bench or bench.pads or not planted_sides):
         raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
     side_support = spec.get("side_support")
-    has_grips = side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
+    has_grips = gripper or side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
+    if gripper:
+        gripper.bind(grips["Left"])
     relaxing = {side: relaxed_fingers(side, spec.get("relaxed_reach", False)) for side in planted_sides
                 if any("plant_" + side.lower() in key for key in keys)}
     wrists = wrist_collision_points()
@@ -5004,6 +5103,8 @@ def bake(spec, keys):
                 gaps.append((side+" hand", gap))
         if machine:
             machine.pose(span, torso, grips, frame, gaps, problems)
+        if gripper:
+            gripper.pose(span, torso, frame, gaps)
         if push_sled:
             push_sled.pose(torso, gaps)
         if ab_wheel:
@@ -5074,6 +5175,8 @@ def bake(spec, keys):
         if "unloaded_arm" in a:
             curl = span.sample("unloaded_curl", 10)
             for side, sign in SIDES.items():
+                if gripper and side == "Left":
+                    continue
                 upper = span.sample("unloaded_arm_" + side.lower(), span.sample("unloaded_arm"))
                 inward = torso.direction(spec["unloaded_palm"], sign) if "unloaded_palm" in spec else -torso.left * sign
                 gap = pose_unloaded_arm(side, torso, upper, curl, inward)
@@ -5300,6 +5403,8 @@ def bake(spec, keys):
             thigh_band.pose(everything, contact, frame, problems, samples)
         if plyo_box:
             plyo_box.check(everything, contact, phase, frame, problems, samples)
+        if gripper:
+            gripper.check(everything, contact.faces, hands, frame, problems)
         if push_sled:
             push_sled.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if ab_wheel:

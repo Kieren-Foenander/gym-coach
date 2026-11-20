@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "gripper",
+    views: ["front"],
+    cues: [
+      "Set one handle in your palm and wrap your fingers around the other.",
+      "Squeeze the handles together with your wrist straight.",
+      "Let the handles reopen slowly.",
+    ],
+  },
+  {
     slug: "wrist-roller",
     views: ["front"],
     cues: [

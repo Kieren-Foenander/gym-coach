@@ -1,0 +1,75 @@
+{
+  "equipment": [
+    {
+      "type": "hand-gripper",
+      "grip": [
+        0.241,
+        -0.344,
+        1.071
+      ]
+    }
+  ],
+  "hands": {
+    "Left": "fist",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "toe_out": 10
+  },
+  "camera": {
+    "angle": 298,
+    "elevation": 16,
+    "bounds": [
+      [
+        -0.1,
+        -0.46,
+        0.78
+      ],
+      [
+        0.36,
+        0.06,
+        1.65
+      ]
+    ]
+  },
+  "frames": 90,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 0,
+      "spring_opening": 0.22,
+      "unloaded_arm": [
+        0.19,
+        -0.02,
+        -1
+      ],
+      "unloaded_curl": 15
+    },
+    {
+      "at": 0.12
+    },
+    {
+      "at": 0.44,
+      "spring_opening": 0
+    },
+    {
+      "at": 0.59
+    }
+  ],
+  "checkpoints": [
+    {
+      "side": "Left",
+      "elbow": [
+        75,
+        110
+      ],
+      "fixed_elbow_m": 0.003
+    }
+  ]
+}
