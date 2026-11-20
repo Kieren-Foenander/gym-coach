@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "high-cable-curl",
+    views: ["front"],
+    cues: [
+      "Hold the handles with your upper arms out at shoulder height.",
+      "Curl the handles toward your head without dropping your elbows.",
+      "Straighten your arms slowly.",
+    ],
+  },
+  {
     slug: "ab-wheel-rollout",
     views: ["front"],
     cues: [
