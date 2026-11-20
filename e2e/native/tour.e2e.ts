@@ -9,14 +9,18 @@ import { dismissSavePassword, dismissSavePasswordIfShown, serverUrl, test, testI
  */
 
 describe("a tour of the main screens", { serial: true }, () => {
-  // The save-password sheet can come after sign-in has stopped waiting for it, over a later screen.
+  // The save-password sheet can come after sign-in has stopped waiting for it, over a later screen. Before
+  // the first test opens the app there is no screen to read, so it starts checking after that.
+  let opened = false
+
   beforeEach(async ({ device }) => {
-    await dismissSavePasswordIfShown(device)
+    if (opened) await dismissSavePasswordIfShown(device)
   })
 
   test("signs in to Today", async ({ app, device, screen }) => {
     await app.clearState()
     await app.open()
+    opened = true
 
     // Stop here unless the build signs in to the server with the tour account, never the live one.
     await expect(screen.getByTestId(testIds.login.server)).toHaveValue(serverUrl(), { timeout: 120_000 })
