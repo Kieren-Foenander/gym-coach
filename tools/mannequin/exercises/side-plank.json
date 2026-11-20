@@ -12,8 +12,8 @@
     ]
   },
   "camera": {
-    "angle": 303,
-    "elevation": 15,
+    "angle": 285,
+    "elevation": 0,
     "margin": 1.22
   },
   "frames": 78,
@@ -23,10 +23,11 @@
       "pelvis": [
         0,
         0,
-        0.382
+        0.367
       ],
-      "lean": -75.5,
-      "roll": 90
+      "lean": -76.55,
+      "roll": 90,
+      "side_bend": 4.1
     }
   ],
   "checkpoints": [

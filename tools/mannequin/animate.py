@@ -3246,13 +3246,39 @@ class SkinContact:
         hips = (head("LeftUpLeg") + head("RightUpLeg")) / 2
         ankles = (head("LeftFoot") + head("RightFoot")) / 2
         body_line = math.degrees((hips - ankles).angle(Torso().up))
-        if body_line > 7:
+        if body_line > 5:
             problems.add(frame, "hips break the side plank line", body_line, "degrees")
-        forearm = np.unique(self.vertices[self.part == "Left forearm"])
-        for label, vertices in (("forearm", forearm), ("lower foot", self.foot_vertices["Left"])):
-            height = points[vertices, 2].min()
-            if not -.006 <= height <= .008:
-                problems.add(frame, label + " loses side support contact", abs(height))
+        head_to_ankles = head("Head") - ankles
+        shoulders = (head("LeftArm") + head("RightArm")) / 2
+        for label, point in (("hips", hips), ("shoulders", shoulders)):
+            offset = (point - ankles).cross(head_to_ankles).length / head_to_ankles.length
+            if offset > .035:
+                problems.add(frame, label + " leave the head-to-heel line", offset)
+        shoulder, elbow, wrist = (head("Left" + bone) for bone in ("Arm", "ForeArm", "Hand"))
+        upper_arm = shoulder - elbow
+        offset = upper_arm.xy.length
+        if offset > .025:
+            problems.add(frame, "support elbow is not under the shoulder", offset)
+        vertical = math.degrees(upper_arm.angle(Vector((0, 0, 1))))
+        if vertical > 6:
+            problems.add(frame, "support upper arm is not vertical", vertical, "degrees")
+        axis = wrist - elbow
+        forward = Torso().forward
+        forward.z = 0
+        direction = math.degrees(axis.angle(forward))
+        if direction > 8:
+            problems.add(frame, "support forearm does not point forward along the floor", direction, "degrees")
+        forearm = points[np.unique(self.vertices[self.part == "Left forearm"])]
+        progress = (forearm - np.array(elbow)) @ np.array(axis) / axis.length_squared
+        edges = (0, .23, .48, .73, .97)
+        for index, (start, end) in enumerate(zip(edges, edges[1:]), 1):
+            heights = forearm[(progress >= start) & (progress < end), 2]
+            gap = heights.min(initial=1)
+            if not -.006 <= gap <= .008 or np.count_nonzero(heights <= .012) < 3:
+                problems.add(frame, f"ulna section {index} loses floor contact", abs(gap))
+        height = points[self.foot_vertices["Left"], 2].min()
+        if not -.006 <= height <= .008:
+            problems.add(frame, "lower foot loses side support contact", abs(height))
         transform = palm.transform
         heights = palm.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
         if heights.min() < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:

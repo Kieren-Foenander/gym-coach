@@ -533,5 +533,5 @@ intentionally lifts those regions. Both default to the whole loop.
 `roll` turns the pelvis around the body's long axis before the lean is
 applied. A left forearm side plank uses `roll: 90` and
 `side_support: {"wrist": [x, y, z]}`. Use a support hand below and a
-relaxed hand above. The bake checks the forearm, palm and lower foot
+relaxed hand above. The bake checks four sections along the ulna, the palm and lower foot
 against the floor, and checks the contact between the two feet.

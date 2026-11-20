@@ -222,3 +222,10 @@ spec["keys"][0]["pelvis"][2] += .04
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "lower foot loses side support contact" in problems.found, list(problems.lines())
 print("SIDE SUPPORT REGRESSION PASSED")
+
+spec = initial_pose("side-plank")
+spec.pop("hands")
+spec["side_support"]["wrist"][2] += .05
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert any(name.startswith("ulna section ") for name in problems.found), list(problems.lines())
+print("FOREARM FLOOR CONTACT REGRESSION PASSED")
