@@ -4,7 +4,7 @@ name: iOS tour
 # seed/training-history.json, taps through the main screens (apps/mobile/e2e/tour.yaml) and keeps a screen
 # recording and a screenshot of each screen as the "ios-tour" artifact.
 #
-# macOS runners cost nothing on a public repository. Simulator builds are unsigned, so no Apple account is needed.
+# macOS runners cost nothing on a public repository. The build is signed ad hoc, so no Apple account is needed.
 # The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
 on:
   workflow_dispatch:
@@ -74,9 +74,14 @@ jobs:
           xcodebuild \
             -workspace ios/GymPreview.xcworkspace -scheme GymPreview \
             -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build | xcbeautify
+            -derivedDataPath ios/build \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+            build | xcbeautify
           APP=ios/build/Build/Products/Release-iphonesimulator/GymPreview.app
           test -d "$APP"
+          # The keychain (expo-secure-store, which keeps the session) needs the app's entitlements, and only
+          # a signed build carries them. "-" signs it ad hoc, which the simulator accepts without an Apple account.
+          codesign --display --entitlements - --xml "$APP" | plutil -p - || echo "No entitlements in the signature"
           echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
           tar -czf "$OUT/gym-preview-simulator.tar.gz" -C "$(dirname "$APP")" GymPreview.app
 
