@@ -3729,6 +3729,20 @@ def bake(spec, keys):
             surface.record_contact(height[on_pad].min(initial=1))
             if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
                 problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
+        if "unloaded_arm" in a:
+            upper = span.sample("unloaded_arm")
+            curl = span.sample("unloaded_curl", 10)
+            for side, sign in SIDES.items():
+                arm = {"upper_arm": upper, "curl": curl}
+                _, target = held_point(side, arm, torso)
+                pole = torso.direction(upper, sign)
+                elbow = head(side + "Arm") + pole * segment(side + "Arm", side + "ForeArm", side + "Hand")[0]
+                along = (target - elbow).normalized()
+                inward = -torso.left * sign
+                palm = (inward - along * along.dot(inward)).normalized()
+                gap = pose_arm(side, target + palm * GRIP[side][1], pole, "neutral",
+                               torso, contact_frame=(along, palm))
+                gaps.append((side + " unloaded arm", gap))
         if floor_hands:
             along, palm = Vector((0, -1, 0)), Vector((0, 0, -1))
             for side, sign in SIDES.items():

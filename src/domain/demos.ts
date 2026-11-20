@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "bodyweight-squat",
+    views: ["front"],
+    cues: [
+      "Plant your feet about shoulder-width apart.",
+      "Sit between your hips and let your knees follow your toes.",
+      "Drive through your whole foot to stand tall.",
+    ],
+  },
+  {
     slug: "stair-climber",
     views: ["front"],
     cues: [
