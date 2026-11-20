@@ -51,8 +51,8 @@ The first account needs no invite. To let more people sign up locally, copy `.en
 - `test/server/`: the real JSON API on SQLite with every migration, using the seed history. `api.test.ts` covers sign-in, errors and what calls do to the data.
 - The API contract (`test/server/contract.test.ts`): runs every call and compares the shape of each answer with `test/server/api-signatures.json`, so a change that would break a native build already installed fails. After a change that only adds to an answer, run `UPDATE_API_SIGNATURES=1 bun run test` and commit the file.
 - `tools/check-migrations.ts`: a migration already on `master` may not be edited, renamed or deleted.
-- `e2e/`: browser tests of the web app with Playwright, on a phone-sized screen. `bun run e2e` serves its own copy of the app on port 4174 with a fresh database (`tools/e2e/serve.ts`), beside any `bun run dev`. Run `bunx playwright install chromium` once first. Tests find elements by test id only; CLAUDE.md has the rules, and `src/domain/test-ids.ts` has the ids.
-- Screenshot comparisons (`e2e/screenshots.spec.ts`) run in CI only, in Playwright's Docker image. After a change that is meant to alter how a screen looks, record new ones with `bun run e2e:screenshots` (needs Docker) or the "Update screenshots" workflow, and check the images in the pull request.
+- `e2e/`: end-to-end tests with [e2e](https://e2e.com) (`e2e.config.ts`). `e2e/web/` tests the web app in a browser, on a phone-sized screen: `bun run e2e` serves its own copy of the app on port 4174 with a fresh database (`tools/e2e/serve.ts`), beside any `bun run dev`, and downloads Chromium the first time. `e2e/native/` tours the native app on an iOS Simulator or Android emulator (see `e2e.config.ts`). Tests find elements by test id only; CLAUDE.md has the rules, and `src/domain/test-ids.ts` has the ids.
+- Screenshot comparisons (`e2e/web/screenshots.e2e.ts`) run in CI only, in Playwright's Docker image. After a change that is meant to alter how a screen looks, record new ones with `bun run e2e:screenshots` (needs Docker) or the "Update screenshots" workflow, and check the images in the pull request.
 
 ### Seed data
 
