@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "wrist-roller"}],
+  "stance": {"width": 0.34, "toe_out": 10},
+  "camera": {"angle": 325, "elevation": 15},
+  "frames": 96,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.925], "lean": 0, "wrist_rest": [0.214, -0.276, 1.096], "grip": "pronated", "elbows": [0.12, 0, -1], "hand_pitch": -24},
+    {"at": 0.09},
+    {"at": 0.47, "hand_pitch": 24},
+    {"at": 0.57}
+  ],
+  "checkpoints": [
+    {"fixed_elbow_m": 0.008, "elbow": [76, 112]},
+    {"at": 0, "hand_pitch": [-25, -23]},
+    {"at": 0.52, "hand_pitch": [23, 25]}
+  ]
+}

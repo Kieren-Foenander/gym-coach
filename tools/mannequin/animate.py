@@ -499,6 +499,7 @@ class Barbell:
     SHAFT = 0.014
     INNER = 0.65  # half the length of the bare shaft between the collars
     PLATE = 0.225
+    fit_width = 1.1
 
     def __init__(self, plate_radius=None):
         self.PLATE = plate_radius if plate_radius is not None else self.PLATE
@@ -552,6 +553,39 @@ class Barbell:
         in_plate = (radial < self.PLATE) & (x > self.INNER + 0.05) & (x < self.INNER + 0.11)
         return int(in_shaft.sum()), int(in_plate.sum()), float((radial[~hand_mask & (x < self.INNER)] - self.SHAFT).min())
 
+
+class WristRoller(Barbell):
+    """A short shaft winds a cord that lifts a hanging plate."""
+
+    INNER = .33
+    PLATE = 0
+    fit_width = INNER
+
+    def __init__(self):
+        steel = material("roller steel", STEEL, .8, .36)
+        iron = material("roller weight", IRON, .35, .57)
+        self.root = bpy.data.objects.new("wrist roller", None)
+        scene.collection.objects.link(self.root)
+        cylinder("roller shaft", self.SHAFT, 2 * self.INNER, 0, steel, self.root)
+        cylinder("spool", .031, .080, 0, iron, self.root)
+        self.cord = CableStation.part("roller cord", .005, iron)
+        self.weight = cylinder("roller weight plate", .086, .032, 0, iron, None)
+
+    def wind(self, pitch, frame):
+        self.eye = self.centre + Vector((0, -.031, 0))
+        length = .40 - .031 * math.radians(pitch)
+        self.load = self.eye - Vector((0, 0, length))
+        set_segment(self.cord, self.eye, self.load, frame)
+        self.weight.location = self.load - Vector((0, 0, .016))
+        self.weight.rotation_euler = (0, 0, 0)
+        self.weight.keyframe_insert("location", frame=frame)
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_hardware_clearance([(self.cord, False), (self.weight, False)],
+                                 points, faces, hands, grips, frame, problems)
+        if self.load.z < .032:
+            problems.add(frame, "roller weight touches the floor", .032 - self.load.z)
+        samples.append(np.array([self.eye, self.load - Vector((0, 0, .032))]))
 
 class BentBar(Barbell):
     """Rigid bars made from straight tube spans. Grip and contact use the rendered spans."""
@@ -4596,12 +4630,14 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
     for item in spec.get("equipment", []):
         kind = item["type"]
+        if kind == "wrist-roller":
+            barbell = WristRoller()
         if kind in {"barbell", "ez-bar", "trap-bar"}:
             radius = item.get("plate_radius", Barbell.PLATE)
             if not .03 < radius <= .225:
@@ -4889,6 +4925,8 @@ def bake(spec, keys):
             else:
                 centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
             barbell.move(Vector(centre), frame)
+            if isinstance(barbell, WristRoller):
+                barbell.wind(span.sample("hand_pitch"), frame)
             if smith:
                 smith.move(barbell, frame, problems)
             width = a["wrist_rest"][0] if "wrist_rest" in a else span.sample("grip_width", 0.25)
@@ -5199,6 +5237,8 @@ def bake(spec, keys):
         everything, hands = evaluated_points(body)
         for section in [contact, *sections, *shoulders]:
             section.check(frame, everything, problems)
+        if isinstance(barbell, WristRoller):
+            barbell.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if smith:
             smith.check(everything, contact.faces, hands, frame, problems, samples)
         if belt_squat:
@@ -5321,7 +5361,7 @@ def bake(spec, keys):
             bottom = barbell.centre.z - barbell.PLATE
             if bottom < -.002:
                 problems.add(frame, "a barbell plate crosses the floor", -bottom)
-            samples.append(np.array([barbell.centre + Vector((s * 1.1, 0, z)) for s in (-1, 1) for z in (-barbell.PLATE-.005, barbell.PLATE+.005)]))
+            samples.append(np.array([barbell.centre + Vector((s * barbell.fit_width, 0, z)) for s in (-1, 1) for z in (-barbell.PLATE-.005, barbell.PLATE+.005)]))
             if cradle:
                 for side, sign in SIDES.items():
                     elbow = head(side + "ForeArm")

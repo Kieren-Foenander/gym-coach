@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "wrist-roller",
+    views: ["front"],
+    cues: [
+      "Hold the roller with your elbows still.",
+      "Turn the shaft to wind the cord and lift the weight.",
+      "Unwind slowly under control.",
+    ],
+  },
+  {
     slug: "sled-push",
     views: ["front"],
     cues: [
