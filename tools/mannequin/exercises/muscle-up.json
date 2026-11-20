@@ -1,0 +1,180 @@
+{
+  "equipment": [
+    {
+      "type": "pullup-bar",
+      "at": [
+        0,
+        -0.075,
+        2.33
+      ],
+      "grip_width": 0.29
+    }
+  ],
+  "camera": {
+    "angle": 58,
+    "elevation": 7
+  },
+  "frames": 192,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        1.15
+      ],
+      "lean": 0,
+      "shoulder_y": 0.0,
+      "hang_lift": 0.0,
+      "elbows": [
+        0.35,
+        0.5,
+        -0.2
+      ],
+      "clavicle": [
+        0,
+        11
+      ],
+      "supine_leg_left": [
+        -85,
+        9
+      ],
+      "supine_leg_right": [
+        -85,
+        9
+      ]
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.25,
+      "lean": -18,
+      "shoulder_y": 0.196,
+      "hang_lift": 0.425,
+      "elbows": [
+        0.65,
+        -0.38,
+        -1
+      ],
+      "clavicle": [
+        5,
+        0
+      ]
+    },
+    {
+      "at": 0.34,
+      "lean": 8,
+      "shoulder_y": 0.132,
+      "hang_lift": 0.633,
+      "elbows": [
+        0.79,
+        -0.92,
+        -0.18
+      ]
+    },
+    {
+      "at": 0.43,
+      "lean": 24,
+      "shoulder_y": 0.065,
+      "hang_lift": 0.763,
+      "elbows": [
+        0.68,
+        -0.85,
+        -0.12
+      ]
+    },
+    {
+      "at": 0.54,
+      "lean": 16,
+      "shoulder_y": -0.018,
+      "hang_lift": 1.1345,
+      "elbows": [
+        0.39,
+        -0.51,
+        0.09
+      ],
+      "supine_leg_left": [
+        -100,
+        8
+      ],
+      "supine_leg_right": [
+        -100,
+        8
+      ]
+    },
+    {
+      "at": 0.61
+    },
+    {
+      "at": 0.73,
+      "lean": 24,
+      "shoulder_y": 0.065,
+      "hang_lift": 0.763,
+      "elbows": [
+        0.68,
+        -0.85,
+        -0.12
+      ]
+    },
+    {
+      "at": 0.81,
+      "lean": 8,
+      "shoulder_y": 0.132,
+      "hang_lift": 0.633,
+      "elbows": [
+        0.79,
+        -0.92,
+        -0.18
+      ]
+    },
+    {
+      "at": 0.88,
+      "lean": -18,
+      "shoulder_y": 0.196,
+      "hang_lift": 0.425,
+      "elbows": [
+        0.65,
+        -0.38,
+        -1
+      ],
+      "clavicle": [
+        5,
+        0
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.05,
+      "elbow": [
+        0,
+        17
+      ]
+    },
+    {
+      "at": 0.39,
+      "elbow": [
+        85,
+        140
+      ]
+    },
+    {
+      "at": 0.58,
+      "elbow": [
+        0,
+        19
+      ]
+    },
+    {
+      "at": 0.58,
+      "position": {
+        "point": "Arm",
+        "z": [
+          2.74,
+          2.93
+        ]
+      }
+    }
+  ]
+}

@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "muscle-up",
+    views: ["front"],
+    cues: [
+      "Start in a full hang with an overhand grip.",
+      "Pull your chest up and bring your shoulders over the bar.",
+      "Press to straight arms, then reverse under control.",
+    ],
+  },
+  {
     slug: "swimming",
     views: ["front"],
     cues: [
