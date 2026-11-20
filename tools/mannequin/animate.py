@@ -212,8 +212,10 @@ def pose_trunk(key):
             turn(name, Torso().up, key["axial_twist"] / 2)
     if "torso_twist" in key:
         turn("Spine", Vector((0, 0, 1)), key["torso_twist"])
-    for name in ("Neck", "Head"):
-        turn(name, left, key.get("head", 0) / 2)
+    head_pitch = key.get("head", 0)
+    neck_pitch = key.get("neck_pitch", head_pitch / 2)
+    turn("Neck", left, neck_pitch)
+    turn("Head", left, head_pitch - neck_pitch)
     if "neck_retraction" in key:
         neck = head("Neck") - pelvis @ Vector((0, -key["neck_retraction"], 0))
         place("Neck", world_rotation("Neck"), neck)
@@ -1485,6 +1487,52 @@ def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems
             if surface.overlap(hardware) or inside:
                 problems.add(frame, part.name.split(".")[0] + " crosses the body", .001)
                 break
+
+
+class StabilityBall:
+    """A floor-supported ball rolls with the heels during a leg curl."""
+
+    RADIUS = .25
+
+    def __init__(self):
+        finish = material("stability ball rubber", (.08, .20, .25), .18, .49)
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=self.RADIUS)
+        self.ball = bpy.context.object
+        self.ball.name = "stability ball"
+        self.ball.data.materials.append(finish)
+        bpy.ops.object.shade_smooth()
+        band = material("stability ball ribs", (.11, .26, .31), .18, .48)
+        for offset in (-.17, -.135, -.1, -.065, -.03, .005, .04, .075, .11, .145, .18):
+            radius = math.sqrt(self.RADIUS ** 2 - offset ** 2)
+            bpy.ops.mesh.primitive_torus_add(major_segments=48, minor_segments=6,
+                                             major_radius=radius, minor_radius=.001)
+            rib = bpy.context.object
+            rib.name = "stability ball rib"
+            rib.parent = self.ball
+            rib.location.z = offset
+            rib.data.materials.append(band)
+        self.start_y = None
+
+    def pose(self, span, frame):
+        y = span.sample("ball_y")
+        if self.start_y is None:
+            self.start_y = y
+        self.ball.location = (0, y, self.RADIUS)
+        self.ball.rotation_euler.x = (self.start_y - y) / self.RADIUS
+        for channel in ("location", "rotation_euler"):
+            self.ball.keyframe_insert(channel, frame=frame)
+
+    def check(self, points, contact, frame, problems, samples):
+        radial = np.linalg.norm(points - np.array(self.ball.location), axis=1)
+        for side, indices in contact.heel_vertices.items():
+            gap = radial[indices].min() - self.RADIUS
+            if not -.007 <= gap <= .013:
+                problems.add(frame, side + " heel loses stability ball contact", abs(gap))
+        penetration = self.RADIUS - radial.min()
+        if penetration > .009:
+            problems.add(frame, "stability ball intersects the body", penetration)
+        samples.append(np.array(self.ball.location) + np.array(
+            [(-self.RADIUS, -self.RADIUS, -self.RADIUS), (self.RADIUS, self.RADIUS, self.RADIUS)]))
 
 
 class HandGripper:
@@ -4155,6 +4203,10 @@ class SkinContact:
             side: [i for i, name in enumerate(owner) if name in (side + "Foot", side + "ToeBase")]
             for side in SIDES
         }
+        self.heel_vertices = {}
+        for side, foot in self.foot_vertices.items():
+            heel_y = rig.data.bones[side + "Foot"].head_local.y - .035
+            self.heel_vertices[side] = [i for i in foot if rest[i].y >= heel_y]
         self.trunk_vertices = [i for i, name in enumerate(owner) if PARTS.get(name) == "trunk"]
 
         self.pelvis_vertices = [i for i, name in enumerate(owner) if name == "Hips"]
@@ -4260,9 +4312,7 @@ class SkinContact:
 
     def check_grounded_heels(self, frame, points, sides, problems):
         for side in sides:
-            heel_y = rig.data.bones[side + "Foot"].head_local.y - .035
-            heel = [i for i in self.foot_vertices[side] if body.data.vertices[i].co.y >= heel_y]
-            gap = points[heel, 2].min()
+            gap = points[self.heel_vertices[side], 2].min()
             if not -.006 <= gap <= .008:
                 problems.add(frame, side + " heel loses floor contact", abs(gap))
 
@@ -4726,7 +4776,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4752,6 +4802,7 @@ def bake(spec, keys):
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
+    stability_ball = StabilityBall() if "stability-ball" in equipment else None
     gripper = next((HandGripper(e) for e in spec.get("equipment", []) if e["type"] == "hand-gripper"), None)
     push_sled = next((PushSled(e) for e in spec.get("equipment", []) if e["type"] == "push-sled"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
@@ -4867,7 +4918,7 @@ def bake(spec, keys):
             gait_phase = phase * ground_gait.get("cycles", 1) - ground_gait.get("surge", 0) * math.sin(math.tau * phase)
         span = PoseSpan(keys, gait_phase)
         a = span.keys[1]
-        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "roll", "side_bend", "torso_twist", "axial_twist") if field in a}
+        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "neck_pitch", "yaw", "roll", "side_bend", "torso_twist", "axial_twist") if field in a}
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         if core_bench:
@@ -5103,6 +5154,8 @@ def bake(spec, keys):
                 gaps.append((side+" hand", gap))
         if machine:
             machine.pose(span, torso, grips, frame, gaps, problems)
+        if stability_ball:
+            stability_ball.pose(span, frame)
         if gripper:
             gripper.pose(span, torso, frame, gaps)
         if push_sled:
@@ -5403,6 +5456,8 @@ def bake(spec, keys):
             thigh_band.pose(everything, contact, frame, problems, samples)
         if plyo_box:
             plyo_box.check(everything, contact, phase, frame, problems, samples)
+        if stability_ball:
+            stability_ball.check(everything, contact, frame, problems, samples)
         if gripper:
             gripper.check(everything, contact.faces, hands, frame, problems)
         if push_sled:

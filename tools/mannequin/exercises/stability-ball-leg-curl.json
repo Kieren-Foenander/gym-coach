@@ -1,0 +1,138 @@
+{
+  "equipment": [
+    {
+      "type": "stability-ball"
+    }
+  ],
+  "stance": {
+    "width": 0.16,
+    "y": -0.785,
+    "toe_out": 2,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 285,
+    "elevation": 12
+  },
+  "hands": {
+    "Left": "support",
+    "Right": "support"
+  },
+  "floor_hands": [
+    0.32,
+    -0.03,
+    0.024
+  ],
+  "frames": 96,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.245
+      ],
+      "lean": -116,
+      "head": 26,
+      "ball_y": -0.776,
+      "foot_left": [
+        0,
+        0.483,
+        0
+      ],
+      "foot_right": [
+        0,
+        0.483,
+        0
+      ],
+      "neck_retraction": -0.004,
+      "neck_pitch": 26
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.45,
+      "ball_y": -0.464,
+      "foot_left": [
+        0.312,
+        0.483,
+        0
+      ],
+      "foot_right": [
+        0.312,
+        0.483,
+        0
+      ],
+      "pelvis": [
+        0,
+        0,
+        0.318
+      ],
+      "lean": -129,
+      "head": 39,
+      "neck_pitch": 39,
+      "neck_retraction": -0.034
+    },
+    {
+      "at": 0.56
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.05,
+      "knee": [
+        8,
+        28
+      ]
+    },
+    {
+      "at": 0.5,
+      "knee": [
+        82,
+        110
+      ]
+    },
+    {
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.238,
+          0.325
+        ]
+      }
+    }
+  ],
+  "supine_support": {
+    "pelvis_contact": [],
+    "lumbar_contact": [],
+    "head_contact": [
+      [
+        0,
+        1
+      ]
+    ],
+    "upper_back_contact": [
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "plant_elbow": [
+    0.65,
+    0.008,
+    -0.04
+  ]
+}

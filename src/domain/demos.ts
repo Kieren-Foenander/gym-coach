@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "stability-ball-leg-curl",
+    views: ["front"],
+    cues: [
+      "Lie back with your heels on the ball and lift your hips.",
+      "Bend your knees to draw the ball in.",
+      "Roll it away slowly and keep your hips lifted.",
+    ],
+  },
+  {
     slug: "gripper",
     views: ["front"],
     cues: [

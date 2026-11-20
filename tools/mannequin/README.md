@@ -87,6 +87,16 @@ Use `parallel-bars` for a dip. Set `grip` to the left palm's target in
 world metres. The right rail mirrors that position. The bake checks
 neutral-grip contact and clearance from the rails, posts and bases.
 
+The wrist roller uses the ordinary shaft grip and a wrist-pitch arc. Its cord
+pays out from the spool, and the weight must stay clear of the figure and the
+floor. The hand gripper uses `spring_opening` to link the finger shape to the
+moving spring handle, checking both handle contacts and spring clearance.
+
+A `push-sled` sets the left palm position with `grip` and mirrors the right grip.
+Its gait keeps the arms on those handles while alternating legs. The
+`stability-ball` rolls along `ball_y`, with per-frame foot contact and
+body clearance.
+
 ### Choosing a colour
 
 ```sh
@@ -136,7 +146,7 @@ key spacing. Landmark positions are resolved in the current torso frame before b
 | `clavicle` | optional pair of angles in degrees, retraction and elevation, applied on each side before hand IK |
 | `lean` | degrees the body pitches forward from the hips. -90 lies on the back with the head towards +Y |
 | `spine` | extra forward bend of the spine, degrees (negative arches) |
-| `head` | nod, degrees (negative looks up) |
+| `head` | nod, degrees (negative looks up). The neck and head share it evenly unless `neck_pitch` assigns the neck’s share explicitly |
 | `yaw` | turns the whole body about the vertical |
 | `bar` | where the bar's middle is: `[x, y, z]`, or `{ "at": landmark, "offset": [side, forward, up] }` measured on the torso |
 | `grip_width` | from the bar's middle to each hand |
