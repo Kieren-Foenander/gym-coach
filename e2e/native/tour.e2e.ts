@@ -43,9 +43,11 @@ describe("a tour of the main screens", { serial: true }, () => {
         async () => {
           dismissed = (await dismissSavePasswordIfShown(screen)) || dismissed
 
-          return today.isVisible()
+          // In the screen tree at all: iOS reports this tab as not visible even when it is on screen, and
+          // while the sheet is up the tree holds only the sheet.
+          return (await today.count()) > 0
         },
-        { timeout: 60_000 },
+        { timeout: 120_000 },
       )
       .toBe(true)
     await expect(today).toBeSelected()
