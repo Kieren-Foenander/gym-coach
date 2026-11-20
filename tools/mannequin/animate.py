@@ -287,9 +287,9 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
     for side, (ankle, yaw) in ankles(spec, key).items():
         if side == except_side:
             continue
-        supine_leg = key.get("supine_leg_" + side.lower())
-        if supine_leg is not None:
-            thigh_pitch, knee_bend = supine_leg
+        leg_pitch = key.get("supine_leg_" + side.lower(), key.get("free_leg_" + side.lower()))
+        if leg_pitch is not None:
+            thigh_pitch, knee_bend = leg_pitch
             shin_pitch = thigh_pitch - knee_bend
             for bone, pitch in (("UpLeg", thigh_pitch), ("Leg", shin_pitch)):
                 angle = math.radians(pitch)
@@ -3421,6 +3421,20 @@ class SkinContact:
         if gap > .012:
             problems.add(frame, "upper foot loses its stack", gap)
 
+    def check_unsupported_feet(self, frame, points, clearances, problems):
+        for side, minimum in clearances.items():
+            height = points[self.foot_vertices[side], 2].min()
+            if height < minimum:
+                problems.add(frame, side + " unsupported foot is too close to the floor", minimum - height)
+
+    def check_grounded_heels(self, frame, points, sides, problems):
+        for side in sides:
+            heel_y = rig.data.bones[side + "Foot"].head_local.y - .035
+            heel = [i for i in self.foot_vertices[side] if body.data.vertices[i].co.y >= heel_y]
+            gap = points[heel, 2].min()
+            if not -.006 <= gap <= .008:
+                problems.add(frame, side + " heel loses floor contact", abs(gap))
+
     def check_kneeling_support(self, frame, points, support, phase, problems):
         for side, intervals in support.items():
             if not any(start <= phase <= end for start, end in intervals):
@@ -4022,7 +4036,7 @@ def bake(spec, keys):
             suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis,
                              overhead=True, lift=span.sample("hang_lift", 0))
             torso = Torso()
-        for field in ("foot_left", "foot_right", "supine_leg_left", "supine_leg_right"):
+        for field in ("foot_left", "foot_right", "supine_leg_left", "supine_leg_right", "free_leg_left", "free_leg_right"):
             if field in a:
                 key[field] = span.sample(field)
         if sled:
@@ -4472,6 +4486,10 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if "unsupported_feet" in spec:
+            contact.check_unsupported_feet(frame, everything, spec["unsupported_feet"], problems)
+        if "grounded_heels" in spec:
+            contact.check_grounded_heels(frame, everything, spec["grounded_heels"], problems)
         if "kneeling_support" in spec:
             contact.check_kneeling_support(frame, everything, spec["kneeling_support"], phase, problems)
         if side_support:

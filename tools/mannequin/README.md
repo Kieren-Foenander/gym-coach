@@ -551,3 +551,8 @@ A Copenhagen hold reuses the forearm support with `bench_foot: true`
 and a flat bench supporting the upper foot. For a kneeling exercise,
 `kneeling_support` maps each side to the phase ranges where that knee
 must touch the floor.
+
+`unsupported_feet` maps each free foot to its minimum floor clearance
+in metres. `grounded_heels` lists the heels that must stay on the floor.
+A `free_leg_left` or `free_leg_right` key takes the same thigh pitch and
+knee bend as a supine leg, measured from forward-horizontal.

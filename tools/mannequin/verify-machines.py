@@ -246,3 +246,10 @@ spec["keys"][0]["pelvis"][2] += .04
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left knee loses floor support" in problems.found, list(problems.lines())
 print("KNEELING FLOOR SUPPORT REGRESSION PASSED")
+
+spec = initial_pose("pistol-squat")
+spec.pop("hands")
+spec["keys"][0]["free_leg_right"] = [-89, 4]
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Right unsupported foot is too close to the floor" in problems.found, list(problems.lines())
+print("UNSUPPORTED FOOT REGRESSION PASSED")
