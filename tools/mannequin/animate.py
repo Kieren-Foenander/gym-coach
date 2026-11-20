@@ -3879,6 +3879,7 @@ class MedicineBall:
     def __init__(self, config):
         self.radius = config.get("radius", .112)
         self.wall = config.get("wall_y")
+        self.track_wrist = config.get("track_wrist", False)
         self.elbows = config.get("elbows", [.46, -.13, -1])
         shell = material("medicine ball leather", (.48, .165, .055), .14, .52)
         seams = material("medicine ball panels", (.15, .068, .046), .13, .64)
@@ -3924,9 +3925,11 @@ class MedicineBall:
                 wrist = guide - .089 * along + Vector((.132 * sign, 0, 0))
                 elbow, _ = bend(shoulder, wrist, upper, fore, pole)
                 lower = wrist - elbow
-                lower.x = 0
+                lower.x *= .65 if self.track_wrist else 0
                 if lower.length > .001:
                     along = along.lerp(lower.normalized(), .62).normalized()
+
+            palm = (palm - along * palm.dot(along)).normalized()
 
             def aim_wrist(lateral):
                 wrist = guide - .089 * along + Vector((lateral * sign, 0, 0))

@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "medicine-ball-slam",
+    views: ["front"],
+    cues: [
+      "Raise the ball overhead with both hands.",
+      "Drive the ball into the floor in front of you.",
+      "Bend your hips and knees to retrieve it.",
+    ],
+  },
+  {
     slug: "wall-ball",
     views: ["front"],
     cues: [
