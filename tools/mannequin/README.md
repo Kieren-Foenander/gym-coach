@@ -507,3 +507,12 @@ For a supine exercise that keeps the pelvis and lower back down, set
 `"supine_support": {}`. The bake checks both skin regions against the
 floor on every frame, allowing for the natural curve of the lower back.
 Set `"supine_support": {"feet": true}` when both feet must stay planted.
+Supine poses also limit head and neck extension relative to the upper
+back. Use `head_contact` inside `supine_support` to give the phase ranges
+where the back of the head must touch the floor. The optional
+`neck_retraction` key sets the cervical offset in metres along the
+pelvis's backward direction.
+
+Use the `relaxed` hand shape for an unloaded open hand. With
+`thigh_reach`, the palm follows the thigh surface. Key the contact
+position as a fraction of the distance from the hip to the knee.

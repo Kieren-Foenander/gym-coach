@@ -280,15 +280,15 @@ def make_fists(hand_shapes):
         palm = -frame.col[2] * sign  # found by eye: this way the fingers close over the palm
         shape = hand_shapes[side]
         if shape != "fist":
-            if shape not in {"support", "diamond", "pinch", "cup"}:
+            if shape not in {"support", "diamond", "pinch", "cup", "relaxed"}:
                 raise ValueError(f"Unknown hand shape {shape}")
             # Keep the MakeHuman phalanx lengths. The long fingers share a
             # contact plane on a plate, or turn up around a dumbbell head.
-            bends = {"support": (0, 0, 0), "diamond": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70)}[shape]
+            bends = {"support": (0, 0, 0), "diamond": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70), "relaxed": (5, 8, 9)}[shape]
             for finger in (2, 3, 4, 5):
                 for joint, degrees in enumerate(bends, 1):
                     angle = math.radians(degrees)
-                    spread = (3.5 - finger)*(.055 if shape in ("support", "diamond") else .028)
+                    spread = (3.5 - finger)*(.055 if shape in ("support", "diamond") else .012 if shape == "relaxed" else .028)
                     direction = Vector((spread, math.cos(angle), -sign*math.sin(angle)))
                     swing(f"finger{finger}-{joint}.{tag}", frame @ direction)
             if shape in ("support", "diamond", "pinch", "cup"):
@@ -296,6 +296,8 @@ def make_fists(hand_shapes):
                     (.058,.056,-.022),(.067,.080,-.039),(.060,.102,-.055))
                 if shape == "support":
                     targets = ((.068,.052,-.008),(.079,.074,-.010),(.087,.092,-.012))
+                if shape == "relaxed":
+                    targets = ((.047,.058,-.014),(.041,.078,-.017),(.032,.098,-.020))
                 for joint, (x,y,z) in enumerate(targets, 1):
                     name = f"finger1-{joint}.{tag}"
                     direction = frame @ Vector((.75, .66, 0)) if shape == "diamond" else (

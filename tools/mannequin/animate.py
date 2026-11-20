@@ -210,6 +210,9 @@ def pose_trunk(key):
         turn("Spine", Vector((0, 0, 1)), key["torso_twist"])
     for name in ("Neck", "Head"):
         turn(name, left, key.get("head", 0) / 2)
+    if "neck_retraction" in key:
+        neck = head("Neck") - pelvis @ Vector((0, -key["neck_retraction"], 0))
+        place("Neck", world_rotation("Neck"), neck)
     return pelvis
 
 
@@ -3172,10 +3175,20 @@ class SkinContact:
         self.pelvis_vertices = [i for i, name in enumerate(owner) if name == "Hips"]
         self.lumbar_vertices = [i for i, name in enumerate(owner) if name == "Spine"]
 
-    def check_supine_support(self, frame, points, feet, problems):
+        self.head_vertices = [i for i, name in enumerate(owner) if name == "Head"]
+
+    def check_supine_support(self, frame, points, support, phase, problems):
+        torso = Torso()
+        for bone in ("Neck", "Head"):
+            forward = world_rotation(bone) @ REST[bone].transposed() @ Vector((0, -1, 0))
+            pitch = math.degrees(math.atan2(-forward.dot(torso.up), forward.dot(torso.forward)))
+            if pitch < -5:
+                problems.add(frame, bone + " extends during supine support", -pitch, "degrees")
         regions = [("pelvis", self.pelvis_vertices, .012), ("lower back", self.lumbar_vertices, .028)]
-        if feet:
+        if support.get("feet"):
             regions.extend((side + " foot", vertices, .010) for side, vertices in self.foot_vertices.items())
+        if any(start <= phase <= end for start, end in support.get("head_contact", [])):
+            regions.append(("head", self.head_vertices, .008))
         for label, vertices, maximum in regions:
             gap = points[vertices, 2].min()
             if gap > maximum:
@@ -3708,7 +3721,7 @@ def bake(spec, keys):
     elevated_palms = spec.get("palm_support") == "bench"
     if elevated_palms and (not bench or bench.pads or not planted_sides):
         raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
-    has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station
+    has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     relaxing = {side: relaxed_fingers(side) for side in planted_sides
                 if any("plant_" + side.lower() in key for key in keys)}
@@ -3737,7 +3750,7 @@ def bake(spec, keys):
             mod.show_viewport = False
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
-        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "yaw", "side_bend", "torso_twist") if field in a}
+        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "side_bend", "torso_twist") if field in a}
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
@@ -3959,6 +3972,27 @@ def bake(spec, keys):
             surface.record_contact(height[on_pad].min(initial=1))
             if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
                 problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
+        if "thigh_reach" in a:
+            skin, _ = evaluated_points(body)
+            for side, sign in SIDES.items():
+                hip, knee = head(side + "UpLeg"), head(side + "Leg")
+                along = (knee - hip).normalized()
+                normal = along.cross(Vector((1, 0, 0))).normalized()
+                triangles = contact.vertices[contact.part == side + " thigh"]
+                thigh = BVHTree.FromPolygons(skin.tolist(), triangles.tolist(), all_triangles=True)
+                centre = hip.lerp(knee, span.sample("thigh_reach"))
+                hit, outward, _, _ = thigh.ray_cast(centre + normal * .20, -normal, .20)
+                if hit is None:
+                    problems.add(frame, side + " palm misses thigh", .20)
+                    continue
+                along = (along - outward * along.dot(outward)).normalized()
+                pole = torso.direction([1, .05, -1], sign)
+                gap = pose_arm(side, hit, pole, "neutral", torso, contact_frame=(along, -outward))
+                gaps.append((side + " resting thigh hand", gap))
+                surface = grips[side]
+                _, _, _, distance = surface.surface.find_nearest(surface.transform.inverted() @ hit)
+                if distance > .010:
+                    problems.add(frame, side + " palm loses thigh contact", distance)
         if "unloaded_arm" in a:
             upper = span.sample("unloaded_arm")
             curl = span.sample("unloaded_curl", 10)
@@ -4178,7 +4212,7 @@ def bake(spec, keys):
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
         if supine is not None:
-            contact.check_supine_support(frame, everything, supine.get("feet", False), problems)
+            contact.check_supine_support(frame, everything, supine, phase, problems)
         if spec.get("forearm_support") == "thighs":
             contact.check_resting_forearms(frame, everything, problems)
         samples.append(everything[::50])

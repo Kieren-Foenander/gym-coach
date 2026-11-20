@@ -1,14 +1,14 @@
 {
   "equipment": [],
-  "supine_support": {"feet": true},
-  "hands": {"Left": "support", "Right": "support"},
+  "supine_support": {"feet": true, "head_contact": [[0, 0.10], [0.99, 1]]},
+  "hands": {"Left": "relaxed", "Right": "relaxed"},
   "stance": {"width": 0.32, "y": -0.53, "toe_out": 5, "knee_direction": {"Left": [0, 0, 1], "Right": [0, 0, 1]}},
   "camera": {"angle": 67, "elevation": 17},
   "frames": 96,
   "keys": [
-    {"at": 0, "pelvis": [0, 0, 0.094], "lean": -90, "head": -18, "unloaded_arm": [0.25, 0.25, -1], "unloaded_curl": 12},
+    {"at": 0, "pelvis": [0, 0, 0.094], "lean": -90, "head": 0, "neck_retraction": 0.041, "thigh_reach": 0.40},
     {"at": 0.10},
-    {"at": 0.46, "spine": 34, "head": 7, "unloaded_arm": [0.25, 0.63, -1]},
+    {"at": 0.46, "spine": 30, "head": 8, "neck_retraction": 0, "thigh_reach": 0.62},
     {"at": 0.57}
   ],
   "checkpoints": [
