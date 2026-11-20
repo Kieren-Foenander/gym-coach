@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "single-arm-lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Grip one handle overhead and keep your ribs square.",
+      "Pull the elbow toward your side without leaning away.",
+      "Reach overhead slowly and repeat on the other side.",
+    ],
+  },
+  {
+    slug: "neutral-grip-lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Hold the neutral handles with your palms facing each other.",
+      "Drive your elbows down and bring the attachment toward your upper chest.",
+      "Return slowly to a long overhead reach.",
+    ],
+  },
+  {
     slug: "reverse-grip-lat-pulldown",
     views: ["back"],
     cues: [
