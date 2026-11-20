@@ -28,10 +28,8 @@ export function HistoryScreen() {
     )
   }
 
-  const { workouts, exercises, measurements } = data
+  const { workouts, totals, exercises, measurements } = data
   const performed = exercises.filter((exercise) => exercise.lastPerformedAt !== null)
-  const totalVolume = workouts.reduce((total, workout) => total + workout.volume, 0)
-  const totalSets = workouts.reduce((total, workout) => total + workout.setCount, 0)
 
   return (
     <Screen tabs>
@@ -39,9 +37,10 @@ export function HistoryScreen() {
 
       {workouts.length > 0 ? (
         <View className="flex-row gap-2 pb-4">
-          <Stat label="Workouts" value={workouts.length} />
-          <Stat label="Sets" value={formatCompact(totalSets)} />
-          <Stat label="Lifted" value={formatCompact(totalVolume)} unit={user.unit} />
+          {/* Totals over every workout; the list below holds only the latest ones. */}
+          <Stat label="Workouts" value={totals.workouts} />
+          <Stat label="Sets" value={formatCompact(totals.sets)} />
+          <Stat label="Lifted" value={formatCompact(totals.volume)} unit={user.unit} />
         </View>
       ) : null}
 

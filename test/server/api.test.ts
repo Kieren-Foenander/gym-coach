@@ -104,6 +104,20 @@ describe("training", () => {
     expect((await me.call("getToday", {})).activity).toHaveLength(seedHistory.workouts.length)
   })
 
+  it("totals the whole history, beyond the latest workouts it lists", async () => {
+    const me = await server.signUp()
+
+    server.seed(me.email)
+
+    const { workouts, totals } = await me.call("getHistory", {})
+    const sets = seedHistory.workouts.flatMap((workout) => workout.exercises.flatMap((exercise) => exercise.sets)).length
+
+    expect(workouts.length).toBeLessThan(seedHistory.workouts.length)
+    expect(totals.workouts).toBe(seedHistory.workouts.length)
+    expect(totals.sets).toBe(sets)
+    expect(totals.volume).toBeGreaterThan(workouts.reduce((total, workout) => total + workout.volume, 0))
+  })
+
   it("logs a set once however many times the phone resends it", async () => {
     const me = await server.signUp()
 

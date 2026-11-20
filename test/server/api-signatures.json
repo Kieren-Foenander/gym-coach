@@ -300,6 +300,25 @@
           }
         }
       },
+      "totals": {
+        "fields": {
+          "sets": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "volume": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "workouts": {
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
       "workouts": {
         "array": true,
         "items": {

@@ -80,6 +80,10 @@ export const testIds = {
   plan: {
     template: keyed<string>("plan.template"),
   },
+  history: {
+    /** How many workouts the history holds in all; `data-value` is the count. */
+    totalWorkouts: "history.total-workouts",
+  },
   exercises: {
     /** A muscle group in the library, keyed by the muscle. */
     muscle: (muscle: string) => `exercises.muscle:${slugFor(muscle)}`,
