@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "band-pushdown",
+    views: ["back"],
+    cues: [
+      "Anchor the band high and step back until it is taut.",
+      "Keep your elbows by your sides as you press the bar down.",
+      "Let the bar rise slowly without moving your upper arms.",
+    ],
+  },
+  {
     slug: "muscle-up",
     views: ["front"],
     cues: [

@@ -588,3 +588,10 @@ joint while the trunk hinges. The front pad edge bears against the
 upper thighs. The bake checks that both thighs stay on the pad, both
 ankles stay against the rollers, and the trunk stops in line with the
 legs at lockout.
+
+A `resistance-band` reuses the cable attachment and grip checks with a
+fixed pin on an anchor post. Select `high`, `mid`, `low` or `floor`
+as the anchor height. Set `rest_length` in metres to the unstretched
+length between the fixed pin and the attachment eye. The strip narrows
+as it lengthens. Each frame must keep it clear of the body and between
+1.05 and 2.5 times its rest length.

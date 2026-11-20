@@ -273,3 +273,15 @@ spec["keys"][0]["pelvis"][2] += .045
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "abdomen loses prone floor support" in problems.found, list(problems.lines())
 print("PRONE FLOOR SUPPORT REGRESSION PASSED")
+
+spec = initial_pose("band-pushdown")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+for rest_length, expected in ((2.0, "resistance band loses tension"),
+                              (.2, "resistance band exceeds its stretch range")):
+    spec = initial_pose("band-pushdown")
+    spec["equipment"][0]["rest_length"] = rest_length
+    problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+    assert expected in problems.found, list(problems.lines())
+print("RESISTANCE BAND TENSION REGRESSIONS PASSED")

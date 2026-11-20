@@ -840,6 +840,7 @@ class CableStation:
     HEIGHTS = {"low": .18, "mid": 1.21, "high": 1.92}
     GRIP_HALF = {"d-handle": .068, "rope": .069, "straight-bar": .32, "v-bar": .078}
     RADIUS = .004
+    LINE_LABEL = "cable line"
     TRAVEL = (.10, 3.05)
 
     def __init__(self, config):
@@ -876,23 +877,7 @@ class CableStation:
             facing = Vector((*column.get("exit", [0, 1]), 0)).normalized()
             if not facing.length:
                 raise ValueError("Pulley exit direction must be nonzero")
-            height = self.HEIGHTS[column["height"]]
-            origin = Vector((x, y, height))
-            anchor = origin + facing * .15
-            if not ski:
-                box("cable column", (.16, .18, 2.06), (x, y, 1.03), frame_finish)
-                box("cable base", (.43, .38, .045), (x, y, .0225), frame_finish)
-            box("pulley carriage", (.19, .19, .13), origin + facing * .065, frame_finish)
-            pulley = cylinder("pulley wheel", .047, .036, 0, self.steel, None)
-            pulley.location = anchor - facing * .038
-            axle = facing.cross(Vector((0, 0, 1)))
-            pulley.rotation_euler = axle.to_track_quat("Z", "Y").to_euler()
-            stack_at = Vector((x, y, 0)) - facing * .19
-            for plate in range(0 if ski else 10):
-                box("stack plate", (.27, .16, .025), stack_at + Vector((0, 0, .105 + .033 * plate)), frame_finish)
-            for side in (-1, 1):
-                self.bounds.append(Vector((x + side * .22, y, 0)))
-                self.bounds.append(Vector((x + side * .09, y, 2.06)))
+            anchor = self.mount(column, x, y, facing, ski, frame_finish)
             grip_sides = (key,) if dual else SIDES
             for side in grip_sides:
                 self.handles[side] = self.part("attachment grip", Barbell.SHAFT, self.steel)
@@ -900,10 +885,41 @@ class CableStation:
                     self.rope_stops[side] = self.part("rope end stop", .025, self.rubber)
             count = {"straight-bar": 1, "rope": 2, "v-bar": 2, "d-handle": 3}[self.attachment]
             links = [self.part("attachment link", .012 if self.attachment == "rope" else .008, self.rubber if self.attachment == "rope" else self.steel) for _ in range(count)]
-            self.stations[key] = (anchor, self.part("taut cable", self.RADIUS, self.rubber), links)
+            self.stations[key] = (anchor, self.make_line(), links)
         if self.attachment == "straight-bar":
             bpy.data.objects.remove(self.handles["Right"], do_unlink=True)
             self.handles["Right"] = self.handles["Left"]
+
+    def mount(self, column, x, y, facing, ski, frame_finish):
+        height = self.HEIGHTS[column["height"]]
+        origin = Vector((x, y, height))
+        anchor = origin + facing * .15
+        if not ski:
+            box("cable column", (.16, .18, 2.06), (x, y, 1.03), frame_finish)
+            box("cable base", (.43, .38, .045), (x, y, .0225), frame_finish)
+        box("pulley carriage", (.19, .19, .13), origin + facing * .065, frame_finish)
+        pulley = cylinder("pulley wheel", .047, .036, 0, self.steel, None)
+        pulley.location = anchor - facing * .038
+        axle = facing.cross(Vector((0, 0, 1)))
+        pulley.rotation_euler = axle.to_track_quat("Z", "Y").to_euler()
+        stack_at = Vector((x, y, 0)) - facing * .19
+        for plate in range(0 if ski else 10):
+            box("stack plate", (.27, .16, .025), stack_at + Vector((0, 0, .105 + .033 * plate)), frame_finish)
+        for side in (-1, 1):
+            self.bounds.append(Vector((x + side * .22, y, 0)))
+            self.bounds.append(Vector((x + side * .09, y, 2.06)))
+        return anchor
+
+    def make_line(self):
+        return self.part("taut cable", self.RADIUS, self.rubber)
+
+    def pose_line(self, cable, anchor, eye, frame, problems):
+        length = (eye - anchor).length
+        minimum, maximum = self.TRAVEL
+        if not minimum <= length <= maximum:
+            problems.add(frame, "cable outside its travel", max(minimum - length, length - maximum))
+        if length >= .001:
+            set_segment(cable, anchor, eye, frame)
 
     @staticmethod
     def part(name, radius, finish):
@@ -1002,12 +1018,7 @@ class CableStation:
                         self.straps.append((key, endpoint, eye))
                 set_segment(links[2], eye, eye + (anchor - eye).normalized() * .025, frame)
                 eye += (anchor - eye).normalized() * .025
-            length = (eye - anchor).length
-            minimum, maximum = self.TRAVEL
-            if not minimum <= length <= maximum:
-                problems.add(frame, "cable outside its travel", max(minimum - length, length - maximum))
-            if length >= .001:
-                set_segment(cable, anchor, eye, frame)
+            self.pose_line(cable, anchor, eye, frame, problems)
             self.lines.append((anchor, eye))
 
     def check_grips(self, grips, frame, problems):
@@ -1032,7 +1043,7 @@ class CableStation:
                     problems.add(frame, side + " foot loses the row platform", abs(sole - top))
         # Cast the centreline and its surrounding cable surface through the posed skin.
         skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
-        segments = [(a, b, self.RADIUS, "cable line") for a, b in self.lines]
+        segments = [(a, b, self.RADIUS, self.LINE_LABEL) for a, b in self.lines]
         segments += [(a, b, .008, "stirrup strap") for _, a, b in self.straps]
         for anchor, eye, radius, label in segments:
             delta = eye - anchor
@@ -1061,6 +1072,55 @@ def check_rendered_grips(handles, grips, frame, problems):
         excess = np.abs(along).max() - transform.col[2].to_3d().length / 2
         if excess > 0:
             problems.add(frame, side + " fist extends past the rendered grip", excess)
+
+
+class BandStation(CableStation):
+    """Fixed anchors and elastic webbing with no pulley or moving stack."""
+
+    HEIGHTS = {**CableStation.HEIGHTS, "floor": .085}
+    RADIUS = .018
+    LINE_LABEL = "resistance band"
+
+    def __init__(self, config):
+        self.rest_length = config["rest_length"]
+        if not math.isfinite(self.rest_length) or self.rest_length <= 0:
+            raise ValueError("Band rest length must be positive")
+        self.parts = []
+        self.elastic = material("amber resistance band", (.60, .205, .035), .03, .47)
+        super().__init__(config)
+
+    def mount(self, column, x, y, facing, ski, finish):
+        height = self.HEIGHTS[column["height"]]
+        origin = Vector((x, y, height))
+        anchor = origin + facing * .12
+        base = box("band anchor base", (.50, .54, .055), (x, y, .0275), finish)
+        post = box("band anchor post", (.10, .10, height + .052),
+                   (x, y, (height + .052) / 2), finish)
+        stud = self.part("fixed band anchor pin", .024, self.steel)
+        set_segment(stud, origin, anchor, 1)
+        self.parts.extend(((base, False), (post, False), (stud, False)))
+        self.bounds.extend(part.matrix_world @ Vector(v) for part in (base, post, stud) for v in part.bound_box)
+        return anchor
+
+    def make_line(self):
+        return box("elastic resistance band", (.035, .005, 1), (0, 0, 0), self.elastic)
+
+    def pose_line(self, band, anchor, eye, frame, problems):
+        length = (eye - anchor).length
+        ratio = length / self.rest_length
+        if ratio < 1.05:
+            problems.add(frame, "resistance band loses tension", 1.05 * self.rest_length - length)
+        if ratio > 2.5:
+            problems.add(frame, "resistance band exceeds its stretch range", length - 2.5 * self.rest_length)
+        if length >= .001:
+            set_segment(band, anchor, eye, frame)
+            # Preserve volume as the strip extends. Both cross-section axes shrink.
+            band.scale.x = band.scale.y = 1 / math.sqrt(max(1, ratio))
+            band.keyframe_insert("scale", frame=frame)
+
+    def check(self, points, faces, frame, problems, samples):
+        super().check(points, faces, frame, problems, samples)
+        check_hardware_clearance(self.parts, points, faces, np.zeros(len(points), dtype=bool), {}, frame, problems)
 
 
 def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems):
@@ -4181,7 +4241,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair", "nordic-bench", "captains-chair"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4203,7 +4263,9 @@ def bake(spec, keys):
         bench.surfaces.extend(preacher.surfaces)
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
-    cables = next((CableStation(e) for e in spec.get("equipment", []) if e["type"] == "cable"), None)
+    tension_stations = {"cable": CableStation, "resistance-band": BandStation}
+    cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
+                   if e["type"] in tension_stations), None)
     belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
