@@ -16,6 +16,11 @@ import type { E2EConfig } from "e2e"
  * .github/workflows/ios-tour.yml does all of it.
  */
 
+// A simulator on a CI runner answers slowly: one screenshot there can take 20 s, and typing an email over 30 s.
+// The iOS workflow sets E2E_SLOW_DEVICE to give each action and test that long; elsewhere a wrong locator
+// still fails fast.
+const slow = Boolean(process.env.E2E_SLOW_DEVICE)
+
 const nativeApp = {
   bundleId: "com.kierenfoenander.gym.preview",
   appPath: process.env.E2E_APP_PATH,
@@ -32,6 +37,8 @@ export default {
     { name: "android", engine: mobile({ platform: "android", device: process.env.E2E_DEVICE }), app: androidApp },
   ],
   workers: 1,
+  timeout: slow ? 600_000 : 120_000,
+  actionTimeout: slow ? 120_000 : 30_000,
   reporters: ["list", "junit"],
   video: "retain-on-failure",
   credentials: {
