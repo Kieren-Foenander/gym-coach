@@ -1,0 +1,29 @@
+{
+  "equipment": [],
+  "stance": {"width": 0.31, "y": 0.6869999999999999, "toe_out": 0, "knee_direction": {"Left": [0, 0, -1], "Right": [0, 0, -1]}},
+  "camera": {"angle": 63},
+  "frames": 152,
+  "floor_hands": [0.226, -0.28, 0.0236],
+  "hands": {"Left": "support", "Right": "support"},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.059, 0.461], "lean": 87, "head": -10, "plant_left": [0.226, -0.255, 0.0236], "plant_right": [-0.226, -0.255, 0.0236], "foot_left": [0.015000000000000013, 0.0, 74], "foot_right": [0.015000000000000013, 0.0, 74]},
+    {"at": 0.155},
+    {"at": 0.235, "plant_left": [0.226, -0.33, 0.1036], "foot_right": [-0.06, 0.055999999999999994, 74]},
+    {"at": 0.317, "plant_left": [0.226, -0.405, 0.0236], "foot_right": [-0.135, 0.0, 74]},
+    {"at": 0.409},
+    {"at": 0.495, "plant_right": [-0.226, -0.343, 0.1036], "foot_left": [-0.07300000000000001, 0.055999999999999994, 74]},
+    {"at": 0.576, "plant_right": [-0.226, -0.41, 0.0236], "foot_left": [-0.13999999999999996, 0.0, 74]},
+    {"at": 0.665},
+    {"at": 0.75, "plant_left": [0.226, -0.328, 0.1036], "foot_right": [-0.057999999999999996, 0.055999999999999994, 74]},
+    {"at": 0.826, "plant_left": [0.226, -0.255, 0.0236], "foot_right": [0.015000000000000013, 0.0, 74]},
+    {"at": 0.911},
+    {"at": 0.956, "plant_right": [-0.226, -0.328, 0.1036], "foot_left": [-0.057999999999999996, 0.055999999999999994, 74]}
+  ],
+  "checkpoints": [
+    {"during": [0.0, 0.155], "side": "Left", "hand_mode": "floor-plant"},
+    {"during": [0.32, 0.67], "side": "Left", "hand_mode": "floor-plant"},
+    {"during": [0.83, 1], "side": "Left", "hand_mode": "floor-plant"},
+    {"during": [0, 0.409], "side": "Right", "hand_mode": "floor-plant"},
+    {"during": [0.58, 0.909], "side": "Right", "hand_mode": "floor-plant"}
+  ]
+}

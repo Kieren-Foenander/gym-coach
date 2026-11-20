@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "bear-crawl",
+    views: ["front"],
+    cues: [
+      "Set your hands under your shoulders and hover your knees.",
+      "Move one hand and the opposite foot together.",
+      "Keep your hips low and alternate sides.",
+    ],
+  },
+  {
     slug: "plank",
     views: ["front"],
     cues: [
