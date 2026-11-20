@@ -1,0 +1,105 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "rope",
+      "columns": {
+        "Both": {
+          "at": [
+            0,
+            -1.08
+          ],
+          "height": "high"
+        }
+      },
+      "end_stops": true
+    }
+  ],
+  "stance": {
+    "width": 0.25,
+    "toe_out": 1,
+    "y": 0.435,
+    "knee_direction": {
+      "Left": [
+        0,
+        -0.29,
+        -1
+      ],
+      "Right": [
+        0,
+        -0.29,
+        -1
+      ]
+    }
+  },
+  "frames": 112,
+  "camera": {
+    "angle": 51,
+    "elevation": 12
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.01,
+        0.49
+      ],
+      "lean": 25,
+      "grip": "neutral",
+      "foot_left": [
+        0,
+        0,
+        12
+      ],
+      "foot_right": [
+        0,
+        0,
+        12
+      ],
+      "upper_arm": [
+        0.25,
+        0.84,
+        -0.48
+      ],
+      "curl": 119,
+      "flex_toward": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "pelvis": [
+        0,
+        0.02,
+        0.49
+      ],
+      "lean": 46,
+      "spine": 22
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        115,
+        123
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        115,
+        123
+      ]
+    }
+  ]
+}

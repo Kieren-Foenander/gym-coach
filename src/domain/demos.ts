@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-crunch",
+    views: ["front"],
+    cues: [
+      "Kneel facing the pulley with the rope beside your head.",
+      "Curl your ribs toward your pelvis while keeping your hips steady.",
+      "Uncurl slowly without pulling the rope with your arms.",
+    ],
+  },
+  {
     slug: "cable-pull-through",
     views: ["back"],
     cues: [
