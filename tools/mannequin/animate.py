@@ -1094,6 +1094,50 @@ class CableStation:
         samples.append(np.array(self.bounds + [eye for _, eye in self.lines]))
 
 
+class AnkleCable(CableStation):
+    """A cuff follows the working shin and couples it to a low cable."""
+
+    def __init__(self, config):
+        steel = material("cable hardware", STEEL, .8, .33)
+        self.steel = steel
+        self.rubber = material("ankle cuff rubber", (.072, .078, .085), .13, .65)
+        self.bounds, self.lines, self.straps, self.restraints = [], [], [], []
+        self.handles = {}
+        self.footplate = None
+        self.side = config.get("side", "Left")
+        column = config["column"]
+        self.anchor = self.mount(column, *column["at"], Vector((*column.get("exit", [0, 1]), 0)).normalized(), False, steel)
+        self.cuff = self.part("padded ankle cuff", .061, self.rubber)
+        self.line = self.make_line()
+        self.clip = self.part("ankle cuff swivel", .012, steel)
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        ankle, knee = (head(self.side + bone) for bone in ("Foot", "Leg"))
+        axis = (knee - ankle).normalized()
+        centre = ankle + axis * .065
+        direction = self.anchor - centre
+        tangent = (direction - axis * direction.dot(axis)).normalized()
+        eye = centre + tangent * .091
+        self.centre, self.axis = centre, axis
+        set_segment(self.cuff, centre - axis * .03, centre + axis * .03, frame)
+        set_segment(self.clip, centre + tangent * .054, eye, frame)
+        self.pose_line(self.line, self.anchor, eye, frame, problems)
+        self.lines[:] = [(self.anchor, eye)]
+
+    def check(self, points, faces, frame, problems, samples):
+        super().check(points, faces, frame, problems, samples)
+        offset = points - np.array(self.centre)
+        height = offset @ np.array(self.axis)
+        radial = np.linalg.norm(offset - height[:, None] * np.array(self.axis), axis=1)
+        near = radial[(abs(height) <= .024) & (radial < .10)]
+        if not near.size or not .036 <= near.max() <= .084:
+            problems.add(frame, "ankle cuff loses its skin fit", .01)
+        else:
+            # Fit the padded outside of the cuff just above the skin.
+            self.cuff.scale.x = self.cuff.scale.y = (near.max() + .003) / .061
+            self.cuff.keyframe_insert("scale", frame=frame)
+
+
 def check_rendered_grips(handles, grips, frame, problems):
     for side, part in handles.items():
         transform = part.matrix_world
@@ -4496,7 +4540,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4521,7 +4565,7 @@ def bake(spec, keys):
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
-    tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand}
+    tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand, "ankle-cable": AnkleCable}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
                    if e["type"] in tension_stations), None)
     belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)

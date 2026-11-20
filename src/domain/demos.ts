@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-kickback",
+    views: ["back"],
+    cues: [
+      "Attach the cuff and face the low pulley.",
+      "Drive your working heel back while keeping your hips square.",
+      "Bring the leg forward slowly without setting it down.",
+    ],
+  },
+  {
+    slug: "cable-hip-abduction",
+    views: ["front"],
+    cues: [
+      "Stand side-on with the cuff on the leg farther from the pulley.",
+      "Lift the working leg out to the side without tilting your hips.",
+      "Lower under control while keeping tension.",
+    ],
+  },
+  {
     slug: "cable-triceps-kickback",
     views: ["back"],
     cues: [
