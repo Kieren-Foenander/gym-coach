@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "bayesian-curl",
+    views: ["front"],
+    cues: [
+      "Stand ahead of the low pulley with your working elbow behind your ribs.",
+      "Curl the handle without letting the elbow move forward.",
+      "Uncurl slowly while keeping tension.",
+    ],
+  },
+  {
     slug: "cable-external-rotation",
     views: ["front"],
     cues: [
