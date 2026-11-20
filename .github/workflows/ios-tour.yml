@@ -6,15 +6,22 @@ name: iOS tour
 #
 # macOS runners cost nothing on a public repository. The build is signed ad hoc, so no Apple account is needed.
 # The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
+#
+# Building takes about half an hour, so the built app is cached, keyed on everything that goes into it: the native
+# app's files, src/domain, the lockfiles, apps/mobile/e2e/build-simulator.sh and the Xcode version. A change to the
+# tour, the server or this file reuses it. Pull requests can read the cache that runs on master make.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
+  push:
+    branches: [master]
+    paths: &paths
       - apps/mobile/**
       - src/domain/**
       - src/server/**
       - migrations/**
       - .github/workflows/ios-tour.yml
+  pull_request:
+    paths: *paths
 
 permissions:
   contents: read
@@ -40,7 +47,7 @@ jobs:
     name: Build and tour the iPhone app
     # The local server is `alchemy dev`, which keeps its state in the Cloudflare account, so it needs the secrets
     # that pull requests from forks don't get.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
     timeout-minutes: 90
     steps:
@@ -54,36 +61,44 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+      - name: Read the Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
 
       - run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
         working-directory: apps/mobile
 
-      - name: Generate the iOS project
-        working-directory: apps/mobile
-        run: npx expo prebuild --platform ios --clean
-        env:
-          LANG: en_US.UTF-8
-          LC_ALL: en_US.UTF-8
+      - name: Restore the built app
+        id: built
+        uses: actions/cache/restore@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: >-
+            ios-sim-app-${{ steps.xcode.outputs.version }}-${{ env.APP_VARIANT }}-${{ env.EXPO_PUBLIC_GYM_SERVER_URL }}-${{
+              hashFiles('apps/mobile/**', '!apps/mobile/node_modules/**', '!apps/mobile/e2e/tour.yaml', '!apps/mobile/test/**',
+                        'src/domain/**', 'bun.lock') }}
 
       - name: Build for the simulator
+        if: steps.built.outputs.cache-hit != 'true'
         working-directory: apps/mobile
+        run: e2e/build-simulator.sh
+
+      - name: Keep the built app for later runs
+        if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: ${{ steps.built.outputs.cache-primary-key }}
+
+      - name: Find the built app
+        working-directory: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
         run: |
-          set -o pipefail
           mkdir -p "$OUT"
-          xcodebuild \
-            -workspace ios/GymPreview.xcworkspace -scheme GymPreview \
-            -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios/build \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
-            build | xcbeautify
-          APP=ios/build/Build/Products/Release-iphonesimulator/GymPreview.app
-          test -d "$APP"
-          # The keychain (expo-secure-store, which keeps the session) needs the app's entitlements, and only
-          # a signed build carries them. "-" signs it ad hoc, which the simulator accepts without an Apple account.
-          codesign --display --entitlements - --xml "$APP" | plutil -p - || echo "No entitlements in the signature"
+          APP=$(ls -d *.app | head -1)
           echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
-          tar -czf "$OUT/gym-preview-simulator.tar.gz" -C "$(dirname "$APP")" GymPreview.app
+          tar -czf "$OUT/gym-preview-simulator.tar.gz" "$APP"
+          echo "Built app: $APP (from the cache: ${{ steps.built.outputs.cache-hit == 'true' }})"
 
       - name: Boot an iPhone simulator
         run: |
