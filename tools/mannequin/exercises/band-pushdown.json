@@ -7,12 +7,12 @@
         "Both": {
           "at": [
             0,
-            -0.86
+            -0.6
           ],
           "height": "high"
         }
       },
-      "rest_length": 0.61
+      "rest_length": 0.57
     }
   ],
   "stance": {
@@ -35,10 +35,10 @@
       "grip": "pronated",
       "upper_arm": [
         0.1,
-        0.26,
+        0.165,
         -1
       ],
-      "curl": 91,
+      "curl": 90,
       "flex_toward": [
         0,
         1,
@@ -50,7 +50,7 @@
     },
     {
       "at": 0.47,
-      "curl": 7
+      "curl": 9
     },
     {
       "at": 0.57
@@ -63,14 +63,30 @@
       "elbow": [
         86,
         96
-      ]
+      ],
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.045,
+          0.045
+        ]
+      }
     },
     {
       "at": 0.52,
       "elbow": [
         3,
         12
-      ]
+      ],
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.27,
+          -0.21
+        ]
+      }
     },
     {
       "fixed_elbow_m": 0.015,
@@ -81,7 +97,12 @@
           0
         ],
         "degrees": 1
-      }
+      },
+      "upper_arm_to_torso": 12,
+      "elbow": [
+        6,
+        94
+      ]
     }
   ]
 }
