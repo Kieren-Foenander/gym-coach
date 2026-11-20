@@ -1,7 +1,7 @@
 import { mobile } from "@e2e-dev/mobile"
 import { web } from "@e2e-dev/web"
 import type { E2EConfig } from "e2e"
-import { E2E_PORT, E2E_TIME_ZONE } from "./tools/e2e/constants"
+import { E2E_PORT, E2E_READY_PORT, E2E_TIME_ZONE } from "./tools/e2e/constants"
 
 /**
  * End-to-end tests with e2e (https://e2e.com), one runner for the web app (e2e/web/) and the native app
@@ -40,7 +40,8 @@ const webApp = remote
   ? { url: remote }
   : {
       url: `http://localhost:${E2E_PORT}`,
-      readyUrl: `http://localhost:${E2E_PORT}/login`,
+      // serve.ts answers here once the app has rendered a page; e2e gives each try of the app itself 2 s.
+      readyUrl: `http://127.0.0.1:${E2E_READY_PORT}/`,
       command: { executable: "bun", args: ["tools/e2e/serve.ts"], startupTimeout: 120_000, log: ".e2e/logs/app.log" },
     }
 
