@@ -1,0 +1,129 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "d-handle",
+      "ski_frame": true,
+      "columns": {
+        "Left": {
+          "at": [
+            0.24,
+            -0.83
+          ],
+          "height": "high"
+        },
+        "Right": {
+          "at": [
+            -0.24,
+            -0.83
+          ],
+          "height": "high"
+        }
+      }
+    }
+  ],
+  "stance": {
+    "width": 0.32,
+    "toe_out": 12
+  },
+  "camera": {
+    "angle": 65
+  },
+  "frames": 182,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.031,
+        0.909
+      ],
+      "lean": 8,
+      "grip": "neutral",
+      "elbows": [
+        0.46,
+        -0.26,
+        -0.6
+      ],
+      "upper_arm": [
+        0.16,
+        0.32,
+        1
+      ],
+      "curl": 20,
+      "flex_toward": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "at": 0.08
+    },
+    {
+      "at": 0.24,
+      "pelvis": [
+        0,
+        0.067,
+        0.851
+      ],
+      "lean": 22,
+      "upper_arm": [
+        0.2,
+        1,
+        0.03
+      ]
+    },
+    {
+      "at": 0.4,
+      "pelvis": [
+        0,
+        0.11,
+        0.784
+      ],
+      "lean": 38,
+      "upper_arm": [
+        0.25,
+        0.24,
+        -1
+      ]
+    },
+    {
+      "at": 0.47
+    },
+    {
+      "at": 0.73,
+      "pelvis": [
+        0,
+        0.067,
+        0.851
+      ],
+      "lean": 22,
+      "upper_arm": [
+        0.2,
+        1,
+        0.03
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        5,
+        63
+      ]
+    },
+    {
+      "at": 0.44,
+      "elbow": [
+        6,
+        66
+      ],
+      "knee": [
+        29,
+        110
+      ]
+    }
+  ]
+}

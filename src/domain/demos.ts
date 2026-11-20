@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "ski-erg",
+    views: ["front"],
+    cues: [
+      "Reach high with soft elbows and knees.",
+      "Hinge and drive the handles down past your hips.",
+      "Stand tall as your arms return overhead.",
+    ],
+  },
+  {
     slug: "single-leg-calf-raise",
     views: ["back"],
     cues: [

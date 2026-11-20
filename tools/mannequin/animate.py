@@ -757,6 +757,14 @@ class CableStation:
         columns = config["columns"]
         if not columns or not set(columns) <= (set(SIDES) if dual else {"Both"}):
             raise ValueError("D-handles need side-specific columns; other attachments need one Both column")
+        ski = config.get("ski_frame", False)
+        if ski:
+            _, y = columns["Left"]["at"]
+            box("ski erg platform", (.64, .48, .045), (0, y, .0225), frame_finish)
+            box("ski erg mast", (.11, .15, 1.92), (0, y, .96), frame_finish)
+            box("ski erg pulley crossbeam", (.62, .14, .10), (0, y, 1.92), frame_finish)
+            fan = cylinder("ski erg fan housing", .207, .144, 0, frame_finish, None)
+            fan.location = (0, y, .57)
         for key, column in columns.items():
             x, y = column["at"]
             facing = Vector((*column.get("exit", [0, 1]), 0)).normalized()
@@ -765,15 +773,16 @@ class CableStation:
             height = self.HEIGHTS[column["height"]]
             origin = Vector((x, y, height))
             anchor = origin + facing * .15
-            box("cable column", (.16, .18, 2.06), (x, y, 1.03), frame_finish)
-            box("cable base", (.43, .38, .045), (x, y, .0225), frame_finish)
+            if not ski:
+                box("cable column", (.16, .18, 2.06), (x, y, 1.03), frame_finish)
+                box("cable base", (.43, .38, .045), (x, y, .0225), frame_finish)
             box("pulley carriage", (.19, .19, .13), origin + facing * .065, frame_finish)
             pulley = cylinder("pulley wheel", .047, .036, 0, self.steel, None)
             pulley.location = anchor - facing * .038
             axle = facing.cross(Vector((0, 0, 1)))
             pulley.rotation_euler = axle.to_track_quat("Z", "Y").to_euler()
             stack_at = Vector((x, y, 0)) - facing * .19
-            for plate in range(10):
+            for plate in range(0 if ski else 10):
                 box("stack plate", (.27, .16, .025), stack_at + Vector((0, 0, .105 + .033 * plate)), frame_finish)
             for side in (-1, 1):
                 self.bounds.append(Vector((x + side * .22, y, 0)))
