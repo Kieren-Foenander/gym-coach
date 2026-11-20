@@ -58,6 +58,11 @@ by `Both` with a `rope`, `straight-bar` or `v-bar`. Each column takes `at: [x, y
 `exit: [x, y]` (default `[0, 1]`). The cable runs straight from that exit to
 the attachment eye. The bake checks travel, cable clearance against the posed skin,
 and contact and wrist alignment at each 28 mm grip. The rope has molded end grips.
+Use `anchor_height` in metres for an exact exit height. A cable or anchored
+band can set `resistance_direction: {"during": [start, end], "min_gain": metres}`
+to check that its loaded span lengthens throughout the working phase. The
+check permits up to 4 mm of backward travel from the longest span measured
+so far.
 
 Use `cable_target` for a left grip position in world metres, mirrored for the right
 hand, and `handle_direction` for the grip shaft direction in torso coordinates.

@@ -20,7 +20,7 @@ export interface ExerciseDemo {
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
     slug: "cable-external-rotation",
-    views: ["back"],
+    views: ["front"],
     cues: [
       "Stand side-on and keep your elbow against your ribs.",
       "Turn your forearm away from your body without moving your elbow.",

@@ -6,21 +6,29 @@
       "columns": {
         "Left": {
           "at": [
-            -0.93,
-            -0.89
+            -0.96,
+            -0.29
           ],
           "height": "mid",
           "exit": [
             1,
             0
-          ]
+          ],
+          "anchor_height": 1.051
         }
       },
       "stirrup_direction": [
         0,
         1,
         0
-      ]
+      ],
+      "resistance_direction": {
+        "during": [
+          0.09,
+          0.47
+        ],
+        "min_gain": 0.23
+      }
     }
   ],
   "stance": {
@@ -28,8 +36,8 @@
     "toe_out": 14
   },
   "camera": {
-    "angle": 57,
-    "elevation": 14
+    "angle": 339,
+    "elevation": 24
   },
   "keys": [
     {
@@ -64,8 +72,8 @@
     {
       "at": 0.47,
       "flex_toward": [
-        0.93,
-        0.36,
+        0.68,
+        0.73,
         0
       ]
     },
@@ -78,10 +86,11 @@
     {
       "side": "Left",
       "elbow": [
-        66,
-        116
+        86,
+        93
       ],
-      "fixed_elbow_m": 0.015
+      "fixed_elbow_m": 0.015,
+      "upper_arm_to_torso": 8
     },
     {
       "at": 0.52,
@@ -89,8 +98,19 @@
       "position": {
         "point": "handle",
         "x": [
-          0.48,
-          0.59
+          0.43,
+          0.51
+        ]
+      }
+    },
+    {
+      "side": "Left",
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.025,
+          0.025
         ]
       }
     }

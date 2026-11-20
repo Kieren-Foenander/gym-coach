@@ -846,6 +846,8 @@ class CableStation:
     def __init__(self, config):
         self.attachment = config["attachment"]
         self.half = config.get("grip_half", self.GRIP_HALF[self.attachment])
+        self.resistance_direction = config.get("resistance_direction")
+        self.resistance_lengths = {}
         self.stirrup_direction = config.get("stirrup_direction")
         dual = self.attachment == "d-handle"
         self.stations = {}
@@ -894,7 +896,7 @@ class CableStation:
             self.handles["Right"] = self.handles["Left"]
 
     def mount(self, column, x, y, facing, ski, frame_finish):
-        height = self.HEIGHTS[column["height"]]
+        height = column.get("anchor_height", self.HEIGHTS[column["height"]])
         origin = Vector((x, y, height))
         anchor = origin + facing * .15
         if not ski:
@@ -1030,6 +1032,24 @@ class CableStation:
                 eye += (anchor - eye).normalized() * .025
             self.pose_line(cable, anchor, eye, frame, problems)
             self.lines.append((anchor, eye))
+            if self.resistance_direction:
+                self.check_resistance_direction(key, (eye - anchor).length, frame, problems)
+
+    def check_resistance_direction(self, key, length, frame, problems):
+        config = self.resistance_direction
+        start, end = config["during"]
+        frames = self.frame_count
+        first, last = 1 + round(start * frames), min(frames, 1 + round(end * frames))
+        if frame == first:
+            self.resistance_lengths[key] = (length, length)
+        if first < frame <= last:
+            initial, peak = self.resistance_lengths[key]
+            if length < peak - .004:
+                problems.add(frame, "resistance line shortens during the working phase", peak - length)
+            self.resistance_lengths[key] = (initial, max(peak, length))
+            if frame == last and length - initial < config["min_gain"]:
+                problems.add(frame, "resistance line does not lengthen enough", config["min_gain"] - length + initial)
+
 
     def check_grips(self, grips, frame, problems):
         check_rendered_grips(self.handles, grips, frame, problems)
@@ -4847,6 +4867,7 @@ def bake(spec, keys):
         if ab_wheel:
             ab_wheel.pose(span, torso, frame, gaps)
         if cables:
+            cables.frame_count = frames
             cables.pose(span, torso, grips, frame, gaps, problems)
         if contact_load:
             contact_load.pose(spec,span,torso,grips,frame,gaps,problems)
