@@ -1,4 +1,4 @@
-import { expect, type Screen } from "e2e"
+import type { Screen } from "e2e"
 
 /**
  * Dialogs that the operating system shows over the app, such as iOS's offer to save the password after a
@@ -16,16 +16,4 @@ export const dismissSavePasswordIfShown = async (screen: Screen): Promise<boolea
   await notNow.tap()
 
   return true
-}
-
-// The sheet can take a long time to come on a CI runner's simulator (E2E_SLOW_DEVICE, see e2e.config.ts).
-const SAVE_PASSWORD_WAIT = process.env.E2E_SLOW_DEVICE ? 120_000 : 15_000
-
-/** Waits for iOS's offer to save the password after a sign-in, and dismisses it. */
-export const dismissSavePassword = async (screen: Screen, within = SAVE_PASSWORD_WAIT) => {
-  try {
-    await expect.poll(() => dismissSavePasswordIfShown(screen), { timeout: within }).toBe(true)
-  } catch {
-    // It never came, as on Android.
-  }
 }

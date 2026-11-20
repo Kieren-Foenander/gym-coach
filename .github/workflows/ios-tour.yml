@@ -50,9 +50,6 @@ env:
 jobs:
   tour:
     name: Build and tour the iPhone app
-    # The local server is `alchemy dev`, which keeps its state in the Cloudflare account, so it needs the secrets
-    # that pull requests from forks don't get.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
     timeout-minutes: 90
     steps:
@@ -116,10 +113,12 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl list devices | grep "$UDID"
 
+      # `alchemy dev` with its state kept on the runner, as tools/e2e/serve.ts runs it for the browser tests, so
+      # it needs no Cloudflare secrets and runs for pull requests from forks too.
       - name: Start the server
         run: |
           mkdir -p "$OUT"
-          nohup bun run dev --no-input --stage ci-ios-tour > "$OUT/server.log" 2>&1 &
+          nohup bunx alchemy dev --stage ci-ios-tour --no-input --env-file tools/e2e/e2e.env > "$OUT/server.log" 2>&1 &
           for i in $(seq 1 90); do
             curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" > /dev/null && exit 0
             sleep 2
@@ -127,8 +126,7 @@ jobs:
           cat "$OUT/server.log"
           exit 1
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALCHEMY_LOCAL_STATE: "1"
 
       - name: Make the tour account and load the seed history
         run: |

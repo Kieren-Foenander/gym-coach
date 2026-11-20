@@ -1,6 +1,6 @@
 import { beforeEach } from "@e2e-dev/mobile"
 import { credentials, describe, expect } from "e2e"
-import { dismissSavePassword, dismissSavePasswordIfShown, serverUrl, test, testIds } from "./support"
+import { dismissSavePasswordIfShown, serverUrl, test, testIds } from "./support"
 
 /**
  * A tour of the native app's main screens: sign in, then each tab, with a screenshot of each.
@@ -9,8 +9,8 @@ import { dismissSavePassword, dismissSavePasswordIfShown, serverUrl, test, testI
  */
 
 describe("a tour of the main screens", { serial: true }, () => {
-  // The save-password sheet can come after sign-in has stopped waiting for it, over a later screen. Before
-  // the first test opens the app there is no screen to read, so it starts checking after that.
+  // In case iOS still offers to save the password, over a later screen. Before the first test opens the app
+  // there is no screen to read, so it starts checking after that.
   let opened = false
 
   beforeEach(async ({ screen }) => {
@@ -33,15 +33,14 @@ describe("a tour of the main screens", { serial: true }, () => {
     await device.dismissKeyboard()
     await screen.getByTestId(testIds.login.submit).tap()
 
-    // Sign-in lands on Today, but iOS can lay its save-password sheet over the app before or after that.
-    // Clear it whenever it shows while waiting, and wait for it afterwards only if it hasn't come yet.
+    // Sign-in lands on Today. A test build doesn't mark its sign-in fields for autofill, so iOS shouldn't
+    // offer to save the password over it; if it does, clear the sheet while waiting.
     const today = screen.getByTestId(testIds.nav.tab("today"))
-    let dismissed = false
 
     await expect
       .poll(
         async () => {
-          dismissed = (await dismissSavePasswordIfShown(screen)) || dismissed
+          await dismissSavePasswordIfShown(screen)
 
           // In the screen tree at all: iOS reports this tab as not visible even when it is on screen, and
           // while the sheet is up the tree holds only the sheet.
@@ -51,8 +50,6 @@ describe("a tour of the main screens", { serial: true }, () => {
       )
       .toBe(true)
     await expect(today).toBeSelected()
-
-    if (!dismissed) await dismissSavePassword(screen)
     await app.screenshot("02-today")
   })
 
