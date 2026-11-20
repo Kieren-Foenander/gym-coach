@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "single-leg-hip-thrust",
+    views: ["back"],
+    cues: [
+      "Rest your upper back on the bench and plant one foot.",
+      "Drive through the planted foot and lift your hips level.",
+      "Lower slowly with your ribs tucked.",
+    ],
+  },
+  {
     slug: "bodyweight-squat",
     views: ["front"],
     cues: [
