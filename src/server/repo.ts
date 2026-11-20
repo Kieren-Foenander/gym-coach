@@ -125,6 +125,13 @@ export interface WorkoutSummary extends Workout {
   readonly volume: number
 }
 
+/** Every finished workout counted together: how many, their sets, and the weight lifted in them. */
+export interface WorkoutTotals {
+  readonly workouts: number
+  readonly sets: number
+  readonly volume: number
+}
+
 export interface Adjustment {
   readonly id: number
   readonly exerciseId: number
@@ -994,6 +1001,19 @@ export const finishWorkout = Effect.fn("finishWorkout")(function* (workoutId: nu
   }
 
   return { discarded: false, adjustments: yield* adjustmentsWhere({ workoutId, limit: 50 }) }
+})
+
+/** The totals of every finished workout, which a list of the latest ones can't add up to. */
+export const getWorkoutTotals = Effect.fn("getWorkoutTotals")(function* () {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+
+  const [totals] = yield* sql<WorkoutTotals>`
+    SELECT COUNT(DISTINCT w.id) AS workouts, COUNT(s.id) AS sets, COALESCE(SUM(s.weight * s.reps), 0) AS volume
+    FROM workouts w LEFT JOIN workout_sets s ON s.workout_id = w.id
+    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL`
+
+  return totals ?? { workouts: 0, sets: 0, volume: 0 }
 })
 
 export const listWorkouts = Effect.fn("listWorkouts")(function* (limit: number) {

@@ -46,7 +46,9 @@ export const Calls = {
   getWorkout: define(CallInputs.getWorkout, (data) => Repo.getWorkoutDetail(data.workoutId)),
   getHistory: define(CallInputs.getHistory, () =>
     Effect.all({
+      // The latest workouts to list, and totals over all of them for the figures above the list.
       workouts: Repo.listWorkouts(100),
+      totals: Repo.getWorkoutTotals(),
       exercises: Repo.listExercises(),
       measurements: Repo.listMeasurements(500),
     }),

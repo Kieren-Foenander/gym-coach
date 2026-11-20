@@ -15,7 +15,7 @@ import { Navigation } from "@/navigation"
 void SplashScreen.preventAutoHideAsync()
 
 // Bump this when the shape of what the server answers changes, so screens cached by an older build are dropped.
-const CACHE_VERSION = "1"
+const CACHE_VERSION = "2"
 
 export default function App() {
   const [fontsLoaded] = useFonts({
