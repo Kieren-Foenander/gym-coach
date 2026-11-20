@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "band-face-pull",
+    views: ["back"],
+    cues: [
+      "Set the band around shoulder height and step back.",
+      "Pull the rope ends toward your temples with elbows high.",
+      "Reach forward slowly without losing tension.",
+    ],
+  },
+  {
     slug: "band-curl",
     views: ["front"],
     cues: [
