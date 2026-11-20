@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "glute-ham-raise",
+    views: ["front"],
+    cues: [
+      "Brace your ankles and start tall over the pad.",
+      "Lower until your hips and shoulders are in line.",
+      "Pull yourself back up by bending at the knees.",
+    ],
+  },
+  {
     slug: "safety-bar-squat",
     views: ["front"],
     cues: [

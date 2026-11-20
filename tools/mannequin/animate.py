@@ -3979,10 +3979,12 @@ class NordicBench:
 
     def __init__(self, config):
         self.knees = Vector(config["knees"])
+        self.ghd = config.get("ghd", False)
         metal = material("Nordic bench frame", IRON, .55, .42)
         foam = material("Nordic bench pads", PAD, .05, .7)
         self.pad = SupportPad("Nordic knee pad", {
-            "face": [0, .055, config["pad_height"]], "size": [.42, .33], "split": True,
+            "face": [0, .107 if self.ghd else .055, config["pad_height"]],
+            "size": [.42, .235 if self.ghd else .33], "split": True,
         }, foam, metal)
         self.roller = Vector(config["roller"])
         self.radius = .043
@@ -3990,6 +3992,18 @@ class NordicBench:
         width = Vector((.253, 0, 0))
         set_segment(roller, self.roller - width, self.roller + width, 1)
         self.parts = []
+        if self.ghd:
+            self.thigh_pad = Vector((0, -.15, config["pad_height"] - .105))
+            pad = CableStation.part("GHD curved thigh pad", .071, foam)
+            span = Vector((.22, 0, 0))
+            set_segment(pad, self.thigh_pad - span, self.thigh_pad + span, 1)
+            self.parts.append((box("GHD pad support", (.44, .13, .06),
+                                   self.thigh_pad - Vector((0, 0, .067)), metal), False))
+            self.foot_face = self.roller.y + .128
+            self.parts.append((box("GHD footplate", (.51, .047, .36),
+                                   (0, self.foot_face + .0235, self.roller.z - .17), metal), False))
+            self.parts.append((box("GHD center pedestal", (.19, .22, self.thigh_pad.z),
+                                   (0, -.095, self.thigh_pad.z / 2), metal), False))
         for sign in (-1, 1):
             x = sign * .266
             post = box("Nordic roller upright", (.052, .065, self.roller.z),
@@ -4005,13 +4019,27 @@ class NordicBench:
         place("Hips", pelvis @ REST["Hips"], head("Hips") + self.knees - mid)
         for side in SIDES:
             swing(side + "Leg", Vector((0, 1, 0)))
-            foot = Matrix.Rotation(math.radians(12), 3, "X")
+            foot = Matrix.Rotation(math.radians(88 if self.ghd else 12), 3, "X")
             for bone in ("Foot", "ToeBase"):
                 place(side + bone, foot @ REST[side + bone])
 
     def check(self, points, contact, hands, frame, problems, samples):
         check_hardware_clearance(self.parts, points, contact.faces, hands, {}, frame, problems)
         self.pad.check(points, frame, problems)
+        if self.ghd:
+            delta = points - np.array(self.thigh_pad)
+            distance = np.linalg.norm(delta[:, 1:], axis=1)
+            near = distance[abs(delta[:, 0]) < .22].min(initial=1) - .071
+            if near < -.009:
+                problems.add(frame, "GHD thigh pad penetrates the legs", -near)
+            if Torso().up.z < .25 and near > .025:
+                problems.add(frame, "thighs lose GHD pad contact at extension", near)
+            for side, indices in contact.foot_vertices.items():
+                feet = points[indices]
+                on_plate = abs(feet[:, 2] - (self.roller.z - .17)) <= .18
+                gap = self.foot_face - feet[on_plate, 1].max(initial=-1)
+                if not -.004 <= gap <= .014:
+                    problems.add(frame, side + " sole loses GHD footplate contact", abs(gap))
         rel = points - np.array(self.roller)
         distances = np.linalg.norm(rel[:, 1:], axis=1) - self.radius
         if distances[abs(rel[:, 0]) < .253].min(initial=1) < -.006:
