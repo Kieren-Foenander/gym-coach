@@ -1,0 +1,47 @@
+{
+  "equipment": [
+    {
+      "type": "stair-climber",
+      "grip": [
+        0.27,
+        -0.29,
+        1.55
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.29,
+    "toe_out": 0
+  },
+  "camera": {
+    "angle": 104
+  },
+  "frames": 104,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.22,
+        1.335
+      ],
+      "lean": 8
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        8,
+        112
+      ]
+    },
+    {
+      "at": 0,
+      "side": "Left",
+      "knee": [
+        12,
+        125
+      ]
+    }
+  ]
+}

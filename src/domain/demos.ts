@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "stair-climber",
+    views: ["front"],
+    cues: [
+      "Plant your whole foot on each step.",
+      "Stand tall and let your legs carry your weight.",
+      "Set a pace that lets you place each foot smoothly.",
+    ],
+  },
+  {
     slug: "rowing-machine",
     views: ["front"],
     cues: [

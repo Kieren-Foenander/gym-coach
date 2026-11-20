@@ -1923,6 +1923,87 @@ class CycleStation:
         samples.append(np.array(self.bounds))
 
 
+class StandingCardio:
+    """Shared grip and foot contact checks for standing cardio machines."""
+
+    def __init__(self, config):
+        self.grip = Vector(config["grip"])
+        self.finish = material("cardio machine frame", (.09, .103, .12), .53, .45)
+        self.tread = material("cardio machine tread", PAD, .06, .67)
+        self.parts, self.handles = [], {}
+        self.contacts = {}
+        for side in SIDES:
+            handle = CableStation.part("cardio machine handle", Barbell.SHAFT, self.finish)
+            self.handles[side] = handle
+            self.parts.append((handle, True))
+
+    def member(self, name, radius):
+        member = CableStation.part(name, radius, self.finish)
+        self.parts.append((member, False))
+        return member
+
+    def grip_pose(self, side, target, torso, frame, gaps):
+        axis = Vector((1, 0, 0))
+        set_segment(self.handles[side], target - axis * .08, target + axis * .08, frame)
+        pole = torso.direction([.44, -.15, -1], SIDES[side])
+        gaps.append((side + " cardio machine grip", pose_arm(side, target, pole, "pronated", torso, axis)))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        for side, (centre, width, length) in self.contacts.items():
+            rel = points - np.array(centre)
+            patch = (abs(rel[:, 0]) < width / 2) & (abs(rel[:, 1]) < length / 2)
+            sole = rel[patch, 2].min(initial=1)
+            if abs(sole) > .012:
+                problems.add(frame, side + " foot loses cardio tread contact", abs(sole))
+        samples.append(np.array([part.matrix_world @ Vector(v)
+                                 for part, _ in self.parts for v in part.bound_box]))
+
+
+class StairClimber(StandingCardio):
+    """Treads descend in lockstep, with feet alternating support and swing."""
+
+    rise, run = .16, .27
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.steps = [box("moving stair tread", (.59, self.run, .062), (0, 0, 0), self.tread)
+                      for _ in range(7)]
+        for side, sign in SIDES.items():
+            rail_x = sign * (self.grip.x + .08)
+            target = Vector((rail_x, self.grip.y, self.grip.z))
+            post = self.member("step mill handle upright", .031)
+            set_segment(post, Vector((rail_x, target.y, 0)), target, 1)
+            rail = self.member("step mill side frame", .037)
+            set_segment(rail, Vector((sign * .34, .78, .07)), Vector((sign * .34, -.82, 1.02)), 1)
+        front = box("step mill front cabinet", (.66, .25, 1.04), (0, -1.0, .52), self.finish)
+        self.parts.append((front, False))
+
+    def pose(self, spec, keys, phase, key, torso, frame, gaps):
+        self.contacts.clear()
+        for index, step in enumerate(self.steps):
+            distance = (index + phase * 2) % len(self.steps) - 3
+            step.location = (0, distance * self.run, .63 - distance * self.rise - .031)
+            step.keyframe_insert("location", frame=frame)
+        for side, (ankle, _) in ankles(spec, key).items():
+            sign = SIDES[side]
+            stride = (phase + (0 if sign > 0 else .5)) % 1
+            distance = 2 * stride
+            if stride < .5:
+                tread_y = distance * self.run
+                level = .63 - distance * self.rise
+                self.contacts[side] = Vector((sign * .145, tread_y, level)), .19, self.run
+            else:
+                progress = (stride - .5) * 2
+                blend = progress * progress * (3 - 2 * progress)
+                tread_y = (1 - blend) * self.run
+                level = .47 + .16 * blend + .145 * math.sin(math.pi * progress)**2
+            key["foot_" + side.lower()] = [tread_y + .056 - ankle.y, level, 0, 0]
+            self.grip_pose(side, Vector((sign * self.grip.x, self.grip.y, self.grip.z)),
+                           torso, frame, gaps)
+
+
 class RowingErg:
     """The carriage slides along a floor rail while a chain pulls the flywheel."""
 
@@ -3334,7 +3415,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "stair-climber", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3361,6 +3442,9 @@ def bake(spec, keys):
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
+    standing_cardio_types = {"stair-climber": StairClimber}
+    standing_cardio = next((standing_cardio_types[e["type"]](e) for e in spec.get("equipment", [])
+                            if e["type"] in standing_cardio_types), None)
     rower = next((RowingErg(e) for e in spec.get("equipment", []) if e["type"] == "rowing-erg"), None)
     cycle = next((CycleStation(e) for e in spec.get("equipment", []) if e["type"] == "cycle-station"), None)
     lateral = next((LateralRaiseStation(e) for e in spec.get("equipment", []) if e["type"] == "lateral-station"), None)
@@ -3388,7 +3472,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
+        standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3464,6 +3548,8 @@ def bake(spec, keys):
             sled.pose(spec, span, key, frame, problems)
         activity_gaps = []
         phase = (frame - 1) / frames
+        if standing_cardio:
+            standing_cardio.pose(spec, keys, phase, key, torso, frame, activity_gaps)
         if treadmill:
             treadmill.pose(spec, keys, phase, key, torso, frame, activity_gaps)
         if cycle:
@@ -3771,6 +3857,8 @@ def bake(spec, keys):
             hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
+        if standing_cardio:
+            standing_cardio.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if rower:
             rower.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if cycle:

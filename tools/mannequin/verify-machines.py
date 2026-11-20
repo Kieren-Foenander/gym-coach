@@ -153,3 +153,13 @@ spec["equipment"][0]["pivot"][1] += .065
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "hip thrust pad leaves the front hip crease" in problems.found, list(problems.lines())
 print("HIP THRUST PELVIS REGRESSIONS PASSED")
+
+spec = initial_pose("stair-climber")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("stair-climber")
+spec["keys"][0]["pelvis"][2] += .22
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert any("foot loses cardio tread contact" in label for label in problems.found), list(problems.lines())
+print("STEP MILL SUPPORT REGRESSIONS PASSED")
