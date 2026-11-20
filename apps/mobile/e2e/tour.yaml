@@ -36,7 +36,12 @@ appId: ${APP_ID}
     visible:
       id: "nav.tab:today"
     timeout: 60000
-# iOS offers to save the password after a sign-in. That dialog is the system's, so it has no test id.
+# iOS offers to save the password a few seconds after a sign-in. That dialog is the system's, so it has no
+# test id. Android never shows it, so both steps are optional.
+- extendedWaitUntil:
+    visible: "Not Now"
+    timeout: 15000
+    optional: true
 - tapOn:
     text: "Not Now"
     optional: true
