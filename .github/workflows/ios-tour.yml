@@ -1,15 +1,15 @@
 name: iOS tour
 
 # Builds the iPhone app for the iOS Simulator on a GitHub macOS runner, signs in to a local server loaded with
-# seed/training-history.json, taps through the main screens (apps/mobile/e2e/tour.yaml) and keeps a screen
-# recording and a screenshot of each screen as the "ios-tour" artifact.
+# seed/training-history.json, taps through the main screens with e2e (e2e/native/tour.e2e.ts, e2e.config.ts) and
+# keeps a screen recording and a screenshot of each screen as the "ios-tour" artifact.
 #
 # macOS runners cost nothing on a public repository. The build is signed ad hoc, so no Apple account is needed.
 # The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
 #
 # Building takes about half an hour, so the built app is cached, keyed on everything that goes into it: the native
 # app's files, src/domain, the lockfiles, apps/mobile/e2e/build-simulator.sh and the Xcode version. A change to the
-# tour, the server or this file reuses it. Pull requests can read the cache that runs on master make.
+# tests, the server or this file reuses it. Pull requests can read the cache that runs on master make.
 on:
   workflow_dispatch:
   push:
@@ -19,6 +19,8 @@ on:
       - src/domain/**
       - src/server/**
       - migrations/**
+      - e2e/native/**
+      - e2e.config.ts
       - .github/workflows/ios-tour.yml
   pull_request:
     paths: *paths
@@ -32,15 +34,16 @@ concurrency:
 
 env:
   APP_VARIANT: preview
-  APP_ID: com.kierenfoenander.gym.preview
   # The build's default server address. The simulator shares the runner's network, so this is the server below.
   # An IP address rather than localhost, which the simulator tries over IPv6 first.
   EXPO_PUBLIC_GYM_SERVER_URL: http://127.0.0.1:1337
+  # e2e.config.ts reads these: the server the build signs in to, and the tour account on it.
+  E2E_SERVER_URL: http://127.0.0.1:1337
   TOUR_EMAIL: tour@example.com
-  TOUR_PASSWORD: tour-password-not-secret
+  E2E_USER_TOUR_PASSWORD: tour-password-not-secret
   OUT: ${{ github.workspace }}/tour-output
-  MAESTRO_CLI_NO_ANALYTICS: "1"
-  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+  # e2e sends anonymous usage data unless told not to.
+  E2E_TELEMETRY_DISABLED: "1"
 
 jobs:
   tour:
@@ -76,7 +79,7 @@ jobs:
           path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
           key: >-
             ios-sim-app-${{ steps.xcode.outputs.version }}-${{ env.APP_VARIANT }}-${{ env.EXPO_PUBLIC_GYM_SERVER_URL }}-${{
-              hashFiles('apps/mobile/**', '!apps/mobile/node_modules/**', '!apps/mobile/e2e/tour.yaml', '!apps/mobile/test/**',
+              hashFiles('apps/mobile/**', '!apps/mobile/node_modules/**', '!apps/mobile/test/**',
                         'src/domain/**', 'bun.lock') }}
 
       - name: Build for the simulator
@@ -107,7 +110,6 @@ jobs:
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl install "$UDID" "$APP"
           xcrun simctl list devices | grep "$UDID"
 
       - name: Start the server
@@ -128,7 +130,7 @@ jobs:
         run: |
           curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-up" \
             -H 'content-type: application/json' \
-            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
           bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
 
       # The app gives up on a request after 15 seconds. Sign in once here, so the server has served the route
@@ -137,25 +139,26 @@ jobs:
         run: |
           curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-in" \
             -H 'content-type: application/json' \
-            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\"}" \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\"}" \
             -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
 
-      - name: Install Maestro
-        run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      # Checks agent-device, Xcode, the simulator and the build before any test runs.
+      - name: Check the e2e setup
+        run: bunx e2e doctor --target ios
+        env:
+          E2E_APP_PATH: ${{ env.APP }}
+          E2E_DEVICE: ${{ env.UDID }}
 
+      # One recording of the whole tour, from the simulator itself. e2e keeps its own video of a failed test.
       - name: Tour the app
-        working-directory: tour-output
         run: |
-          xcrun simctl io "$UDID" recordVideo --codec=h264 --force tour.mp4 &
-          echo $! > recorder.pid
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/tour.mp4" &
+          echo $! > "$OUT/recorder.pid"
           sleep 2
-          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" -o /dev/null -w 'server answered in %{time_total}s\n'
-          maestro --device "$UDID" test ../apps/mobile/e2e/tour.yaml \
-            --test-output-dir maestro \
-            --format junit --output maestro/report.xml \
-            -e APP_ID="$APP_ID" -e EMAIL="$TOUR_EMAIL" -e PASSWORD="$TOUR_PASSWORD" -e SERVER="$EXPO_PUBLIC_GYM_SERVER_URL"
+          bunx e2e run --target ios --retries 0
+        env:
+          E2E_APP_PATH: ${{ env.APP }}
+          E2E_DEVICE: ${{ env.UDID }}
 
       - name: Stop the recording
         if: always()
@@ -167,7 +170,10 @@ jobs:
             for i in $(seq 1 20); do kill -0 "$(cat recorder.pid)" 2> /dev/null || break; sleep 1; done
             rm recorder.pid
           fi
-          find . -name '*.png' -path '*takeScreenshot*' -exec cp {} . \;
+          # Each app.screenshot() in the tour, by its label, and everything e2e kept: the JUnit report, and a
+          # trace page and video for any test that failed.
+          find ../.e2e/results -name '*.png' -path '*/screenshots/*' -exec cp {} . \; 2> /dev/null || true
+          cp -R ../.e2e e2e-results 2> /dev/null || true
           ls -la
 
       - name: Summary

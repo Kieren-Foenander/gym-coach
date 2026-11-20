@@ -1,0 +1,38 @@
+import { mobile } from "@e2e-dev/mobile"
+import type { E2EConfig } from "e2e"
+
+/**
+ * End-to-end tests with e2e (https://e2e.com), one runner for the native app and, as it moves over from
+ * Playwright, the web app. Tests are e2e/**\/*.e2e.ts and find elements by test id only: see CLAUDE.md and
+ * src/domain/test-ids.ts.
+ *
+ *   bunx e2e run --target ios       the native tour on a booted iOS Simulator
+ *   bunx e2e run --target android   the same on a booted Android emulator
+ *
+ * A device target needs a build of the Gym Preview app with its JavaScript bundled in, pointed at a server
+ * at E2E_SERVER_URL that has the tour account on it (E2E_USER_TOUR_PASSWORD is its password). E2E_APP_PATH
+ * names the build: the .app from apps/mobile/e2e/build-simulator.sh, or a release .apk.
+ * .github/workflows/ios-tour.yml does all of it.
+ */
+
+const nativeApp = {
+  bundleId: "com.kierenfoenander.gym.preview",
+  appPath: process.env.E2E_APP_PATH,
+  // Gym asks for notifications for its rest alerts. Answer no up front, so no prompt covers the screen.
+  permissions: { notifications: "deny" },
+} as const
+
+export default {
+  tests: ["e2e/**/*.e2e.ts"],
+  targets: [
+    { name: "ios", engine: mobile({ platform: "ios", device: process.env.E2E_DEVICE }), app: nativeApp },
+    { name: "android", engine: mobile({ platform: "android", device: process.env.E2E_DEVICE }), app: nativeApp },
+  ],
+  workers: 1,
+  reporters: ["list", "junit"],
+  video: "retain-on-failure",
+  credentials: {
+    // The account the native tour signs in to. Its password comes from E2E_USER_TOUR_PASSWORD at fill time.
+    tour: { username: "tour@example.com", password: () => process.env.E2E_USER_TOUR_PASSWORD ?? "" },
+  },
+} satisfies E2EConfig
