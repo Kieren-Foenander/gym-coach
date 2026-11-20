@@ -229,3 +229,11 @@ spec["side_support"]["wrist"][2] += .05
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert any(name.startswith("ulna section ") for name in problems.found), list(problems.lines())
 print("FOREARM FLOOR CONTACT REGRESSION PASSED")
+
+spec = initial_pose("decline-crunch")
+spec.pop("hands")
+spec["keys"][0].pop("thigh_reach")
+spec["equipment"][0]["roller"][2] += .06
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left ankle loses restraint contact" in problems.found, list(problems.lines())
+print("DECLINE BENCH RESTRAINT REGRESSION PASSED")

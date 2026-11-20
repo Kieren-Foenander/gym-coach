@@ -1,0 +1,124 @@
+{
+  "equipment": [
+    {
+      "type": "core-bench",
+      "at": [
+        0,
+        0,
+        0.65
+      ],
+      "angle": -17,
+      "pad": [
+        0.2,
+        0.85
+      ],
+      "roller": [
+        0,
+        -0.595,
+        0.119
+      ]
+    }
+  ],
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "y": -0.53,
+    "toe_out": 5,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 114,
+    "elevation": 21,
+    "margin": 1.2
+  },
+  "frames": 124,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.094
+      ],
+      "lean": -90,
+      "head": 0,
+      "neck_retraction": 0.041,
+      "thigh_reach": 0.4,
+      "spine": 0
+    },
+    {
+      "at": 0.13
+    },
+    {
+      "at": 0.46,
+      "lean": -32,
+      "spine": 14,
+      "neck_retraction": 0,
+      "head": 4,
+      "pelvis": [
+        0,
+        0.018,
+        0.134
+      ],
+      "thigh_reach": 0.66
+    },
+    {
+      "at": 0.56
+    },
+    {
+      "at": 0.95,
+      "pelvis": [
+        0,
+        0,
+        0.094
+      ],
+      "lean": -90,
+      "head": 0,
+      "neck_retraction": 0.041,
+      "thigh_reach": 0.4,
+      "spine": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.5,
+      "position": {
+        "point": "Arm",
+        "z": [
+          0.94,
+          1.18
+        ]
+      }
+    }
+  ],
+  "head_contact": [
+    [
+      0,
+      0.09
+    ],
+    [
+      0.99,
+      1
+    ]
+  ],
+  "pelvis_contact": [
+    [
+      0,
+      1
+    ]
+  ]
+}

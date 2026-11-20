@@ -272,7 +272,7 @@ def pose_side_support(spec, pelvis, torso, gaps):
     gaps.append(("upper hand", gap))
 
 
-def pose_legs(spec, key, pelvis, except_side=None):
+def pose_legs(spec, key, pelvis, except_side=None, support=None):
     gaps = []
     # Knees point where the toes do: forward along the floor, whatever the hips are doing.
     # (The pelvis's own forward tips towards the floor in a deep hinge, and the knee would flip.)
@@ -302,7 +302,12 @@ def pose_legs(spec, key, pelvis, except_side=None):
         thigh, shin = segment(f"{side}UpLeg", f"{side}Leg", f"{side}Foot")
         hip = head(f"{side}UpLeg")
         knee_pole = spec.get("stance", {}).get("knee_direction", {}).get(side)
-        knee, gap = bend(hip, ankle, thigh, shin, turned @ Vector(knee_pole) if knee_pole else turned @ forward)
+        pole = turned @ Vector(knee_pole) if knee_pole else turned @ forward
+        if support:
+            ankle = support.point(ankle)
+            pole = support.rotation @ pole
+            turned = support.rotation @ turned
+        knee, gap = bend(hip, ankle, thigh, shin, pole)
         swing(f"{side}UpLeg", knee - hip)
         swing(f"{side}Leg", ankle - head(f"{side}Leg"))
         place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
@@ -3054,6 +3059,113 @@ class Bench:
         return float(rel[over, 2].min()) if over.any() else math.inf
 
 
+class CoreBench:
+    """A decline bench with an ankle restraint, or a flat bench with fixed grips."""
+
+    def __init__(self, config):
+        self.top = Vector(config["at"])
+        self.angle = config.get("angle", 0)
+        self.flag = "grip" in config
+        self.rotation = Matrix.Rotation(math.radians(self.angle), 3, "X")
+        self.parts, self.contacts, self.handles = [], {}, {}
+        frame = material("core bench frame", IRON, .55, .42)
+        foam = material("core bench pad", PAD, .05, .65)
+        y, length = config["pad"]
+        self.pad = SupportPad("core bench backrest", {
+            "face": self.point((0, y, 0)), "size": [.35, length], "pitch": self.angle,
+        }, foam, frame)
+        for offset in (y - length * .35, y + length * .35):
+            x, py, z = self.point((0, offset, -.08))
+            self.parts.extend((
+                (box("core bench post", (.065, .07, z), (x, py, z / 2), frame), False),
+                (box("core bench base", (.45, .09, .045), (x, py, .0225), frame), False),
+            ))
+        if self.flag:
+            anchor = Vector(config["grip"])
+            for side, sign in SIDES.items():
+                target = Vector((sign * anchor.x, anchor.y, anchor.z))
+                rail = CableStation.part(side + " core bench grip", Barbell.SHAFT, frame)
+                root = self.point((sign * .16, y + length * .40, -.115))
+                end = target + Vector((sign * .12, 0, 0))
+                brace = CableStation.part("core bench grip brace", .023, frame)
+                set_segment(rail, target - Vector((sign * .12, 0, 0)), end, 1)
+                set_segment(brace, root, end, 1)
+                self.handles[side] = rail
+                self.parts.extend(((rail, True), (brace, False)))
+        else:
+            platform = SupportPad("ankle station footplate", {
+                "face": self.point((0, -.59, 0)), "size": [.40, .32], "pitch": self.angle, "split": True,
+            }, foam, frame)
+            self.contacts["plate"] = platform
+            roller = Vector(config["roller"])
+            roller = self.point(roller)
+            pad = CableStation.part("ankle restraint roller", .032, foam)
+            width = Vector((.22, 0, 0))
+            set_segment(pad, roller - width, roller + width, 1)
+            self.parts.append((pad, False))
+            for sign in (-1, 1):
+                strut = CableStation.part("ankle restraint bracket", .022, frame)
+                set_segment(strut, self.point((sign * .22, -.42, -.04)), roller + width * sign, 1)
+                self.parts.append((strut, False))
+            link = CableStation.part("core bench spine", .033, frame)
+            set_segment(link, self.point((0, -.72, -.095)), self.point((0, y, -.095)), 1)
+            self.parts.append((link, False))
+            self.roller = roller
+
+    def point(self, offset):
+        return self.top + self.rotation @ Vector(offset)
+
+    def trunk(self, key):
+        if not self.flag:
+            key["pelvis"] = self.point(key["pelvis"])
+            key["lean"] += self.angle
+
+    def anchor_flag(self, contact):
+        # Keep the middle of the shoulder girdle over one spot on the pad, then
+        # settle the dorsal skin against the surface before solving the hands.
+        hips = head("Hips")
+        shoulder = (head("LeftArm") + head("RightArm")) / 2
+        hips.y += self.pad.face.y + self.pad.length / 2 - .008 - shoulder.y
+        place("Hips", world_rotation("Hips"), hips)
+        points, _ = evaluated_points(body)
+        back = points[contact.upper_back_vertices]
+        over = np.abs(back[:, 1] - self.pad.face.y) < self.pad.length / 2
+        hips.z += self.pad.face.z - back[over, 2].min() + .003
+        place("Hips", world_rotation("Hips"), hips)
+
+    def pose(self, torso, gaps):
+        if self.flag:
+            for side, sign in SIDES.items():
+                target = self.handles[side].matrix_world.translation
+                pole = torso.direction([.38, 1, 0], sign)
+                gap = pose_arm(side, target, pole, "pronated", torso, Vector((1, 0, 0)))
+                gaps.append((side + " core bench grip", gap))
+
+    def check(self, points, contact, hands, grips, frame, phase, problems, samples, spec):
+        contact.check_supine_neck(frame, problems)
+        check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
+        check_rendered_grips(self.handles, grips, frame, problems)
+        self.pad.check(points, frame, problems)
+        for pad in self.contacts.values():
+            pad.check(points, frame, problems)
+        if not self.flag:
+            for side in SIDES:
+                foot = points[contact.foot_vertices[side]]
+                distance = np.linalg.norm(foot[:, 1:] - np.array(self.roller)[1:], axis=1).min()
+                if distance > .041:
+                    problems.add(frame, side + " ankle loses restraint contact", distance - .032)
+        for key, indices in (
+            ("head_contact", contact.head_vertices),
+            ("upper_back_contact", contact.upper_back_vertices),
+            ("pelvis_contact", contact.pelvis_vertices),
+        ):
+            if any(start <= phase <= end for start, end in spec.get(key, ())):
+                self.pad.check(points[indices], frame, problems)
+        samples.append(np.array([obj.matrix_world @ Vector(v)
+                                 for obj in scene.objects if obj.name.startswith(("core bench", "ankle "))
+                                 for v in obj.bound_box]))
+
+
 # ---------------------------------------------------------------- muscles, camera, checks
 
 
@@ -3217,13 +3329,16 @@ class SkinContact:
 
         self.head_vertices = [i for i, name in enumerate(owner) if name == "Head"]
 
-    def check_supine_support(self, frame, points, support, phase, problems):
+    def check_supine_neck(self, frame, problems):
         torso = Torso()
         for bone in ("Neck", "Head"):
             forward = world_rotation(bone) @ REST[bone].transposed() @ Vector((0, -1, 0))
             pitch = math.degrees(math.atan2(-forward.dot(torso.up), forward.dot(torso.forward)))
             if pitch < -5:
                 problems.add(frame, bone + " extends during supine support", -pitch, "degrees")
+
+    def check_supine_support(self, frame, points, support, phase, problems):
+        self.check_supine_neck(frame, problems)
         regions = []
         for key, label, vertices, maximum, default in (
             ("pelvis_contact", "pelvis", self.pelvis_vertices, .012, [[0, 1]]),
@@ -3732,7 +3847,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3791,9 +3906,10 @@ def bake(spec, keys):
     floor_hands = spec.get("floor_hands")
     if (rack_contact or cradle) and type(barbell) is not Barbell:
         raise ValueError("Open rack contact requires a straight barbell")
+    core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        pullup, dip_bars, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
+        pullup, dip_bars, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3850,7 +3966,11 @@ def bake(spec, keys):
         key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "roll", "side_bend", "torso_twist", "axial_twist") if field in a}
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
+        if core_bench:
+            core_bench.trunk(key)
         pelvis = pose_trunk(key)
+        if core_bench and core_bench.flag:
+            core_bench.anchor_flag(contact)
         if "shoulder_y" not in a and "pelvis" not in key:
             raise ValueError("A pose needs a pelvis position or a suspended shoulder_y")
         if not pullup and "shoulder_y" in a:
@@ -3904,7 +4024,9 @@ def bake(spec, keys):
             roller.pose_legs(span, frame, problems)
             roller.pose_grips(torso, gaps)
         else:
-            gaps = pose_legs(spec, {**a, **key}, pelvis)
+            gaps = pose_legs(spec, {**a, **key}, pelvis, support=core_bench if core_bench and not core_bench.flag else None)
+        if core_bench:
+            core_bench.pose(torso, gaps)
         gaps.extend(activity_gaps)
         if pullup:
             pullup.pose(span, torso, gaps)
@@ -4293,6 +4415,8 @@ def bake(spec, keys):
                                      for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
         if pullup:
             pullup.check(everything, contact, hands, grips, frame, problems, samples)
+        if core_bench:
+            core_bench.check(everything, contact, hands, grips, frame, phase, problems, samples, spec)
         if dip_bars:
             dip_bars.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if standing_cardio:

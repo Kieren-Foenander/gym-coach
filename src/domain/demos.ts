@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "decline-crunch",
+    views: ["front"],
+    cues: [
+      "Secure your feet under the roller and lie back on the pad.",
+      "Curl your ribs toward your pelvis to lift your shoulder blades.",
+      "Lower your upper back and head with control.",
+    ],
+  },
+  {
+    slug: "decline-sit-up",
+    views: ["front"],
+    cues: [
+      "Secure your ankles under the roller.",
+      "Curl up and reach toward your knees.",
+      "Lower slowly until your back and head return to the pad.",
+    ],
+  },
+  {
+    slug: "dragon-flag",
+    views: ["front"],
+    cues: [
+      "Grip the bench behind your head and brace.",
+      "Keep your hips and legs in line as you lift on your upper back.",
+      "Lower the whole line under control.",
+    ],
+  },
+  {
     slug: "pistol-squat",
     views: ["front"],
     cues: [

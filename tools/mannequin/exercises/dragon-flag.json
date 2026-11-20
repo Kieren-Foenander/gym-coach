@@ -1,0 +1,102 @@
+{
+  "equipment": [
+    {
+      "type": "core-bench",
+      "at": [
+        0,
+        0.08,
+        0.55
+      ],
+      "pad": [
+        -0.127,
+        0.49
+      ],
+      "grip": [
+        0.23,
+        0.43,
+        0.67
+      ]
+    }
+  ],
+  "upper_back_contact": [
+    [
+      0,
+      1
+    ]
+  ],
+  "camera": {
+    "angle": 68,
+    "elevation": 10,
+    "margin": 1.23
+  },
+  "frames": 138,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        -0.22,
+        0.67
+      ],
+      "lean": -108,
+      "head": 11,
+      "supine_leg_left": [
+        18,
+        2
+      ],
+      "supine_leg_right": [
+        18,
+        2
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.46,
+      "lean": -151,
+      "head": 40,
+      "supine_leg_left": [
+        61,
+        2
+      ],
+      "supine_leg_right": [
+        61,
+        2
+      ]
+    },
+    {
+      "at": 0.55
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        0,
+        6
+      ]
+    },
+    {
+      "at": 0,
+      "position": {
+        "point": "Foot",
+        "relative_to": "Hips",
+        "z": [
+          0.15,
+          0.3
+        ]
+      }
+    },
+    {
+      "at": 0.5,
+      "position": {
+        "point": "Foot",
+        "relative_to": "Hips",
+        "z": [
+          0.63,
+          0.77
+        ]
+      }
+    }
+  ]
+}

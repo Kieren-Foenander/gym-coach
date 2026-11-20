@@ -535,3 +535,14 @@ applied. A left forearm side plank uses `roll: 90` and
 `side_support: {"wrist": [x, y, z]}`. Use a support hand below and a
 relaxed hand above. The bake checks four sections along the ulna, the palm and lower foot
 against the floor, and checks the contact between the two feet.
+
+A `core-bench` has a single pad at `pad: [centre_y, length]` relative
+to its `at` origin. For a decline curl, set its `angle` and an ankle
+`roller` in bench coordinates. The footplate and roller support both
+feet while the bake checks hardware clearance. `head_contact` and
+`pelvis_contact` set the phases where those skin surfaces must reach
+the pad.
+
+For a dragon flag, use a flat core bench with a fixed `grip` instead
+of the ankle roller. The upper back anchors near the end of the pad.
+Use `upper_back_contact` to check the support throughout the rep.
