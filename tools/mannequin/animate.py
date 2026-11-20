@@ -766,13 +766,17 @@ class Landmine:
         tube("pivot socket", (0,.085,0), along, .042, .17, iron)
         tube("shaft", (0,.84,0), along, self.SHAFT, 1.68, steel)
         tube("sleeve", (0,1.70,0), along, .025, .24, steel)
-        tube("weight plate", (0,1.69,0), along, .135, .045, iron)
+        tube("weight plate", (0,1.69,0), along, config.get("plate_radius", .135), .045, iron)
         style = config["attachment"]
         if style == "parallel":
             row_axis = (0, math.cos(math.radians(12)), math.sin(math.radians(12)))
-            tube("row crosspiece", (0,1.48,.027), across, .02, .31, iron)
+            half_width = config.get("row_width", .145)
+            tube("row crosspiece", (0,1.48,.027), across, .02, 2 * half_width + .02, iron)
+            rise = config.get("row_rise", 0)
             for side, sign in SIDES.items():
-                self.handles[side] = tube("row grip", (-sign*.145,1.54,.04), row_axis, self.SHAFT,.18,steel)
+                if rise:
+                    tube("row grip riser", (-sign*half_width, 1.48, .027 + rise/2), (0,0,1), .016, rise, iron)
+                self.handles[side] = tube("row grip", (-sign*half_width,1.54,.04 + rise), row_axis, self.SHAFT,.18,steel)
         elif style == "end":
             side = config["side"]
             self.handles[side] = tube("end grip", (0,1.91,0), along, self.SHAFT,.18,steel)
@@ -4058,7 +4062,7 @@ class PullStation:
 
 
 class Bench:
-    def __init__(self, at, length=1.2, angle=None, support="back", width=.30):
+    def __init__(self, at, length=1.2, angle=None, support="back", width=.30, straddle_frame=False):
         self.top, self.length, self.width = Vector(at), length, width
         pad = material("pad", PAD, 0.0, 0.7)
         frame = material("frame", IRON, 0.6, 0.4)
@@ -4074,13 +4078,29 @@ class Bench:
             prone = self.chest_support
             direction = -1 if prone else 1
             rotation = Matrix.Rotation(math.radians(direction * angle), 3, "X")
-            for extent, offset, rot in ((.32, -.165*direction, Matrix.Identity(3)),
-                                         (length-.32, (length-.32)*direction/2+.005*direction, rotation)):
+            cushions = [(.32, -.165*direction, Matrix.Identity(3)),
+                        (length-.32, (length-.32)*direction/2+.005*direction, rotation)]
+            if straddle_frame:
+                cushions = [(length, length*direction/2, rotation)]
+            for extent, offset, rot in cushions:
                 top = self.top + rot @ Vector((0, offset, 0))
                 self.pads.append((np.array(top), np.array(rot), extent))
                 part = box("bench pad", (.30, extent, .08), top + rot @ Vector((0,0,-.04)),
                            pad, rotation=rot.to_euler())
                 self.surfaces.append(self.surface(part))
+            if straddle_frame:
+                # Twin sloping posts support the chest cushion on either side of the lever.
+                for sign in (-1, 1):
+                    px = x + sign * .115
+                    low = Vector((px, y + .38, .03))
+                    high = self.top + rotation @ Vector((sign * .115, -.085, -.045))
+                    axis = high - low
+                    post = box("bench post", (.044,.044,axis.length), (low + high)/2, frame,
+                               rotation=axis.to_track_quat("Z", "Y").to_euler())
+                    self.surfaces.append(self.surface(post))
+                    foot = box("bench foot", (.075,.74,.035), (px,y+.12,.0175), frame)
+                    self.surfaces.append(self.surface(foot))
+                return
             support_y = min(.55, (length - .32) * math.cos(math.radians(angle)) - .045)
             for offset in (-.20, support_y):
                 leg_y = y + direction*offset
@@ -5220,7 +5240,7 @@ def bake(spec, keys):
     bell_spec = next((e for e in spec.get("equipment", []) if e["type"] == "kettlebells"), None)
     if bell_spec:
         dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES, bell_spec.get("shared", False))
-    bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back"), e.get("width", .30)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
+    bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back"), e.get("width", .30), e.get("straddle_frame", False)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     preacher = next((PreacherPad(e["arm_pad"]) for e in spec.get("equipment", []) if "arm_pad" in e), None)
     if preacher:
         bench.surfaces.extend(preacher.surfaces)
@@ -5999,7 +6019,7 @@ def bake(spec, keys):
                 problems.add(frame, "a dumbbell passes through the body", max(-gap, 0.001))
         if bench:
             if bench.surfaces:
-                bench.check_apparatus([barbell.root] if barbell else dumbbells.roots.values() if dumbbells else
+                bench.check_apparatus([landmine.root] if landmine else [barbell.root] if barbell else dumbbells.roots.values() if dumbbells else
                                       contact_load.roots.values() if contact_load else [],
                                       frame, problems)
             if bench.chest_support:

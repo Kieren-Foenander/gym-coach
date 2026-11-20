@@ -1,0 +1,19 @@
+{
+  "equipment": [
+    {"type": "landmine", "pivot": [0, 1.29, 0.055], "attachment": "parallel", "row_width": 0.29, "plate_radius": 0.13, "row_rise": 0.27},
+    {"type": "bench", "at": [0, -0.05, 0.5821], "angle": 50, "support": "chest", "length": 0.42, "straddle_frame": true}
+  ],
+  "stance": {"width": 0.94, "y": 0.4, "toe_out": 12},
+  "camera": {"angle": 57, "elevation": 16},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.72], "lean": 40, "head": -14, "grip": "thumb-forward", "elbows": [0.62, -0.97, -0.32], "landmine_angles": [2.7, 180]},
+    {"at": 0.44, "landmine_angles": [15.2, 180]},
+    {"at": 0.52},
+    {"at": 0.95, "landmine_angles": [2.7, 180]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 36]},
+    {"at": 0.48, "elbow": [74, 146], "position": {"point": "handle", "z": [0.748, 0.771]}}
+  ],
+  "touching": ["bench"]
+}

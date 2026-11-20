@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "chest-supported-t-bar-row",
+    views: ["front"],
+    cues: [
+      "Plant your feet and rest your chest against the pad.",
+      "Drive your elbows back and pull the handles toward your ribs.",
+      "Extend your arms while keeping your chest on the pad.",
+    ],
+  },
+  {
     slug: "bench-dip",
     views: ["front"],
     cues: [
