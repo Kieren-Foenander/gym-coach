@@ -28,6 +28,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "tibialis-raise",
+    views: ["front"],
+    cues: [
+      "Lean your back against the wall with your feet forward.",
+      "Keep your heels down and lift your toes toward your shins.",
+      "Lower your toes slowly.",
+    ],
+  },
+  {
     slug: "l-sit",
     views: ["front"],
     cues: [

@@ -571,3 +571,5 @@ unloaded hands' palm direction in torso coordinates.
 For a kneeling lift with a changing knee direction, key
 `knee_pole_left` or `knee_pole_right` in stance coordinates. The
 floor-contact and alignment checks still apply to the supporting limbs.
+
+Set `heel_pivot` to centre the ankle rotation on the heel for a toe raise.
