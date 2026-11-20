@@ -215,3 +215,10 @@ spec["keys"][0].pop("thigh_reach")
 spec["keys"][0]["head"] = -18
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Head extends during supine support" in problems.found, list(problems.lines())
+
+spec = initial_pose("side-plank")
+spec.pop("hands")
+spec["keys"][0]["pelvis"][2] += .04
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "lower foot loses side support contact" in problems.found, list(problems.lines())
+print("SIDE SUPPORT REGRESSION PASSED")

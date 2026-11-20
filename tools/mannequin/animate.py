@@ -198,7 +198,8 @@ def pose_trunk(key):
     reset_pose()
     lean = Matrix.Rotation(math.radians(key.get("lean", 0)), 3, "X")
     yaw = Matrix.Rotation(math.radians(key.get("yaw", 0)), 3, "Z")
-    pelvis = yaw @ lean
+    roll = Matrix.Rotation(math.radians(key.get("roll", 0)), 3, "Z")
+    pelvis = yaw @ lean @ roll
     place("Hips", pelvis @ REST["Hips"], Vector(key.get("pelvis", (0, 0, 0))))
     left = pelvis @ Vector((1, 0, 0))
     forward = pelvis @ Vector((0, -1, 0))
@@ -245,6 +246,30 @@ def ankles(spec, key):
     height += next((e["footplate"][1] for e in spec.get("equipment", []) if "footplate" in e), 0)
     return {side: (Vector((sign * width / 2, y, FLOOR_ANKLE + height)), sign * toe_out)
             for side, sign in SIDES.items()}
+
+
+def pose_side_support(spec, pelvis, torso, gaps):
+    """Stack the feet and support the body on the lower forearm."""
+    down = pelvis @ Vector((0, 0, -1))
+    for side in SIDES:
+        direction = down if side == "Left" else (down + torso.left * .153).normalized()
+        for bone in ("UpLeg", "Leg"):
+            swing(side + bone, direction)
+        for bone in ("Foot", "ToeBase"):
+            place(side + bone, pelvis @ REST[side + bone])
+    along, palm = Vector((1, 0, 0)), Vector((0, 0, -1))
+    wrist = Vector(spec["wrist"])
+    target = wrist + along * GRIP["Left"][0] + palm * GRIP["Left"][1]
+    gap = pose_arm("Left", target, Vector((-.9, 0, -1)), "pronated", torso, contact_frame=(along, palm))
+    gaps.append(("support wrist", gap))
+    along = -torso.up
+    palm = -Vector((0, 0, 1))
+    palm = (palm - along * palm.dot(along)).normalized()
+    wrist = head("RightUpLeg") + torso.forward * .035 - torso.left * .087 + torso.up * .08
+    target = wrist + along * GRIP["Right"][0] + palm * GRIP["Right"][1]
+    gap = pose_arm("Right", target, torso.direction([1, -.3, -.4], -1), "neutral", torso,
+                   contact_frame=(along, palm))
+    gaps.append(("upper hand", gap))
 
 
 def pose_legs(spec, key, pelvis, except_side=None):
@@ -3217,6 +3242,30 @@ class SkinContact:
             if gap < -.006:
                 problems.add(frame, label + " penetrates the floor", -gap)
 
+    def check_side_support(self, frame, points, palm, problems):
+        hips = (head("LeftUpLeg") + head("RightUpLeg")) / 2
+        ankles = (head("LeftFoot") + head("RightFoot")) / 2
+        body_line = math.degrees((hips - ankles).angle(Torso().up))
+        if body_line > 7:
+            problems.add(frame, "hips break the side plank line", body_line, "degrees")
+        forearm = np.unique(self.vertices[self.part == "Left forearm"])
+        for label, vertices in (("forearm", forearm), ("lower foot", self.foot_vertices["Left"])):
+            height = points[vertices, 2].min()
+            if not -.006 <= height <= .008:
+                problems.add(frame, label + " loses side support contact", abs(height))
+        transform = palm.transform
+        heights = palm.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
+        if heights.min() < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:
+            problems.add(frame, "lower palm loses side support contact", abs(heights.min()))
+        lower_faces = self.vertices[np.isin(self.vertices, self.foot_vertices["Left"]).all(axis=1)]
+        lower_foot = BVHTree.FromPolygons(points.tolist(), lower_faces.tolist(), all_triangles=True)
+        upper_points = points[self.foot_vertices["Right"]]
+        # Use the lower edge of the upper foot so a shank or stray toe cannot satisfy the stack.
+        edge = upper_points[upper_points[:, 2] < upper_points[:, 2].min() + .020]
+        gap = min(lower_foot.find_nearest(Vector(point))[3] for point in edge)
+        if gap > .012:
+            problems.add(frame, "upper foot loses its stack", gap)
+
     def check_resting_forearms(self, frame, points, problems):
         for side in SIDES:
             thighs = self.vertices[self.part == side + " thigh"]
@@ -3742,7 +3791,8 @@ def bake(spec, keys):
     elevated_palms = spec.get("palm_support") == "bench"
     if elevated_palms and (not bench or bench.pads or not planted_sides):
         raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
-    has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
+    side_support = spec.get("side_support")
+    has_grips = side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     relaxing = {side: relaxed_fingers(side) for side in planted_sides
                 if any("plant_" + side.lower() in key for key in keys)}
@@ -3771,7 +3821,7 @@ def bake(spec, keys):
             mod.show_viewport = False
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
-        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "side_bend", "torso_twist", "axial_twist") if field in a}
+        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "roll", "side_bend", "torso_twist", "axial_twist") if field in a}
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
@@ -3817,6 +3867,9 @@ def bake(spec, keys):
         if assist:
             gaps = []
             assist.pose(span, torso, frame, gaps, problems)
+        elif side_support:
+            gaps = []
+            pose_side_support(side_support, pelvis, torso, gaps)
         elif hip_machine:
             gaps = []
             hip_machine.pose(span, torso, frame, gaps, problems)
@@ -4244,6 +4297,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if side_support:
+            contact.check_side_support(frame, everything, grips["Left"], problems)
         if supine is not None:
             contact.check_supine_support(frame, everything, supine, phase, problems)
         if spec.get("forearm_support") == "thighs":

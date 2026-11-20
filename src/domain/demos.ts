@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "side-plank",
+    views: ["front"],
+    cues: [
+      "Lie on your side with your elbow under your shoulder.",
+      "Stack your feet and lift your hips into a straight line.",
+      "Keep your hips facing forward and breathe steadily.",
+    ],
+  },
+  {
     slug: "lying-leg-raise",
     views: ["front"],
     cues: [

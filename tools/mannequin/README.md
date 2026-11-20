@@ -529,3 +529,9 @@ intentionally lifts those regions. Both default to the whole loop.
 `axial_twist` turns the upper spine around the torso's long axis.
 `upper_back_contact` pins the upper back during a reverse curl.
 `temple_hands` keeps relaxed fingertips beside the head as the trunk turns.
+
+`roll` turns the pelvis around the body's long axis before the lean is
+applied. A left forearm side plank uses `roll: 90` and
+`side_support: {"wrist": [x, y, z]}`. Use a support hand below and a
+relaxed hand above. The bake checks the forearm, palm and lower foot
+against the floor, and checks the contact between the two feet.
