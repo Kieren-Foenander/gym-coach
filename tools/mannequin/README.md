@@ -556,3 +556,8 @@ must touch the floor.
 in metres. `grounded_heels` lists the heels that must stay on the floor.
 A `free_leg_left` or `free_leg_right` key takes the same thigh pitch and
 knee bend as a supine leg, measured from forward-horizontal.
+
+`kneeling_support` keeps the hip over each supporting knee. If the
+exercise uses floor-plant checkpoints, it also keeps the loaded shoulder
+over the wrist. Set `relaxed_reach` to bring the fingers closer
+together as the palm leaves the floor.

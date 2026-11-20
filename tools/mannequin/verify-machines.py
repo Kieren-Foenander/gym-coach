@@ -253,3 +253,12 @@ spec["keys"][0]["free_leg_right"] = [-89, 4]
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Right unsupported foot is too close to the floor" in problems.found, list(problems.lines())
 print("UNSUPPORTED FOOT REGRESSION PASSED")
+
+spec = initial_pose("bird-dog")
+spec.pop("hands")
+spec.pop("floor_hands")
+spec["checkpoints"] = [entry for entry in spec["checkpoints"] if "hand_mode" not in entry]
+spec["stance"]["y"] -= .11
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left hip is not over the knee" in problems.found, list(problems.lines())
+print("KNEELING STACK REGRESSION PASSED")

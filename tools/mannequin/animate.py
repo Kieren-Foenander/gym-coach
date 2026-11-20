@@ -375,7 +375,7 @@ def relax_unsupported_hand(side, wrist, ground_along, ground_palm, torso):
     return 1 - approach
 
 
-def relaxed_fingers(side):
+def relaxed_fingers(side, narrow=False):
     """Curl the distal skin slightly without moving the stitched wrist."""
     skin = bpy.data.objects["skin"]
     if skin.data.shape_keys is None:
@@ -385,12 +385,16 @@ def relaxed_fingers(side):
     wrist = bones[side + "Hand"].bone.head_local
     along = REST[side + "Hand"].col[1]
     palm = REST[side + "Hand"] @ palm_axis(side)
+    across = along.cross(palm).normalized()
     for vertex in skin.data.vertices:
         if not any(group.group == marker for group in vertex.groups):
             continue
         depth = max(0.0, (vertex.co - wrist).dot(along) - .069)
         bend = depth * min(1, depth / .07)
         shape.data[vertex.index].co += (palm * .50 - along * .18) * bend
+        if narrow:
+            spread = (vertex.co - wrist).dot(across)
+            shape.data[vertex.index].co -= across * spread * min(.36, depth * 4.5)
     return shape
 
 
@@ -3433,10 +3437,19 @@ class SkinContact:
             if not -.006 <= gap <= .008:
                 problems.add(frame, side + " heel loses floor contact", abs(gap))
 
-    def check_kneeling_support(self, frame, points, support, phase, problems):
+    def check_kneeling_support(self, frame, points, support, phase, frame_checks, problems):
+        for side in SIDES:
+            if any(check.get("hand_mode") == "floor-plant" and check.get("side", side) == side
+                   for check in frame_checks):
+                gap = (head(side + "Arm") - head(side + "Hand")).xy.length
+                if gap > .030:
+                    problems.add(frame, side + " shoulder is not over the wrist", gap)
         for side, intervals in support.items():
             if not any(start <= phase <= end for start, end in intervals):
                 continue
+            offset = (head(side + "UpLeg") - head(side + "Leg")).xy.length
+            if offset > .030:
+                problems.add(frame, side + " hip is not over the knee", offset)
             triangles = self.vertices[np.isin(self.part, (side + " thigh", side + " shin"))]
             vertices = points[np.unique(triangles)]
             near = np.linalg.norm(vertices - np.array(head(side + "Leg")), axis=1) < .105
@@ -3973,7 +3986,7 @@ def bake(spec, keys):
     side_support = spec.get("side_support")
     has_grips = side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
-    relaxing = {side: relaxed_fingers(side) for side in planted_sides
+    relaxing = {side: relaxed_fingers(side, spec.get("relaxed_reach", False)) for side in planted_sides
                 if any("plant_" + side.lower() in key for key in keys)}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
@@ -4489,7 +4502,8 @@ def bake(spec, keys):
         if "grounded_heels" in spec:
             contact.check_grounded_heels(frame, everything, spec["grounded_heels"], problems)
         if "kneeling_support" in spec:
-            contact.check_kneeling_support(frame, everything, spec["kneeling_support"], phase, problems)
+            contact.check_kneeling_support(frame, everything, spec["kneeling_support"], phase,
+                                          checkpoints.get(frame, ()), problems)
         if side_support:
             contact.check_side_support(frame, everything, grips["Left"], problems,
                                        bench if side_support.get("bench_foot") else None)
