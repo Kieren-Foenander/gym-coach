@@ -120,6 +120,7 @@ key spacing. Landmark positions are resolved in the current torso frame before b
 | --- | --- |
 | `pelvis` | `[x, y, z]` of the pelvis |
 | `shoulder_y` | alternative to `pelvis` for a square, suspended barbell pull. Set the world Y coordinate between the shoulders and give `bar` in world coordinates. The rig derives pelvis height from bar height, grip width and arm length, keeping the arms long |
+| `hang_lift` | on a `pullup-bar`, metres to raise the shoulders from the passive hang height derived from `shoulder_y` and the grip geometry |
 | `clavicle` | optional pair of angles in degrees, retraction and elevation, applied on each side before hand IK |
 | `lean` | degrees the body pitches forward from the hips. -90 lies on the back with the head towards +Y |
 | `spine` | extra forward bend of the spine, degrees (negative arches) |

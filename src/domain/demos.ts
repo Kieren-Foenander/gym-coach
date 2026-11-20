@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "pull-up",
+    views: ["front"],
+    cues: [
+      "Take an overhand grip just outside shoulder width.",
+      "Drive your elbows down until your chin clears the bar.",
+      "Lower smoothly to straight arms.",
+    ],
+  },
+  {
+    slug: "wide-grip-pull-up",
+    views: ["front"],
+    cues: [
+      "Grip the bar well outside shoulder width.",
+      "Draw your elbows down and lift your chin over the bar.",
+      "Return to straight arms without swinging.",
+    ],
+  },
+  {
+    slug: "chin-up",
+    views: ["front"],
+    cues: [
+      "Grip the bar with your palms facing you.",
+      "Pull your elbows down and bring your chin above the bar.",
+      "Lower under control to a full hang.",
+    ],
+  },
+  {
+    slug: "neutral-grip-pull-up",
+    views: ["front"],
+    cues: [
+      "Grab the parallel handles with your palms facing in.",
+      "Pull your elbows down as you lift your chin above your hands.",
+      "Lower until your arms are straight.",
+    ],
+  },
+  {
     slug: "mountain-climber",
     views: ["front"],
     cues: [

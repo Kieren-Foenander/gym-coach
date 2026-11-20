@@ -223,12 +223,12 @@ def vertical_arm_reach(lateral, forward, slack=.0003):
     return math.sqrt(reach ** 2 + palm ** 2 - forward ** 2)
 
 
-def suspend_from_bar(centre, width, shoulder_y, pelvis_rotation, overhead=False):
+def suspend_from_bar(centre, width, shoulder_y, pelvis_rotation, overhead=False, lift=0):
     """Set trunk height from the bar and the length of a hanging, nearly straight arm."""
     shoulder = (head("LeftArm") + head("RightArm")) / 2
     lateral = width - (head("LeftArm").x - shoulder.x)
     height = vertical_arm_reach(lateral, shoulder_y - centre[1])
-    target = Vector((centre[0], shoulder_y, centre[2] - height if overhead else centre[2] + height))
+    target = Vector((centre[0], shoulder_y, centre[2] + (lift - height if overhead else height)))
     place("Hips", pelvis_rotation @ REST["Hips"], head("Hips") + target - shoulder)
 
 
@@ -1971,25 +1971,44 @@ class PullupBar:
     def __init__(self, config):
         self.centre = Vector(config["at"])
         self.grip_width = config["grip_width"]
+        self.grip = config.get("grip", "pronated")
         finish = material("pull-up frame", (.08, .09, .105), .55, .43)
         shaft = CableStation.part("pull-up bar", Barbell.SHAFT, finish)
         spread = Vector((.69, 0, 0))
-        set_segment(shaft, self.centre - spread, self.centre + spread, 1)
-        self.handles = dict.fromkeys(SIDES, shaft)
-        self.parts = [(shaft, True)]
+        mount = self.centre.copy()
+        self.axis = Vector((1, 0, 0))
+        if self.grip == "thumb-forward":
+            self.axis = Vector((0, 1, 0))
+            mount += Vector((0, -.23, .12))
+            self.handles, self.parts = {}, [(shaft, False)]
+            for side, sign in SIDES.items():
+                grip = CableStation.part(side + " parallel grip", Barbell.SHAFT, finish)
+                support = CableStation.part(side + " parallel grip mount", .018, finish)
+                target = self.target(sign)
+                nose = target - self.axis * .16
+                set_segment(grip, nose, target + self.axis * .12, 1)
+                set_segment(support, nose, mount + Vector((sign * self.grip_width, 0, 0)), 1)
+                self.handles[side] = grip
+                self.parts.extend(((grip, True), (support, False)))
+        else:
+            self.handles = dict.fromkeys(SIDES, shaft)
+            self.parts = [(shaft, True)]
+        set_segment(shaft, mount - spread, mount + spread, 1)
         for sign in (-1, 1):
-            x = self.centre.x + sign * .69
-            y, z = self.centre.y, self.centre.z
+            x = mount.x + sign * .69
+            y, z = mount.y, mount.z
             post = box("pull-up upright", (.076, .078, z + .055), (x, y, (z + .055) / 2), finish)
             foot = box("pull-up base", (.116, .67, .05), (x, y + .08, .025), finish)
             self.parts.extend(((post, False), (foot, False)))
 
-    def pose(self, torso, gaps):
-        axis = Vector((1, 0, 0))
+    def target(self, sign):
+        return self.centre + Vector((sign * self.grip_width, 0, 0))
+
+    def pose(self, span, torso, gaps):
         for side, sign in SIDES.items():
-            target = self.centre + axis * (sign * self.grip_width)
-            pole = torso.direction([.42, .47, -.14], sign)
-            gaps.append((side + " pull-up grip", pose_arm(side, target, pole, "pronated", torso, axis)))
+            target = self.target(sign)
+            pole = torso.direction(span.sample("elbows", [.42, .47, -.14]), sign)
+            gaps.append((side + " pull-up grip", pose_arm(side, target, pole, self.grip, torso, self.axis)))
 
     def check(self, points, contact, hands, grips, frame, problems, samples):
         check_rendered_grips(self.handles, grips, frame, problems)
@@ -3696,7 +3715,8 @@ def bake(spec, keys):
                 turn_up = Matrix.Rotation(sign * elevate, 3, torso.forward)
                 swing(name, turn_back @ turn_up @ direction)
         if pullup:
-            suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis, overhead=True)
+            suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis,
+                             overhead=True, lift=span.sample("hang_lift", 0))
             torso = Torso()
         for field in ("foot_left", "foot_right"):
             if field in a:
@@ -3725,7 +3745,7 @@ def bake(spec, keys):
             gaps = pose_legs(spec, {**a, **key}, pelvis)
         gaps.extend(activity_gaps)
         if pullup:
-            pullup.pose(torso, gaps)
+            pullup.pose(span, torso, gaps)
         if rower:
             rower.pose(span, torso, frame, gaps)
         if belt_squat:
