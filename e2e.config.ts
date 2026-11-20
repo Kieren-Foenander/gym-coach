@@ -19,15 +19,17 @@ import type { E2EConfig } from "e2e"
 const nativeApp = {
   bundleId: "com.kierenfoenander.gym.preview",
   appPath: process.env.E2E_APP_PATH,
-  // Gym asks for notifications for its rest alerts. Answer no up front, so no prompt covers the screen.
-  permissions: { notifications: "deny" },
 } as const
+
+// Gym asks for notifications for its rest alerts. On Android, answer no up front so no prompt covers the
+// screen; an iOS Simulator can't have that permission set, and asks only once a rest timer starts.
+const androidApp = { ...nativeApp, permissions: { notifications: "deny" } } as const
 
 export default {
   tests: ["e2e/**/*.e2e.ts"],
   targets: [
     { name: "ios", engine: mobile({ platform: "ios", device: process.env.E2E_DEVICE }), app: nativeApp },
-    { name: "android", engine: mobile({ platform: "android", device: process.env.E2E_DEVICE }), app: nativeApp },
+    { name: "android", engine: mobile({ platform: "android", device: process.env.E2E_DEVICE }), app: androidApp },
   ],
   workers: 1,
   reporters: ["list", "junit"],
