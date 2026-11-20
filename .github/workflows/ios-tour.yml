@@ -110,6 +110,8 @@ jobs:
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
+          # Installed here rather than by the tests: copying the build takes longer than one e2e action may.
+          xcrun simctl install "$UDID" "$APP"
           xcrun simctl list devices | grep "$UDID"
 
       - name: Start the server
@@ -146,14 +148,12 @@ jobs:
       - name: Check the e2e setup
         run: bunx e2e doctor --target ios
         env:
-          E2E_APP_PATH: ${{ env.APP }}
           E2E_DEVICE: ${{ env.UDID }}
 
       # e2e records the device itself, one video for the tour, since its tests run as one group.
       - name: Tour the app
         run: bunx e2e run --target ios --retries 0 --video on
         env:
-          E2E_APP_PATH: ${{ env.APP }}
           E2E_DEVICE: ${{ env.UDID }}
 
       - name: Collect the recording and screenshots

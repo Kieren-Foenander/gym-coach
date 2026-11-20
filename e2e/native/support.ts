@@ -20,11 +20,13 @@ export const serverUrl = (): string => {
 }
 
 /**
- * Installs E2E_APP_PATH once per device, before the first test (the tour clears its data itself). An Android emulator does not share the
- * host's network, so its 127.0.0.1 is pointed back at the host's.
+ * Installs E2E_APP_PATH once per device, before the first test, when it is set; without it the app must be
+ * on the device already, as CI does with simctl (a large build can take longer to copy than one e2e action
+ * may). The tour clears the app's data itself. An Android emulator does not share the host's network, so
+ * its 127.0.0.1 is pointed back at the host's.
  */
 const prepare = async (device: Device) => {
-  await device.installApp()
+  if (process.env.E2E_APP_PATH) await device.installApp()
 
   if (device.unstable_raw.platform === "android") {
     const { port } = new URL(serverUrl())
