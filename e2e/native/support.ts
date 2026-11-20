@@ -1,6 +1,6 @@
 import { test as base, type Device } from "@e2e-dev/mobile"
 import { testIds } from "../../src/domain/test-ids"
-import { dismissSavePassword, dismissSavePasswordIfShown } from "./system-dialogs"
+import { dismissSavePasswordIfShown } from "./system-dialogs"
 
 /**
  * What the native app's tests share. Elements are found by test id only, from src/domain/test-ids.ts, as
@@ -46,4 +46,4 @@ export const test = base.extend<{}, { installed: void }>({
   ],
 })
 
-export { dismissSavePassword, dismissSavePasswordIfShown }
+export { dismissSavePasswordIfShown }
