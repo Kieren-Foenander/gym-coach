@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-hip-adduction",
+    views: ["front"],
+    cues: [
+      "Stand side-on with the cuff on the leg nearest the pulley.",
+      "Draw that leg inward across your body without turning your hips.",
+      "Return slowly to the side.",
+    ],
+  },
+  {
     slug: "cable-crunch",
     views: ["front"],
     cues: [
