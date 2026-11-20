@@ -502,3 +502,8 @@ the leg-machine pads. The pulldown uses a split thigh restraint.
   positions. A recumbent cycle adds a `backrest` contact pad, and `air`
   makes the handles move with the crank. The bake checks the saddle,
   pedals, grips, and frame.
+
+For a supine exercise that keeps the pelvis and lower back down, set
+`"supine_support": {}`. The bake checks both skin regions against the
+floor on every frame, allowing for the natural curve of the lower back.
+Set `"supine_support": {"feet": true}` when both feet must stay planted.

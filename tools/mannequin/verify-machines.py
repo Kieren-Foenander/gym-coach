@@ -186,3 +186,16 @@ spec["equipment"][0]["grip"][0] = .12
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert any("dip rail crosses the body" in label for label in problems.found), list(problems.lines())
 print("DIP RAIL CLEARANCE REGRESSIONS PASSED")
+
+spec = initial_pose("crunch")
+spec.pop("hands")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("crunch")
+spec.pop("hands")
+spec["keys"][0]["pelvis"][2] += .05
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+for label in ("pelvis", "lower back"):
+    assert label + " loses supine floor support" in problems.found, list(problems.lines())
+print("SUPINE FLOOR SUPPORT REGRESSIONS PASSED")

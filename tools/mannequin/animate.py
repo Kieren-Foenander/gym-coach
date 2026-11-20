@@ -3169,6 +3169,20 @@ class SkinContact:
         }
         self.trunk_vertices = [i for i, name in enumerate(owner) if PARTS.get(name) == "trunk"]
 
+        self.pelvis_vertices = [i for i, name in enumerate(owner) if name == "Hips"]
+        self.lumbar_vertices = [i for i, name in enumerate(owner) if name == "Spine"]
+
+    def check_supine_support(self, frame, points, feet, problems):
+        regions = [("pelvis", self.pelvis_vertices, .012), ("lower back", self.lumbar_vertices, .028)]
+        if feet:
+            regions.extend((side + " foot", vertices, .010) for side, vertices in self.foot_vertices.items())
+        for label, vertices, maximum in regions:
+            gap = points[vertices, 2].min()
+            if gap > maximum:
+                problems.add(frame, label + " loses supine floor support", gap)
+            if gap < -.006:
+                problems.add(frame, label + " penetrates the floor", -gap)
+
     def check_resting_forearms(self, frame, points, problems):
         for side in SIDES:
             thighs = self.vertices[self.part == side + " thigh"]
@@ -3702,6 +3716,7 @@ def bake(spec, keys):
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
     contact = SkinContact()
+    supine = spec.get("supine_support")
     shoulders = [ShoulderShape(side) for side in SIDES]
     pose_clavicles = any("clavicle" in key for key in keys)
     correctives = {}
@@ -4162,6 +4177,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if supine is not None:
+            contact.check_supine_support(frame, everything, supine.get("feet", False), problems)
         if spec.get("forearm_support") == "thighs":
             contact.check_resting_forearms(frame, everything, problems)
         samples.append(everything[::50])

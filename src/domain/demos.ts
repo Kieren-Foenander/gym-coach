@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "crunch",
+    views: ["front"],
+    cues: [
+      "Lie on your back with knees bent and feet flat.",
+      "Curl your ribs toward your pelvis and reach toward your knees.",
+      "Lower your shoulders slowly while keeping your lower back down.",
+    ],
+  },
+  {
     slug: "dip",
     views: ["front"],
     cues: [
