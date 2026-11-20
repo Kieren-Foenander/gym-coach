@@ -77,5 +77,8 @@
         6
       ]
     }
-  ]
+  ],
+  "unsupported_feet": {
+    "Left": 0.05
+  }
 }

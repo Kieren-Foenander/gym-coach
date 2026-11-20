@@ -255,11 +255,11 @@ def pose_side_support(spec, pelvis, torso, gaps):
         direction = down if side == "Left" else (down + torso.left * .153).normalized()
         free_leg = side == "Left" and spec.get("bench_foot")
         if free_leg:
-            direction = (down + torso.left * .34 + torso.forward * .52).normalized()
+            direction = (down + torso.left * .115 + torso.forward * .52).normalized()
         swing(side + "UpLeg", direction)
         foot = pelvis
         if free_leg:
-            direction = (down + torso.left * .34 - torso.forward * .16).normalized()
+            direction = (down + torso.left * .115 - torso.forward * .16).normalized()
             foot = Matrix.Rotation(-.20, 3, "Z") @ pelvis
         swing(side + "Leg", direction)
         for bone in ("Foot", "ToeBase"):
@@ -3406,8 +3406,6 @@ class SkinContact:
         if heights.min() < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:
             problems.add(frame, "lower palm loses side support contact", abs(heights.min()))
         if bench:
-            if height < .05:
-                problems.add(frame, "lower foot drops in Copenhagen hold", .05 - height)
             gap = bench.gap(points[self.foot_vertices["Right"]])
             if not -.006 <= gap <= .010:
                 problems.add(frame, "upper foot loses Copenhagen bench support", abs(gap))
