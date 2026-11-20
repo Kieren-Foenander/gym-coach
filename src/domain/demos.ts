@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "pistol-squat",
+    views: ["front"],
+    cues: [
+      "Balance on one foot and reach the other leg forward.",
+      "Sit down slowly with the free foot clear of the floor.",
+      "Push through the planted foot to stand tall.",
+    ],
+  },
+  {
+    slug: "sissy-squat",
+    views: ["front"],
+    cues: [
+      "Stand tall and brace through your hips.",
+      "Rise onto your toes and bend your knees as your body leans back.",
+      "Straighten your knees and lower your heels with control.",
+    ],
+  },
+  {
     slug: "side-plank",
     views: ["front"],
     cues: [
