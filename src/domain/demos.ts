@@ -28,6 +28,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "l-sit",
+    views: ["front"],
+    cues: [
+      "Grip the bars beside your hips and straighten your arms.",
+      "Lift your hips and hold both legs out in front.",
+      "Keep your knees straight and breathe steadily.",
+    ],
+  },
+  {
     slug: "donkey-kick",
     views: ["front"],
     cues: [
