@@ -1,0 +1,138 @@
+{
+  "equipment": [],
+  "supine_support": {
+    "feet": true,
+    "head_contact": [
+      [
+        0,
+        0.05
+      ],
+      [
+        0.5,
+        0.55
+      ],
+      [
+        0.99,
+        1
+      ]
+    ]
+  },
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "y": -0.53,
+    "toe_out": 5,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 67,
+    "elevation": 17
+  },
+  "frames": 174,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.094
+      ],
+      "lean": -90,
+      "head": 0,
+      "neck_retraction": 0.041,
+      "thigh_reach": 0.4,
+      "axial_twist": 0,
+      "side_bend": 0,
+      "spine": 0
+    },
+    {
+      "at": 0.05
+    },
+    {
+      "at": 0.22,
+      "spine": 25,
+      "head": 6,
+      "neck_retraction": 0,
+      "axial_twist": 24,
+      "side_bend": -8,
+      "thigh_reach": 0.59
+    },
+    {
+      "at": 0.28
+    },
+    {
+      "at": 0.5,
+      "pelvis": [
+        0,
+        0,
+        0.094
+      ],
+      "lean": -90,
+      "head": 0,
+      "neck_retraction": 0.041,
+      "thigh_reach": 0.4,
+      "axial_twist": 0,
+      "side_bend": 0,
+      "spine": 0
+    },
+    {
+      "at": 0.55
+    },
+    {
+      "at": 0.72,
+      "spine": 25,
+      "head": 6,
+      "neck_retraction": 0,
+      "axial_twist": -24,
+      "side_bend": 8,
+      "thigh_reach": 0.59
+    },
+    {
+      "at": 0.78
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        90,
+        123
+      ]
+    },
+    {
+      "at": 0.25,
+      "side": "Right",
+      "position": {
+        "point": "Arm",
+        "z": [
+          0.27,
+          0.32
+        ]
+      }
+    },
+    {
+      "at": 0.75,
+      "side": "Left",
+      "position": {
+        "point": "Arm",
+        "z": [
+          0.27,
+          0.32
+        ]
+      }
+    }
+  ]
+}

@@ -55,6 +55,33 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "reverse-crunch",
+    views: ["front"],
+    cues: [
+      "Lie on your back and bend both knees.",
+      "Draw your knees toward your chest and curl your pelvis up.",
+      "Lower your hips with control.",
+    ],
+  },
+  {
+    slug: "bicycle-crunch",
+    views: ["front"],
+    cues: [
+      "Lift your shoulders and keep your lower back down.",
+      "Turn one shoulder toward the opposite knee as you extend the other leg.",
+      "Switch sides in one smooth motion.",
+    ],
+  },
+  {
+    slug: "oblique-crunch",
+    views: ["front"],
+    cues: [
+      "Lie on your back with knees bent and feet planted.",
+      "Curl one shoulder toward the opposite knee.",
+      "Lower to the floor and switch sides.",
+    ],
+  },
+  {
     slug: "crunch",
     views: ["front"],
     cues: [
