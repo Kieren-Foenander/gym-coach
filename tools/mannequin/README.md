@@ -548,4 +548,6 @@ of the ankle roller. The upper back anchors near the end of the pad.
 Use `upper_back_contact` to check the support throughout the rep.
 
 A Copenhagen hold reuses the forearm support with `bench_foot: true`
-and a flat bench supporting the upper foot.
+and a flat bench supporting the upper foot. For a kneeling exercise,
+`kneeling_support` maps each side to the phase ranges where that knee
+must touch the floor.

@@ -3421,6 +3421,17 @@ class SkinContact:
         if gap > .012:
             problems.add(frame, "upper foot loses its stack", gap)
 
+    def check_kneeling_support(self, frame, points, support, phase, problems):
+        for side, intervals in support.items():
+            if not any(start <= phase <= end for start, end in intervals):
+                continue
+            triangles = self.vertices[np.isin(self.part, (side + " thigh", side + " shin"))]
+            vertices = points[np.unique(triangles)]
+            near = np.linalg.norm(vertices - np.array(head(side + "Leg")), axis=1) < .105
+            gap = vertices[near, 2].min(initial=1)
+            if not -.006 <= gap <= .008:
+                problems.add(frame, side + " knee loses floor support", abs(gap))
+
     def check_resting_forearms(self, frame, points, problems):
         for side in SIDES:
             thighs = self.vertices[self.part == side + " thigh"]
@@ -4461,6 +4472,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if "kneeling_support" in spec:
+            contact.check_kneeling_support(frame, everything, spec["kneeling_support"], phase, problems)
         if side_support:
             contact.check_side_support(frame, everything, grips["Left"], problems,
                                        bench if side_support.get("bench_foot") else None)

@@ -237,3 +237,12 @@ spec["equipment"][0]["roller"][2] += .06
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left ankle loses restraint contact" in problems.found, list(problems.lines())
 print("DECLINE BENCH RESTRAINT REGRESSION PASSED")
+
+spec = initial_pose("bird-dog")
+spec.pop("hands")
+spec.pop("floor_hands")
+spec["checkpoints"] = [entry for entry in spec["checkpoints"] if "hand_mode" not in entry]
+spec["keys"][0]["pelvis"][2] += .04
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left knee loses floor support" in problems.found, list(problems.lines())
+print("KNEELING FLOOR SUPPORT REGRESSION PASSED")

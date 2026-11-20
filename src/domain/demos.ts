@@ -73,6 +73,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "bird-dog",
+    views: ["front"],
+    cues: [
+      "Set up on hands and knees with your back steady.",
+      "Reach one arm and the opposite leg away from you.",
+      "Return both to the floor and switch sides.",
+    ],
+  },
+  {
     slug: "side-plank",
     views: ["front"],
     cues: [
