@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "pallof-press",
+    views: ["front"],
+    cues: [
+      "Stand side-on with the cable handle at your chest.",
+      "Press it forward without turning your ribs or hips.",
+      "Bring the handle back slowly and switch sides.",
+    ],
+  },
+  {
     slug: "cable-upright-row",
     views: ["front"],
     cues: [

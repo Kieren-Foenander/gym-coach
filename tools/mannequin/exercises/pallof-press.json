@@ -1,0 +1,92 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "straight-bar",
+      "columns": {
+        "Both": {
+          "at": [
+            -1.15,
+            -0.32
+          ],
+          "height": "mid",
+          "exit": [
+            1,
+            0
+          ]
+        }
+      }
+    }
+  ],
+  "stance": {
+    "width": 0.34,
+    "toe_out": 12
+  },
+  "frames": 112,
+  "camera": {
+    "angle": 51,
+    "elevation": 12
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 0,
+      "grip": "pronated",
+      "cable_target": [
+        0.15,
+        -0.285,
+        1.18
+      ],
+      "handle_direction": [
+        1,
+        0,
+        0
+      ],
+      "elbows": [
+        0.56,
+        -0.58,
+        -1
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "cable_target": [
+        0.15,
+        -0.548,
+        1.18
+      ],
+      "elbows": [
+        0.4,
+        -0.16,
+        -1
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        75,
+        155
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        5,
+        44
+      ]
+    }
+  ]
+}
