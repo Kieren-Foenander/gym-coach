@@ -4023,6 +4023,12 @@ def bake(spec, keys):
                 contact_gap = bench.gap(chest)
                 if contact_gap > .02:
                     problems.add(frame, "chest loses the supporting pad", contact_gap)
+            if spec.get("bench_upper_back"):
+                behind = (everything[:, 1] >= head("Spine2").y - .02) & (
+                    everything[:, 1] <= head("LeftArm").y + .08)
+                shoulder_gap = bench.gap(everything[behind])
+                if shoulder_gap > .016:
+                    problems.add(frame, "upper back loses bench contact", shoulder_gap)
             gap = bench.gap(everything)
             closest["bench"] = min(closest["bench"], gap)
             if gap < -0.025:

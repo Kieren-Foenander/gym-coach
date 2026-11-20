@@ -11,12 +11,19 @@
     }
   ],
   "stance": {
-    "width": 0.38,
-    "y": -0.335,
-    "toe_out": 15
+    "width": 0.32,
+    "y": -0.366,
+    "toe_out": 4,
+    "knee_direction": {
+      "Right": [
+        -0.31,
+        -1,
+        0
+      ]
+    }
   },
   "camera": {
-    "angle": 125
+    "angle": 85
   },
   "keys": [
     {
@@ -35,10 +42,10 @@
       ],
       "unloaded_curl": 14,
       "foot_right": [
-        -0.23,
-        0.24,
-        18,
-        0.012
+        -0.247,
+        0.195,
+        13,
+        -0.054
       ]
     },
     {
@@ -46,7 +53,7 @@
       "pelvis": [
         0.011,
         0.065,
-        0.54
+        0.503
       ],
       "lean": -90,
       "head": 18,
@@ -57,10 +64,10 @@
       ],
       "unloaded_curl": 14,
       "foot_right": [
-        -0.23,
-        0.37,
-        18,
-        0.012
+        -0.247,
+        0.317,
+        13,
+        -0.054
       ]
     },
     {
@@ -82,10 +89,10 @@
       ],
       "unloaded_curl": 14,
       "foot_right": [
-        -0.23,
-        0.24,
-        18,
-        0.012
+        -0.247,
+        0.195,
+        13,
+        -0.054
       ]
     }
   ],
@@ -105,15 +112,15 @@
       "position": {
         "point": "Hips",
         "z": [
-          0.525,
-          0.555
+          0.493,
+          0.515
         ]
       },
       "knee": [
         85,
-        97
+        95
       ],
-      "shin_vertical": 7,
+      "shin_vertical": 5,
       "side": "Left"
     },
     {
@@ -125,9 +132,34 @@
         ]
       },
       "side": "Right"
+    },
+    {
+      "at": 0.48,
+      "side": "Left",
+      "position": {
+        "point": "Leg",
+        "relative_to": "UpLeg",
+        "z": [
+          -0.035,
+          0.035
+        ]
+      }
+    },
+    {
+      "at": 0.48,
+      "side": "Left",
+      "position": {
+        "point": "Shoulder",
+        "relative_to": "Hips",
+        "z": [
+          -0.03,
+          0.03
+        ]
+      }
     }
   ],
   "touching": [
     "bench"
-  ]
+  ],
+  "bench_upper_back": true
 }
