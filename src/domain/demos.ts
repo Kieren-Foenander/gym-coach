@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-external-rotation",
+    views: ["back"],
+    cues: [
+      "Stand side-on and keep your elbow against your ribs.",
+      "Turn your forearm away from your body without moving your elbow.",
+      "Return slowly and repeat on the other side.",
+    ],
+  },
+  {
+    slug: "single-arm-cable-press",
+    views: ["front"],
+    cues: [
+      "Stand facing away from the pulley and bring one handle to chest height.",
+      "Press straight forward while keeping your ribs and hips square.",
+      "Bring the handle back to your chest under control.",
+    ],
+  },
+  {
     slug: "cable-reverse-fly",
     views: ["back"],
     cues: [
