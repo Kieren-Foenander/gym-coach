@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "wide-grip-seated-cable-row",
+    views: ["back"],
+    cues: [
+      "Brace your feet and reach forward with long arms.",
+      "Pull the wide bar toward your lower ribs with your chest lifted.",
+      "Reach toward the pulley under control.",
+    ],
+  },
+  {
     slug: "pallof-press",
     views: ["front"],
     cues: [
