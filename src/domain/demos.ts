@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "burpee",
+    views: ["front"],
+    cues: [
+      "Squat and plant both palms on the floor.",
+      "Send both feet back and lower into a push-up.",
+      "Press up, bring your feet in and stand tall.",
+    ],
+  },
+  {
     slug: "diamond-push-up",
     views: ["front"],
     cues: [
