@@ -3262,6 +3262,58 @@ class NordicBench:
                                  for part, _ in self.parts for corner in part.bound_box]))
 
 
+class CaptainsChair:
+    """Fixed forearm rests and upright grips support a hanging knee raise."""
+
+    def __init__(self, config):
+        metal = material("captain's chair frame", IRON, .55, .42)
+        foam = material("captain's chair pads", PAD, .05, .7)
+        self.grip = Vector(config["grip"])
+        self.axis = Vector((0, 0, 1))
+        self.handles, self.parts, self.pads = {}, [], {}
+        self.back = SupportPad("captain's chair back pad", {
+            "face": config["back"], "pitch": 90, "size": [.32, .38],
+        }, foam, metal)
+        for side, sign in SIDES.items():
+            x = sign * self.grip.x
+            pad_y, pad_z = config["forearm_pad"]
+            self.pads[side] = SupportPad(side + " captain's chair arm pad", {
+                "face": [x, pad_y, pad_z], "size": [.136, .28],
+            }, foam, metal)
+            y = self.back.face.y + .14
+            post = box("captain's chair upright", (.065, .075, pad_z), (x, y, pad_z / 2), metal)
+            base = box("captain's chair foot", (.09, .75, .06), (x, y - .22, .03), metal)
+            rail = box("captain's chair arm rest mount", (.058, y - self.grip.y, .055),
+                       (x, (y + self.grip.y) / 2, pad_z - .097), metal)
+            grip = Vector((x, self.grip.y, self.grip.z))
+            handle = CableStation.part(side + " captain's chair grip", Barbell.SHAFT, metal)
+            set_segment(handle, Vector((x, self.grip.y, pad_z - .108)), grip + self.axis * .093, 1)
+            self.parts.extend(((post, False), (base, False), (rail, False), (handle, True)))
+            self.handles[side] = handle
+        back_mount = box("captain's chair backrest mount", (.52, .18, .065),
+                         (0, self.back.face.y + .16, self.back.face.z), metal)
+        self.parts.append((back_mount, False))
+
+    def pose(self, torso, gaps):
+        for side, sign in SIDES.items():
+            target = Vector((sign * self.grip.x, self.grip.y, self.grip.z))
+            pole = torso.direction([.18, -.45, -1], sign)
+            gaps.append((side + " captain's chair grip",
+                         pose_arm(side, target, pole, "thumb-forward", torso, self.axis)))
+
+    def check(self, points, contact, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
+        for side, pad in self.pads.items():
+            pad.check(points, frame, problems)
+            forearm = points[np.unique(contact.vertices[contact.part == side + " forearm"])]
+            pad.check(forearm, frame, problems)
+        self.back.check(points, frame, problems)
+        contact.check_unsupported_feet(frame, points, {side: .10 for side in SIDES}, problems)
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part, _ in self.parts for corner in part.bound_box]))
+
+
 class CoreBench:
     """A decline bench with an ankle restraint, or a flat bench with fixed grips."""
 
@@ -4095,7 +4147,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair", "nordic-bench"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair", "nordic-bench", "captains-chair"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4122,6 +4174,7 @@ def bake(spec, keys):
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     nordic = next((NordicBench(e) for e in spec.get("equipment", []) if e["type"] == "nordic-bench"), None)
+    captains_chair = next((CaptainsChair(e) for e in spec.get("equipment", []) if e["type"] == "captains-chair"), None)
     roman_chair = next((RomanChair(e) for e in spec.get("equipment", []) if e["type"] == "roman-chair"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
@@ -4161,7 +4214,7 @@ def bake(spec, keys):
     core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        pullup, dip_bars, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
+        pullup, dip_bars, captains_chair, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -4303,6 +4356,8 @@ def bake(spec, keys):
             pullup.pose(span, torso, gaps)
         if dip_bars:
             dip_bars.pose(span, torso, gaps)
+        if captains_chair:
+            captains_chair.pose(torso, gaps)
         if rower:
             rower.pose(span, torso, frame, gaps)
         if belt_squat:
@@ -4692,6 +4747,8 @@ def bake(spec, keys):
             roman_chair.check(everything, contact, hands, frame, problems, samples)
         if nordic:
             nordic.check(everything, contact, hands, frame, problems, samples)
+        if captains_chair:
+            captains_chair.check(everything, contact, hands, grips, frame, problems, samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
         if wall:

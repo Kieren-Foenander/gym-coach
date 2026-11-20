@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "captains-chair-leg-raise",
+    views: ["front"],
+    cues: [
+      "Brace your forearms on the pads and grip the handles.",
+      "Keep your back against the pad as you raise your knees.",
+      "Lower your legs without swinging.",
+    ],
+  },
+  {
     slug: "handstand-push-up",
     views: ["front"],
     cues: [
