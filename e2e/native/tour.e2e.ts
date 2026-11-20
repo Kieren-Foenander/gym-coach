@@ -1,5 +1,6 @@
+import { beforeEach } from "@e2e-dev/mobile"
 import { credentials, describe, expect } from "e2e"
-import { dismissSavePassword, serverUrl, test, testIds } from "./support"
+import { dismissSavePassword, dismissSavePasswordIfShown, serverUrl, test, testIds } from "./support"
 
 /**
  * A tour of the native app's main screens: sign in, then each tab, with a screenshot of each.
@@ -8,6 +9,11 @@ import { dismissSavePassword, serverUrl, test, testIds } from "./support"
  */
 
 describe("a tour of the main screens", { serial: true }, () => {
+  // The save-password sheet can come after sign-in has stopped waiting for it, over a later screen.
+  beforeEach(async ({ device }) => {
+    await dismissSavePasswordIfShown(device)
+  })
+
   test("signs in to Today", async ({ app, device, screen }) => {
     await app.clearState()
     await app.open()
