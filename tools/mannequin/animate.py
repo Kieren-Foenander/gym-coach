@@ -3873,6 +3873,113 @@ class ContactLoad:
                     problems.add(frame,self.kind+" crosses the floor",-corners[:,2].min())
 
 
+class MedicineBall:
+    """A two-handed ball that can separate from the hands between releases and catches."""
+
+    def __init__(self, config):
+        self.radius = config.get("radius", .112)
+        self.wall = config.get("wall_y")
+        self.elbows = config.get("elbows", [.46, -.13, -1])
+        shell = material("medicine ball leather", (.48, .165, .055), .14, .52)
+        seams = material("medicine ball panels", (.15, .068, .046), .13, .64)
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=self.radius)
+        self.ball = bpy.context.object
+        self.ball.name = "medicine ball"
+        self.ball.data.materials.append(shell)
+        bpy.ops.object.shade_smooth()
+        for angle in (0, math.pi/2):
+            bpy.ops.mesh.primitive_torus_add(major_segments=48, minor_segments=8,
+                                             major_radius=self.radius-.001, minor_radius=.0018)
+            seam = bpy.context.object
+            seam.name = "medicine ball seam"
+            seam.parent = self.ball
+            seam.rotation_euler.y = angle
+            seam.data.materials.append(seams)
+        if self.wall is not None:
+            wall_finish = material("wall ball target", (.15, .17, .19), .21, .68)
+            box("wall ball wall", (.65, .052, 2.32), (0, self.wall-.026, 1.16), wall_finish)
+            target = cylinder("wall ball target mark", .155, .006, 0, seams, None)
+            target.rotation_euler = (math.pi/2, 0, 0)
+            target.location = (0, self.wall+.004, config["wall_target"])
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        centre = Vector(span.sample("ball"))
+        self.ball.location = centre
+        self.ball.rotation_euler.x = span.sample("ball_spin", 0)
+        for field in ("location", "rotation_euler"):
+            self.ball.keyframe_insert(field, frame=frame)
+        guide = Vector(span.sample("ball_hands"))
+        opening = span.sample("ball_open", 0)
+        angle = math.radians(span.sample("ball_hand_pitch"))
+        nominal = Vector((0, -math.cos(angle), math.sin(angle)))
+        for side, sign in SIDES.items():
+            palm = Vector((-sign, 0, 0))
+            surface = grips[side]
+            pole = torso.direction(span.sample("ball_elbows", self.elbows), sign)
+
+            shoulder = head(side + "Arm")
+            upper, fore = segment(side + "Arm", side + "ForeArm", side + "Hand")
+            along = nominal.copy()
+            for _ in range(5):
+                wrist = guide - .089 * along + Vector((.132 * sign, 0, 0))
+                elbow, _ = bend(shoulder, wrist, upper, fore, pole)
+                lower = wrist - elbow
+                lower.x = 0
+                if lower.length > .001:
+                    along = along.lerp(lower.normalized(), .62).normalized()
+
+            def aim_wrist(lateral):
+                wrist = guide - .089 * along + Vector((lateral * sign, 0, 0))
+                target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+                return pose_arm(side, target, pole, "neutral", torso, contact_frame=(along, palm))
+
+            aim_wrist(.132)
+            transform = surface.transform
+            posed = surface.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+            local = posed - np.array(guide)
+            yz = (local[:, 1:]**2).sum(axis=1)
+            active = yz < self.radius**2
+            if not active.any():
+                problems.add(frame, side + " hand has no medicine ball contact patch", .01)
+                continue
+            contact_x = (np.sqrt(self.radius**2 - yz[active]) - local[active, 0] * sign).max()
+            lateral = .132 + contact_x + opening
+            gap = aim_wrist(lateral)
+            for _ in range(2):
+                transform = surface.transform
+                posed = surface.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+                local = posed - np.array(centre)
+                yz = (local[:, 1:]**2).sum(axis=1)
+                active = yz < self.radius**2
+                extra = (np.sqrt(self.radius**2 - yz[active]) - local[active, 0] * sign).max(initial=0)
+                if extra <= .0001:
+                    break
+                lateral += extra
+                gap = aim_wrist(lateral)
+            gaps.append((side + " medicine ball wrist", gap))
+            transform = surface.transform
+            posed = surface.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+            gap = np.linalg.norm(posed - np.array(centre), axis=1).min() - self.radius
+            surface.check_wrist(frame, problems)
+            if gap < -.002:
+                problems.add(frame, side + " hand intersects medicine ball", -gap)
+            if opening < .004 and (centre - guide).length < .004 and gap > .005:
+                problems.add(frame, side + " hand loses medicine ball contact", gap)
+
+    def check(self, points, frame, problems, samples):
+        centre = self.ball.location
+        gap = np.linalg.norm(points - np.array(centre), axis=1).min() - self.radius
+        if gap < -.004:
+            problems.add(frame, "medicine ball crosses the body", -gap)
+        if centre.z < self.radius - .002:
+            problems.add(frame, "medicine ball crosses the floor", self.radius - centre.z)
+        if self.wall is not None:
+            if centre.y < self.wall + self.radius - .002:
+                problems.add(frame, "medicine ball crosses the wall", self.wall + self.radius - centre.y)
+            samples.append(np.array([[-.325, self.wall, 0], [.325, self.wall, 2.32]]))
+        samples.append(np.array(centre) + np.array([[-self.radius]*3, [self.radius]*3]))
+
+
 class PreacherPad:
     """Split sloping pads leave chest clearance between the supported upper arms."""
 
@@ -5087,7 +5194,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "wrist-roller", "safety-bar", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball", "jump-rope", "battle-ropes"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "safety-bar", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball", "jump-rope", "battle-ropes", "medicine-ball"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -5118,6 +5225,7 @@ def bake(spec, keys):
     stability_ball = StabilityBall() if "stability-ball" in equipment else None
     gripper = next((HandGripper(e) for e in spec.get("equipment", []) if e["type"] == "hand-gripper"), None)
     battle_ropes = next((BattleRopes(e) for e in spec.get("equipment", []) if e["type"] == "battle-ropes"), None)
+    medicine_ball = next((MedicineBall(e) for e in spec.get("equipment", []) if e["type"] == "medicine-ball"), None)
     jump_rope = next((JumpRope(e) for e in spec.get("equipment", []) if e["type"] == "jump-rope"), None)
     push_sled = next((PushSled(e) for e in spec.get("equipment", []) if e["type"] == "push-sled"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
@@ -5193,7 +5301,7 @@ def bake(spec, keys):
     if elevated_palms and (not bench or bench.pads or not planted_sides):
         raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
     side_support = spec.get("side_support")
-    has_grips = gripper or side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
+    has_grips = medicine_ball or gripper or side_support or barbell or dumbbells or contact_load or landmine or floor_hands or handled_station or "thigh_reach" in keys[0]
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     if gripper:
         gripper.bind(grips["Left"])
@@ -5477,6 +5585,8 @@ def bake(spec, keys):
             gripper.pose(span, torso, frame, gaps)
         if battle_ropes:
             battle_ropes.pose(span, torso, phase, frame, gaps)
+        if medicine_ball:
+            medicine_ball.pose(span, torso, grips, frame, gaps, problems)
         if jump_rope:
             jump_rope.pose(span, torso, phase, frame, gaps)
         if push_sled:
@@ -5783,6 +5893,8 @@ def bake(spec, keys):
             gripper.check(everything, contact.faces, hands, frame, problems)
         if battle_ropes:
             battle_ropes.check(everything, contact, grips, phase, frame, problems, samples)
+        if medicine_ball:
+            medicine_ball.check(everything, frame, problems, samples)
         if jump_rope:
             jump_rope.check(everything, contact, grips, phase, frame, problems, samples)
         if push_sled:

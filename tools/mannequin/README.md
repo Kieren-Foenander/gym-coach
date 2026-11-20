@@ -107,6 +107,11 @@ A `jump-rope` uses an authored grip position and `reach` in metres. Its
 constant-length cord has per-frame floor and body clearance checks, and
 the feet must be airborne while the rope passes beneath them.
 
+Battle ropes reuse the round, keyed line geometry, with alternating waves
+and one fixed anchor. A `medicine-ball` separates the ball position from the
+hand target so a release and catch can be checked at the fingertips. It
+checks ball clearance against the body, floor and optional wall.
+
 ### Choosing a colour
 
 ```sh

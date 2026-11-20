@@ -123,3 +123,17 @@ rope.rope.check_clearance(BVHTree.FromPolygons(points, faces, all_triangles=True
                           1, problems, "jump rope", rope.radius)
 assert "jump rope crosses the body" in problems.found, list(problems.lines())
 print("ROAD BIKE, GHD, SAFETY BAR AND JUMP ROPE REGRESSIONS PASSED")
+
+spec = initial_pose("battle-ropes")
+bake(spec)
+
+ball = api["MedicineBall"]({"wall_y": -.875, "wall_target": 2.06})
+ball.ball.location = (0, -.50, 1.1)
+problems = api["Problems"]()
+ball.check(np.array([(0., 0., 0.)]), 1, problems, [])
+assert not problems.found, list(problems.lines())
+ball.ball.location = (0, -.80, .08)
+ball.check(np.array([(0., -.80, .08)]), 1, problems, [])
+assert {"medicine ball crosses the body", "medicine ball crosses the floor",
+        "medicine ball crosses the wall"} <= set(problems.found), list(problems.lines())
+print("BATTLE ROPE AND MEDICINE BALL REGRESSIONS PASSED")

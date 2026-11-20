@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "wall-ball",
+    views: ["front"],
+    cues: [
+      "Hold the ball at your chest and squat.",
+      "Stand powerfully and throw toward the wall target.",
+      "Catch the return softly before your next squat.",
+    ],
+  },
+  {
     slug: "battle-ropes",
     views: ["front"],
     cues: [
