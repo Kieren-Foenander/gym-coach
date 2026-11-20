@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "outdoor-cycling",
+    views: ["front"],
+    cues: [
+      "Keep your hands steady on the bars.",
+      "Pedal in smooth circles with quiet hips.",
+      "Look ahead and keep a soft bend in your elbows.",
+    ],
+  },
+  {
     slug: "stability-ball-leg-curl",
     views: ["front"],
     cues: [

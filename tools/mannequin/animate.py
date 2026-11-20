@@ -2541,6 +2541,8 @@ class CycleStation:
         self.saddle = Vector(config["saddle"])
         self.grip = Vector(config["grip"])
         self.air = config.get("air", False)
+        self.road = config.get("road", False)
+        self.wheels = []
         self.seat_half = .14 if config.get("backrest") else .089
         self.seat_depth = .12
         metal = material("cycle frame", IRON, .60, .46)
@@ -2551,45 +2553,48 @@ class CycleStation:
         self.backrest = SupportPad("recumbent cycle backrest", config["backrest"], rubber, metal) if "backrest" in config else None
         if self.backrest:
             self.parts.extend((mount,False) for mount in self.backrest.mounts)
-        support = box("cycle saddle post", (.095,.11,self.saddle.z),
-                      (0,self.saddle.y,self.saddle.z / 2), metal)
-        self.parts.append((support,False))
-        for y in (self.crank.y-.26,self.saddle.y+.13):
-            base = box("cycle ground stabilizer", (.71,.115,.055),(0,y,.0275),metal)
-            self.parts.append((base,False))
-        front = Vector((0, self.crank.y - .34, .31))
-        if self.backrest:
-            wheel = cylinder("cycle flywheel", .175, .16, 0, metal, None)
-            wheel.location = (0, self.crank.y - .29, .245)
-        elif self.air:
-            wheel = cylinder("air bike fan housing", .268, .18, 0, metal, None)
-            wheel.location = front
-            self.fan_grille(front, metal)
+        if self.road:
+            self.road_frame(metal, rubber)
         else:
-            shell = material("spin bike belt cover", (.135, .148, .165), .45, .36)
-            wheel = cylinder("enclosed spin bike flywheel", .199, .12, 0, shell, None)
-            wheel.location = front
-        self.parts.append((wheel, False))
-        for name, start, end in (
-            ("cycle frame spine", Vector((0,self.saddle.y,.18)), self.crank),
-            ("cycle flywheel carrier", self.crank, wheel.location),
-        ):
-            member = CableStation.part(name,.035,metal)
-            set_segment(member,start,end,1)
-            self.parts.append((member,False))
-        if not self.backrest:
-            self.member("cycle front dropout", front, Vector((0, self.crank.y - .26, .046)), .036, metal)
-        if self.air:
-            self.arm_axle = Vector((0, front.y, .557))
-            self.member("air bike pivot mast", front, self.arm_axle, .047, metal)
-            self.member("air bike arm axle",
-                        self.arm_axle - Vector((self.grip.x + .094, 0, 0)),
-                        self.arm_axle + Vector((self.grip.x + .094, 0, 0)), .027, metal)
-        elif not self.backrest:
-            stem = Vector((0, self.grip.y, self.grip.z))
-            self.member("spin bike handlebar stem", front, stem, .036, metal)
-            reach = Vector((self.grip.x - .077, 0, 0))
-            self.member("spin bike handlebar bridge", stem - reach, stem + reach, .018, metal)
+            support = box("cycle saddle post", (.095,.11,self.saddle.z),
+                          (0,self.saddle.y,self.saddle.z / 2), metal)
+            self.parts.append((support,False))
+            for y in (self.crank.y-.26,self.saddle.y+.13):
+                base = box("cycle ground stabilizer", (.71,.115,.055),(0,y,.0275),metal)
+                self.parts.append((base,False))
+            front = Vector((0, self.crank.y - .34, .31))
+            if self.backrest:
+                wheel = cylinder("cycle flywheel", .175, .16, 0, metal, None)
+                wheel.location = (0, self.crank.y - .29, .245)
+            elif self.air:
+                wheel = cylinder("air bike fan housing", .268, .18, 0, metal, None)
+                wheel.location = front
+                self.fan_grille(front, metal)
+            else:
+                shell = material("spin bike belt cover", (.135, .148, .165), .45, .36)
+                wheel = cylinder("enclosed spin bike flywheel", .199, .12, 0, shell, None)
+                wheel.location = front
+            self.parts.append((wheel, False))
+            for name, start, end in (
+                ("cycle frame spine", Vector((0,self.saddle.y,.18)), self.crank),
+                ("cycle flywheel carrier", self.crank, wheel.location),
+            ):
+                member = CableStation.part(name,.035,metal)
+                set_segment(member,start,end,1)
+                self.parts.append((member,False))
+            if not self.backrest:
+                self.member("cycle front dropout", front, Vector((0, self.crank.y - .26, .046)), .036, metal)
+            if self.air:
+                self.arm_axle = Vector((0, front.y, .557))
+                self.member("air bike pivot mast", front, self.arm_axle, .047, metal)
+                self.member("air bike arm axle",
+                            self.arm_axle - Vector((self.grip.x + .094, 0, 0)),
+                            self.arm_axle + Vector((self.grip.x + .094, 0, 0)), .027, metal)
+            elif not self.backrest:
+                stem = Vector((0, self.grip.y, self.grip.z))
+                self.member("spin bike handlebar stem", front, stem, .036, metal)
+                reach = Vector((self.grip.x - .077, 0, 0))
+                self.member("spin bike handlebar bridge", stem - reach, stem + reach, .018, metal)
         for side, sign in SIDES.items():
             self.pedals[side] = box("cycle pedal", (.126,.22,.031), (0,0,0), rubber)
             self.rods[side] = CableStation.part("cycle crank arm", .016, metal)
@@ -2607,6 +2612,60 @@ class CycleStation:
         self.pedal_faces = {}
         self.bounds = [Vector((sign*.37,y,z)) for sign in (-1,1)
                        for y,z in ((self.crank.y-.44,.0),(self.saddle.y+.19,self.saddle.z))]
+
+        if self.road:
+            self.bounds.extend(Vector((0, y, z)) for y in (-1.10, .95) for z in (0, .62))
+
+    def road_frame(self, metal, rubber):
+        front = Vector((0, -.773, .31))
+        rear = Vector((0, .620, .31))
+        seat = self.saddle - Vector((0, 0, .095))
+        headset = Vector((0, -.60, .758))
+        stem = Vector((0, self.grip.y, self.grip.z))
+        for name, start, end, radius in (
+            ("seat tube", self.crank, seat, .026),
+            ("top tube", seat, headset, .021),
+            ("down tube", self.crank, headset, .025),
+            ("seat post", seat, self.saddle - Vector((0, 0, .038)), .016),
+            ("handlebar stem", headset, stem, .018),
+            ("road handlebar", stem - Vector((self.grip.x - .075, 0, 0)),
+                              stem + Vector((self.grip.x - .075, 0, 0)), .014),
+        ):
+            self.member(name, start, end, radius, metal)
+        for sign in (-1, 1):
+            drop_x = sign * (self.grip.x + .077)
+            drop = [Vector((drop_x, stem.y + y, stem.z + z))
+                    for y, z in ((0, 0), (-.049, -.016), (-.076, -.058),
+                                 (-.064, -.107), (-.02, -.131), (.046, -.131))]
+            for start, end in zip(drop, drop[1:]):
+                self.member("road handlebar drop", start, end, .012, rubber)
+            offset = Vector((sign * .044, 0, 0))
+            self.member("road fork", headset + offset, front + offset, .014, metal)
+            self.member("road seat stay", seat + offset, rear + offset, .011, metal)
+            self.member("road chain stay", self.crank + offset, rear + offset, .013, metal)
+        for hub in (front, rear):
+            wheel = bpy.data.objects.new("road wheel hub", None)
+            scene.collection.objects.link(wheel)
+            wheel.location = hub
+            self.wheels.append(wheel)
+            for name, major, minor, finish in (
+                ("road tire", .296, .014, rubber), ("road rim", .278, .009, metal),
+            ):
+                bpy.ops.mesh.primitive_torus_add(major_segments=56, minor_segments=8,
+                                                 major_radius=major, minor_radius=minor)
+                ring = bpy.context.object
+                ring.name = name
+                ring.rotation_euler.y = math.pi / 2
+                ring.parent = wheel
+                ring.data.materials.append(finish)
+                bpy.ops.object.shade_smooth()
+                self.parts.append((ring, False))
+            for index in range(16):
+                angle = index * math.tau / 16
+                spoke = CableStation.part("road wheel spoke", .0017, metal)
+                spoke.parent = wheel
+                set_segment(spoke, Vector(), .278 * Vector((0, math.cos(angle), math.sin(angle))), 1)
+                self.parts.append((spoke, False))
 
     def member(self, name, start, end, radius, finish):
         member = CableStation.part(name, radius, finish)
@@ -2627,6 +2686,9 @@ class CycleStation:
                 self.member("air bike radial grille", start, end, .009, grille)
 
     def pose(self, spec, span, phase, key, torso, frame, gaps):
+        for wheel in self.wheels:
+            wheel.rotation_euler.x = phase * math.tau * 2
+            wheel.keyframe_insert("rotation_euler", frame=frame)
         for side, (ankle, yaw) in ankles(spec, key).items():
             sign = SIDES[side]
             angle = (phase + (0 if side == "Left" else .50)) * math.tau

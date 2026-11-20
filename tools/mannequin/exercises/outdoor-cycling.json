@@ -1,0 +1,69 @@
+{
+  "equipment": [
+    {
+      "type": "cycle-station",
+      "crank": [
+        0,
+        -0.219,
+        0.293
+      ],
+      "saddle": [
+        0,
+        0.152,
+        0.727
+      ],
+      "grip": [
+        0.24,
+        -0.555,
+        0.994
+      ],
+      "radius": 0.134,
+      "air": false,
+      "road": true
+    }
+  ],
+  "stance": {
+    "width": 0.33,
+    "toe_out": 0
+  },
+  "camera": {
+    "angle": 65
+  },
+  "frames": 84,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.068,
+        0.872
+      ],
+      "lean": 31,
+      "head": -16,
+      "elbows": [
+        0.38,
+        -0.45,
+        -0.67
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        5,
+        128
+      ]
+    },
+    {
+      "at": 0.25,
+      "side": "Left",
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.43,
+          0.72
+        ]
+      }
+    }
+  ]
+}
