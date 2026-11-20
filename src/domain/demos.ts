@@ -37,6 +37,24 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "dead-bug",
+    views: ["front"],
+    cues: [
+      "Start with arms up and hips and knees bent.",
+      "Extend one leg and the opposite arm as you exhale.",
+      "Return to centre and switch sides with your lower back down.",
+    ],
+  },
+  {
+    slug: "hollow-hold",
+    views: ["front"],
+    cues: [
+      "Press your lower back into the floor.",
+      "Lift your shoulders and extend your legs and arms.",
+      "Hold the position and breathe steadily.",
+    ],
+  },
+  {
     slug: "crunch",
     views: ["front"],
     cues: [
