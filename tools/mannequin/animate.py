@@ -4799,6 +4799,12 @@ def bake(spec, keys):
                 clearance = everything[contact.foot_vertices[side], 2].min()
                 if planted and not -.010 <= clearance <= .012:
                     problems.add(frame, side + " stance foot loses ground contact", abs(clearance))
+        if spec.get("side_lying"):
+            for label, vertices in (("lower hip", contact.pelvis_vertices),
+                                    ("lower leg", contact.foot_vertices["Left"])):
+                gap = everything[vertices, 2].min()
+                if not -.009 <= gap <= .023:
+                    problems.add(frame, label + " loses side-lying floor support", abs(gap))
         if spec.get("prone_support"):
             contact.check_prone_support(frame, everything, problems)
         if "unsupported_feet" in spec:

@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "side-lying-leg-raise",
+    views: ["front"],
+    cues: [
+      "Lie on your side with your hips stacked.",
+      "Keep your top knee straight and lift the leg without rolling back.",
+      "Lower slowly to the start.",
+    ],
+  },
+  {
     slug: "captains-chair-leg-raise",
     views: ["front"],
     cues: [
