@@ -1627,24 +1627,35 @@ class HandGripper:
 
 
 class PushSled:
-    """A low prowler chassis with vertical grips and a loaded centre post."""
+    """A loaded prowler with uprights for pushing or a tow rope for pulling."""
 
     def __init__(self, config):
         self.handles = {}
         self.grip = Vector(config["grip"])
         frame = material("sled frame", IRON, .55, .5)
         grip_finish = material("sled grip", STEEL, .55, .42)
-        y = self.grip.y
+        self.tow = "tow_y" in config
+        y = config.get("tow_y", self.grip.y)
         self.parts = [box("sled crossbar", (.64, .09, .06), (0, y - .22, .064), frame)]
         for side, sign in SIDES.items():
             x = self.grip.x * sign
             self.parts.append(box("sled runner", (.105, .59, .035), (x, y - .195, .021), frame))
-            self.parts.append(box("sled upright", (.043, .043, self.grip.z - .11),
-                                  (x, y, self.grip.z / 2 - .025), frame))
+            if not self.tow:
+                self.parts.append(box("sled upright", (.043, .043, self.grip.z - .11),
+                                      (x, y, self.grip.z / 2 - .025), frame))
             handle = CableStation.part("sled handle", Barbell.SHAFT, grip_finish)
-            centre = Vector((x, y, self.grip.z))
+            centre = Vector((x, self.grip.y, self.grip.z))
             set_segment(handle, centre - Vector((0, 0, .085)), centre + Vector((0, 0, .085)), 1)
             self.handles[side] = handle
+            if self.tow:
+                rope = CableStation.part("sled tow rope", .013, frame)
+                tie = Vector((0, y + .035, .085))
+                set_segment(rope, tie, centre - Vector((0, 0, .085)), 1)
+                self.parts.append(rope)
+        if self.tow:
+            eye = CableStation.part("sled tow anchor", .021, grip_finish)
+            set_segment(eye, Vector((0, y - .23, .074)), Vector((0, y + .035, .085)), 1)
+            self.parts.append(eye)
         for z in (.08, .117, .154):
             plate = cylinder("sled weight plate", .158, .035, 0, frame, None)
             plate.rotation_euler = (0, 0, 0)
@@ -1659,7 +1670,7 @@ class PushSled:
         for side, sign in SIDES.items():
             target = self.grip.copy()
             target.x *= sign
-            pole = torso.direction([.21, -.1, -1], sign)
+            pole = torso.direction([.28, .10, -1] if self.tow else [.21, -.1, -1], sign)
             gap = pose_arm(side, target, pole, "thumb-forward", torso, Vector((0, 0, 1)))
             gaps.append((side + " sled grip", gap))
 
@@ -2425,11 +2436,13 @@ def swim_surface(height):
         yield np.array([line.matrix_world @ Vector(corner) for corner in line.bound_box])
 
 
-def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0, hands_supported=False):
+def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0, hands_supported=False, reverse=False):
     pitch = math.radians(incline)
     for side, sign in SIDES.items():
         stride = PoseSpan(keys, phase + (0 if side == "Left" else .5))
         y, lift, heel = stride.sample("gait")
+        if reverse:
+            y = -y
         contacts[side] = lift < .002
         ankle_bone = rig.data.bones[side + "Foot"].head_local
         toe_bone = rig.data.bones[side + "ToeBase"].head_local
@@ -5030,7 +5043,7 @@ def bake(spec, keys):
             pose_swim_stroke(keys, phase, torso, activity_gaps)
         if ground_gait is not None:
             pose_gait(keys, gait_phase, key, torso, activity_gaps, gait_contacts,
-                      hands_supported=push_sled is not None)
+                      hands_supported=push_sled is not None, reverse=bool(push_sled and push_sled.tow))
         if standing_cardio:
             standing_cardio.pose(spec, keys, phase, key, torso, frame, activity_gaps)
         if treadmill:

@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "sled-pull",
+    views: ["front"],
+    cues: [
+      "Face the sled with a firm grip on both rope handles.",
+      "Sit back slightly and take short backward steps.",
+      "Keep the rope taut and drive through each foot.",
+    ],
+  },
+  {
     slug: "outdoor-cycling",
     views: ["front"],
     cues: [
