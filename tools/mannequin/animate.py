@@ -1834,6 +1834,34 @@ def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0):
         gaps.append((side + " gait arm", gap))
 
 
+def check_gait(spec, phase, points, contact, frame, problems, belt=None):
+    left_ankle, right_ankle = (head(side + "Foot").y for side in SIDES)
+    left_wrist, right_wrist = (head(side + "Hand").y for side in SIDES)
+    ankle_lead = right_ankle - left_ankle
+    wrist_lead = right_wrist - left_wrist
+    # Compare the two sides so a forward lean cannot disguise an in-phase swing.
+    if abs(ankle_lead) > .24 and math.copysign(1, ankle_lead) * wrist_lead > -.045:
+        problems.add(frame, "gait arms and legs swing in phase", abs(wrist_lead + math.copysign(.045, ankle_lead)))
+    if not spec.get("running_gait"):
+        return
+    sole = points if belt is None else (points - np.array(belt.face)) @ np.array(belt.rotation)
+    if .415 <= phase % .5 <= .463:
+        height = min(sole[indices, 2].min() for indices in contact.foot_vertices.values())
+        if height < .018:
+            problems.add(frame, "running gait loses its flight phase", .018 - height)
+    for side in SIDES:
+        local = (phase + (0 if side == "Left" else .5)) % 1
+        shoulder, elbow, wrist = (head(side + bone) for bone in ("Arm", "ForeArm", "Hand"))
+        flex = math.degrees((elbow - shoulder).angle(wrist - elbow))
+        if not 73 <= flex <= 102:
+            problems.add(frame, side + " running elbow flexion", max(73 - flex, flex - 102), "degrees")
+        if .135 <= local <= .17:
+            hip, knee, ankle = (head(side + bone) for bone in ("UpLeg", "Leg", "Foot"))
+            flex = math.degrees((knee - hip).angle(ankle - knee))
+            if not 19 <= flex <= 33:
+                problems.add(frame, side + " running support knee flexion", max(19 - flex, flex - 33), "degrees")
+
+
 class Treadmill:
     """An inclined deck and a phase-shifted repeating gait on the belt."""
 
@@ -4629,6 +4657,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if ground_gait is not None or treadmill:
+            check_gait(spec, gait_phase, everything, contact, frame, problems, treadmill)
         if ground_gait is not None:
             for side, planted in gait_contacts.items():
                 clearance = everything[contact.foot_vertices[side], 2].min()

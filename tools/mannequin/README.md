@@ -575,8 +575,11 @@ floor-contact and alignment checks still apply to the supporting limbs.
 Set `ground_gait: {}` to reuse the treadmill gait on the floor without
 equipment. The stance feet are checked against the floor throughout
 their contact phases. A longer loop can set `cycles` and `surge` to
-vary cadence between slower and faster strides while keeping both arms
-and legs in phase.
+vary cadence between slower and faster strides. All walking and running
+gaits check that the leading ankle pairs with the trailing wrist when
+the stride is open. Set `running_gait` to also check flight clearance,
+mid-stance knee flexion and elbow bend. The `gait` hand shape cups the
+fingers with the thumb alongside the index finger.
 
 Set `heel_pivot` to centre the ankle rotation on the heel for a toe raise.
 
