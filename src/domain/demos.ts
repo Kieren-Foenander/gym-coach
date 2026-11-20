@@ -58,9 +58,9 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     slug: "back-extension",
     views: ["front"],
     cues: [
-      "Lie face down with your fingertips beside your head.",
-      "Lift your chest gently while keeping your hips and legs down.",
-      "Lower slowly with your neck in line.",
+      "Set the pad just below the hip crease and secure your ankles.",
+      "Hinge forward at the hips with a long spine.",
+      "Rise until your head, hips and heels form a straight line.",
     ],
   },
   {

@@ -3078,6 +3078,99 @@ class Bench:
         return float(rel[over, 2].min()) if over.any() else math.inf
 
 
+class RomanChair:
+    """A 45-degree thigh pad and ankle rollers support a free hip hinge."""
+
+    def __init__(self, config):
+        self.hips = Vector(config["hips"])
+        self.rotation = Matrix.Rotation(math.radians(-45), 3, "X")
+        self.leg_axis = self.rotation @ Vector((0, 1, 0))
+        self.normal = self.rotation @ Vector((0, 0, 1))
+        thighs, shins = segment("LeftUpLeg", "LeftLeg", "LeftFoot")
+        self.ankle = self.hips + self.leg_axis * (thighs + shins - .001)
+        frame = material("Roman chair frame", IRON, .55, .42)
+        foam = material("Roman chair upholstery", PAD, .05, .7)
+        face = self.hips + self.rotation @ Vector((0, .216, config["pad_height"]))
+        self.pad = SupportPad("Roman chair hip pad", {
+            "face": face, "size": [.40, .172], "pitch": -45, "split": True,
+        }, foam, frame)
+        self.parts = []
+        backbone = CableStation.part("Roman chair spine", .037, frame)
+        set_segment(backbone, face - self.normal * .112, self.ankle - self.normal * .16, 1)
+        self.parts.append((backbone, False))
+        for point in (face - self.normal * .105, self.ankle - self.normal * .15):
+            self.parts.extend((
+                (box("Roman chair post", (.08, .08, point.z), (0, point.y, point.z / 2), frame), False),
+                (box("Roman chair base", (.64, .125, .055), (0, point.y, .0275), frame), False),
+            ))
+        self.roller_radius = .038
+        self.roller_half = .090
+        anchor = self.ankle + self.rotation @ Vector(config["roller_offset"])
+        self.rollers = {}
+        for side, sign in SIDES.items():
+            centre = anchor + Vector((sign * .123, 0, 0))
+            self.rollers[side] = centre
+            roller = CableStation.part("Roman chair ankle roller", self.roller_radius, foam)
+            width = Vector((self.roller_half, 0, 0))
+            set_segment(roller, centre - width, centre + width, 1)
+            bracket = CableStation.part("Roman chair roller bracket", .023, frame)
+            end = centre + width * sign
+            lower = self.ankle - self.normal * .15
+            lower.x = end.x
+            set_segment(bracket, end, lower, 1)
+            crossbar = CableStation.part("Roman chair roller mount", .022, frame)
+            set_segment(crossbar, lower, self.ankle - self.normal * .15, 1)
+            self.parts.extend(((bracket, False), (crossbar, False)))
+
+    def anchor(self, pelvis):
+        midpoint = (head("LeftUpLeg") + head("RightUpLeg")) / 2
+        place("Hips", pelvis @ REST["Hips"], head("Hips") + self.hips - midpoint)
+
+    def pose_legs(self, gaps):
+        for side in SIDES:
+            hip = head(side + "UpLeg")
+            ankle = self.ankle + Vector((hip.x, 0, 0))
+            thigh, shin = segment(side + "UpLeg", side + "Leg", side + "Foot")
+            knee, gap = bend(hip, ankle, thigh, shin, -self.normal)
+            swing(side + "UpLeg", (knee - hip).normalized())
+            swing(side + "Leg", (ankle - head(side + "Leg")).normalized())
+            for bone in ("Foot", "ToeBase"):
+                place(side + bone, self.rotation @ REST[side + bone])
+            gaps.append((side + " Roman chair ankle", gap))
+
+    def check(self, points, contact, hands, frame, problems, samples):
+        check_hardware_clearance(self.parts, points, contact.faces, hands, {}, frame, problems)
+        self.pad.check(points, frame, problems)
+        trunk = (head("Neck") - head("Hips")).normalized()
+        if trunk.dot(self.normal) > .035:
+            problems.add(frame, "Roman chair lockout extends past the legs",
+                         math.degrees(math.asin(trunk.dot(self.normal))), "degrees")
+        # The front edge meets the uppermost supported thigh, just below the hip.
+        pad_points = (points - np.array(self.pad.face)) @ np.array(self.rotation)
+        at_edge = (abs(pad_points[:, 0]) < self.pad.width / 2) & (
+            abs(pad_points[:, 1] + self.pad.length / 2) < .020)
+        for side, sign in SIDES.items():
+            on_thigh = np.unique(contact.vertices[contact.part == side + " thigh"])
+            patch = pad_points[on_thigh]
+            edge = at_edge[on_thigh] & (sign * patch[:, 0] > .045)
+            gap = np.abs(patch[edge, 2]).min(initial=1)
+            if gap > .018:
+                problems.add(frame, side + " Roman chair front edge loses upper thigh contact", gap)
+        for side, centre in self.rollers.items():
+            local = points - np.array(centre)
+            under = np.abs(local[:, 0]) < self.roller_half
+            distance = np.linalg.norm(local[:, 1:], axis=1) - self.roller_radius
+            penetration = distance[under].min(initial=1)
+            if penetration < -.006:
+                problems.add(frame, side + " Roman chair roller penetrates skin", -penetration)
+            ankle_region = np.linalg.norm(points - np.array(head(side + "Foot")), axis=1) < .115
+            gap = distance[under & ankle_region].min(initial=1)
+            if gap > .014:
+                problems.add(frame, side + " ankle loses Roman chair roller contact", gap)
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part, _ in self.parts for corner in part.bound_box]))
+
+
 class CoreBench:
     """A decline bench with an ankle restraint, or a flat bench with fixed grips."""
 
@@ -3911,7 +4004,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3937,6 +4030,7 @@ def bake(spec, keys):
     belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
+    roman_chair = next((RomanChair(e) for e in spec.get("equipment", []) if e["type"] == "roman-chair"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
     wall = SupportPad("wall back contact", wall_config, material("wall", (.12, .13, .145), .04, .72), None) if wall_config else None
@@ -4039,6 +4133,8 @@ def bake(spec, keys):
         if core_bench:
             core_bench.trunk(key)
         pelvis = pose_trunk(key)
+        if roman_chair:
+            roman_chair.anchor(pelvis)
         if core_bench and core_bench.flag:
             core_bench.anchor_flag(contact)
         if "shoulder_y" not in a and "pelvis" not in key:
@@ -4084,6 +4180,9 @@ def bake(spec, keys):
         if assist:
             gaps = []
             assist.pose(span, torso, frame, gaps, problems)
+        elif roman_chair:
+            gaps = []
+            roman_chair.pose_legs(gaps)
         elif side_support:
             gaps = []
             pose_side_support(side_support, pelvis, torso, gaps)
@@ -4488,6 +4587,8 @@ def bake(spec, keys):
             rotary.check(everything,contact,hands,grips,frame,problems,samples)
         if hip_thrust:
             hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
+        if roman_chair:
+            roman_chair.check(everything, contact, hands, frame, problems, samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
         if wall:

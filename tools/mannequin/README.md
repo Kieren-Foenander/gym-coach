@@ -579,3 +579,9 @@ vary cadence between slower and faster strides while keeping both arms
 and legs in phase.
 
 Set `heel_pivot` to centre the ankle rotation on the heel for a toe raise.
+
+A `roman-chair` holds the thigh angle at 45 degrees and fixes the hip
+joint while the trunk hinges. The front pad edge bears against the
+upper thighs. The bake checks that both thighs stay on the pad, both
+ankles stay against the rollers, and the trunk stops in line with the
+legs at lockout.

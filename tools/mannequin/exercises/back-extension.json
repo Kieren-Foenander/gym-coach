@@ -1,75 +1,25 @@
 {
-  "equipment": [],
-  "hands": {
-    "Left": "relaxed",
-    "Right": "relaxed"
-  },
-  "prone_support": true,
-  "camera": {
-    "angle": 54,
-    "elevation": 30,
-    "margin": 1.26
-  },
-  "frames": 114,
-  "keys": [
+  "equipment": [
     {
-      "at": 0,
-      "pelvis": [
-        0,
-        0,
-        0.122
-      ],
-      "lean": 90,
-      "spine": -5.5,
-      "head": -4,
-      "free_leg_left": [
-        -4,
-        0
-      ],
-      "free_leg_right": [
-        -4,
-        0
-      ],
-      "neck_retraction": 0.012
-    },
-    {
-      "at": 0.12
-    },
-    {
-      "at": 0.44,
-      "spine": -19,
-      "head": 0,
-      "free_leg_left": [
-        -4,
-        0
-      ],
-      "free_leg_right": [
-        -4,
-        0
-      ],
-      "neck_retraction": 0
-    },
-    {
-      "at": 0.58
+      "type": "roman-chair",
+      "hips": [0, 0, 1.15],
+      "pad_height": -0.117,
+      "roller_offset": [0, -0.057, 0.088]
     }
   ],
+  "hands": {"Left": "relaxed", "Right": "relaxed"},
+  "camera": {"angle": 82, "elevation": 10, "margin": 1.24},
+  "frames": 114,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 1.15], "lean": 45},
+    {"at": 0.10},
+    {"at": 0.48, "lean": 131},
+    {"at": 0.58}
+  ],
   "checkpoints": [
-    {
-      "at": 0.5,
-      "position": {
-        "point": "Arm",
-        "z": [
-          0.16,
-          0.24
-        ]
-      }
-    },
-    {
-      "elbow": [
-        106,
-        130
-      ]
-    }
+    {"at": 0.05, "position": {"point": "Head", "relative_to": "Hips", "z": [0.34, 0.40]}},
+    {"at": 0.53, "position": {"point": "Head", "relative_to": "Hips", "z": [-0.50, -0.34]}},
+    {"elbow": [106, 130]}
   ],
   "temple_hands": true
 }
