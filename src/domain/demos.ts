@@ -55,6 +55,24 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "hanging-knee-raise",
+    views: ["front"],
+    cues: [
+      "Hang from the bar with both arms straight.",
+      "Bend your knees and lift them toward your chest.",
+      "Lower your legs under control without swinging.",
+    ],
+  },
+  {
+    slug: "hanging-leg-raise",
+    views: ["front"],
+    cues: [
+      "Hang with your feet together and your arms straight.",
+      "Lift both legs forward to about hip height.",
+      "Lower slowly without swinging.",
+    ],
+  },
+  {
     slug: "mountain-climber",
     views: ["front"],
     cues: [
