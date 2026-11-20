@@ -307,6 +307,39 @@ def hand_on_bar(forearm, palm_wanted, bar):
     return along, palm if palm.dot(palm_wanted) > 0 else -palm
 
 
+def relax_unsupported_hand(side, wrist, ground_along, ground_palm, torso):
+    """Ease into a neutral wrist as a support hand leaves the floor."""
+    forearm = world_rotation(side + "ForeArm").col[1]
+    approach = max(0, min(1, (.16 - wrist.z) / .135))
+    bend = forearm.rotation_difference(ground_along)
+    amount = min(approach, math.radians(39) / max(.001, bend.angle))
+    along = Quaternion().slerp(bend, amount) @ forearm
+    inward = -torso.left * SIDES[side]
+    palm = inward.lerp(ground_palm, approach)
+    palm = (palm - along * palm.dot(along)).normalized()
+    aim(side + "Hand", along, palm_axis(side), palm)
+    return 1 - approach
+
+
+def relaxed_fingers(side):
+    """Curl the distal skin slightly without moving the stitched wrist."""
+    skin = bpy.data.objects["skin"]
+    if skin.data.shape_keys is None:
+        skin.shape_key_add(name="Basis")
+    shape = skin.shape_key_add(name="Relaxed fingers." + side)
+    marker = skin.vertex_groups["GripSurface." + side].index
+    wrist = bones[side + "Hand"].bone.head_local
+    along = REST[side + "Hand"].col[1]
+    palm = REST[side + "Hand"] @ palm_axis(side)
+    for vertex in skin.data.vertices:
+        if not any(group.group == marker for group in vertex.groups):
+            continue
+        depth = max(0.0, (vertex.co - wrist).dot(along) - .069)
+        bend = depth * min(1, depth / .07)
+        shape.data[vertex.index].co += (palm * .50 - along * .18) * bend
+    return shape
+
+
 def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0)), contact_frame=None):
     sign = SIDES[side]
     upper, fore = segment(f"{side}Arm", f"{side}ForeArm", f"{side}Hand")
@@ -3568,6 +3601,8 @@ def bake(spec, keys):
         raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
     has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
+    relaxing = {side: relaxed_fingers(side) for side in planted_sides
+                if any("plant_" + side.lower() in key for key in keys)}
     wrists = wrist_collision_points()
     wrist_points = np.empty((len(wrists.data.vertices), 3), dtype=np.float32)
     sections = [ElbowSection(side) for side in SIDES]
@@ -3838,7 +3873,15 @@ def bake(spec, keys):
                 gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
                 gaps.append((side + " floor wrist", gap))
                 if side in planted_sides and not planted:
+                    relaxation = relax_unsupported_hand(side, wrist, along, palm, torso)
+                    if side in relaxing:
+                        relaxing[side].value = relaxation
+                        relaxing[side].keyframe_insert("value", frame=frame)
+                    grips[side].check_wrist(frame, problems)
                     continue
+                if side in relaxing:
+                    relaxing[side].value = 0
+                    relaxing[side].keyframe_insert("value", frame=frame)
                 surface = grips[side]
                 transform = surface.transform
                 heights = surface.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z

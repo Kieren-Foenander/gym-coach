@@ -378,8 +378,9 @@ enough `width` to fit both hands. Contact is measured against the pad's
 top, within its edges. For moving hands, key `plant_left` and
 `plant_right` as world-space wrist positions, and use `during: [start, end]`
 on each side's floor-plant checkpoints. Intervals include the start and
-exclude the end, and all phases use the normalized loop time. The wrist
-can travel off the support between those intervals.
+exclude the end, and all phases use the normalized loop time. Between those intervals the fingers relax toward a slight curl and the
+wrist is checked against the standard 40° limit. The planted hand retains
+the ground-contact and wrist-extension checks.
 
 ### Bar turnover
 
