@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "dip",
+    views: ["front"],
+    cues: [
+      "Support yourself on straight arms between the bars.",
+      "Lean slightly forward and bend your elbows back.",
+      "Press through the bars to straighten your arms.",
+    ],
+  },
+  {
     slug: "pull-up",
     views: ["front"],
     cues: [

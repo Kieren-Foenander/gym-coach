@@ -75,6 +75,10 @@ each hand. The frame checks grip contact, hardware clearance, and whether
 the lowest skin vertex on each foot stays at least 10 cm above the floor
 on every frame.
 
+Use `parallel-bars` for a dip. Set `grip` to the left palm's target in
+world metres. The right rail mirrors that position. The bake checks
+neutral-grip contact and clearance from the rails, posts and bases.
+
 ### Choosing a colour
 
 ```sh

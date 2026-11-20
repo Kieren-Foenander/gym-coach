@@ -176,3 +176,13 @@ problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 for side in ("Left", "Right"):
     assert side + " foot below hanging clearance" in problems.found, list(problems.lines())
 print("HANGING FOOT CLEARANCE REGRESSIONS PASSED")
+
+spec = initial_pose("dip")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("dip")
+spec["equipment"][0]["grip"][0] = .12
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert any("dip rail crosses the body" in label for label in problems.found), list(problems.lines())
+print("DIP RAIL CLEARANCE REGRESSIONS PASSED")
