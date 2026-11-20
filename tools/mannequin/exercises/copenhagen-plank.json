@@ -1,0 +1,81 @@
+{
+  "equipment": [
+    {
+      "type": "bench",
+      "at": [
+        0.115,
+        -0.84,
+        0.413
+      ],
+      "length": 0.24,
+      "width": 0.2
+    }
+  ],
+  "hands": {
+    "Left": "support",
+    "Right": "relaxed"
+  },
+  "side_support": {
+    "wrist": [
+      0.251,
+      0.36,
+      0.0236
+    ],
+    "bench_foot": true
+  },
+  "camera": {
+    "angle": 285,
+    "elevation": 6,
+    "margin": 1.23
+  },
+  "frames": 78,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.475
+      ],
+      "lean": -90,
+      "roll": 90,
+      "side_bend": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "side": "Left",
+      "elbow": [
+        80,
+        105
+      ],
+      "knee": [
+        30,
+        43
+      ],
+      "position": {
+        "point": "ForeArm",
+        "relative_to": "Arm",
+        "x": [
+          -0.03,
+          0.03
+        ],
+        "y": [
+          -0.03,
+          0.03
+        ],
+        "z": [
+          -0.25,
+          -0.22
+        ]
+      }
+    },
+    {
+      "side": "Right",
+      "knee": [
+        0,
+        6
+      ]
+    }
+  ]
+}

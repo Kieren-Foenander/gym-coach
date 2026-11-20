@@ -46,6 +46,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "copenhagen-plank",
+    views: ["front"],
+    cues: [
+      "Place your upper foot on the bench and your elbow under your shoulder.",
+      "Lift your hips and keep your chest facing forward.",
+      "Hold the position and breathe steadily.",
+    ],
+  },
+  {
     slug: "pistol-squat",
     views: ["front"],
     cues: [

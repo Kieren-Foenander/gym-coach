@@ -546,3 +546,6 @@ the pad.
 For a dragon flag, use a flat core bench with a fixed `grip` instead
 of the ankle roller. The upper back anchors near the end of the pad.
 Use `upper_back_contact` to check the support throughout the rep.
+
+A Copenhagen hold reuses the forearm support with `bench_foot: true`
+and a flat bench supporting the upper foot.

@@ -253,10 +253,17 @@ def pose_side_support(spec, pelvis, torso, gaps):
     down = pelvis @ Vector((0, 0, -1))
     for side in SIDES:
         direction = down if side == "Left" else (down + torso.left * .153).normalized()
-        for bone in ("UpLeg", "Leg"):
-            swing(side + bone, direction)
+        free_leg = side == "Left" and spec.get("bench_foot")
+        if free_leg:
+            direction = (down + torso.left * .34 + torso.forward * .52).normalized()
+        swing(side + "UpLeg", direction)
+        foot = pelvis
+        if free_leg:
+            direction = (down + torso.left * .34 - torso.forward * .16).normalized()
+            foot = Matrix.Rotation(-.20, 3, "Z") @ pelvis
+        swing(side + "Leg", direction)
         for bone in ("Foot", "ToeBase"):
-            place(side + bone, pelvis @ REST[side + bone])
+            place(side + bone, foot @ REST[side + bone])
     along, palm = Vector((1, 0, 0)), Vector((0, 0, -1))
     wrist = Vector(spec["wrist"])
     target = wrist + along * GRIP["Left"][0] + palm * GRIP["Left"][1]
@@ -3357,9 +3364,9 @@ class SkinContact:
             if gap < -.006:
                 problems.add(frame, label + " penetrates the floor", -gap)
 
-    def check_side_support(self, frame, points, palm, problems):
+    def check_side_support(self, frame, points, palm, problems, bench=None):
         hips = (head("LeftUpLeg") + head("RightUpLeg")) / 2
-        ankles = (head("LeftFoot") + head("RightFoot")) / 2
+        ankles = head("RightFoot") if bench else (head("LeftFoot") + head("RightFoot")) / 2
         body_line = math.degrees((hips - ankles).angle(Torso().up))
         if body_line > 5:
             problems.add(frame, "hips break the side plank line", body_line, "degrees")
@@ -3392,12 +3399,19 @@ class SkinContact:
             if not -.006 <= gap <= .008 or np.count_nonzero(heights <= .012) < 3:
                 problems.add(frame, f"ulna section {index} loses floor contact", abs(gap))
         height = points[self.foot_vertices["Left"], 2].min()
-        if not -.006 <= height <= .008:
+        if not bench and not -.006 <= height <= .008:
             problems.add(frame, "lower foot loses side support contact", abs(height))
         transform = palm.transform
         heights = palm.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
         if heights.min() < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:
             problems.add(frame, "lower palm loses side support contact", abs(heights.min()))
+        if bench:
+            if height < .05:
+                problems.add(frame, "lower foot drops in Copenhagen hold", .05 - height)
+            gap = bench.gap(points[self.foot_vertices["Right"]])
+            if not -.006 <= gap <= .010:
+                problems.add(frame, "upper foot loses Copenhagen bench support", abs(gap))
+            return
         lower_faces = self.vertices[np.isin(self.vertices, self.foot_vertices["Left"]).all(axis=1)]
         lower_foot = BVHTree.FromPolygons(points.tolist(), lower_faces.tolist(), all_triangles=True)
         upper_points = points[self.foot_vertices["Right"]]
@@ -4448,7 +4462,8 @@ def bake(spec, keys):
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
         if side_support:
-            contact.check_side_support(frame, everything, grips["Left"], problems)
+            contact.check_side_support(frame, everything, grips["Left"], problems,
+                                       bench if side_support.get("bench_foot") else None)
         if supine is not None:
             contact.check_supine_support(frame, everything, supine, phase, problems)
         if spec.get("forearm_support") == "thighs":
