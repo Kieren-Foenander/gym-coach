@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "single-leg-calf-raise",
+    views: ["back"],
+    cues: [
+      "Balance on one foot and lift the other clear.",
+      "Rise onto the ball of your foot without rolling the ankle.",
+      "Lower the heel slowly before repeating.",
+    ],
+  },
+  {
     slug: "single-leg-hip-thrust",
     views: ["back"],
     cues: [
