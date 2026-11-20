@@ -149,29 +149,20 @@ jobs:
           E2E_APP_PATH: ${{ env.APP }}
           E2E_DEVICE: ${{ env.UDID }}
 
-      # One recording of the whole tour, from the simulator itself. e2e keeps its own video of a failed test.
+      # e2e records the device itself, one video for the tour, since its tests run as one group.
       - name: Tour the app
-        run: |
-          xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/tour.mp4" &
-          echo $! > "$OUT/recorder.pid"
-          sleep 2
-          bunx e2e run --target ios --retries 0
+        run: bunx e2e run --target ios --retries 0 --video on
         env:
           E2E_APP_PATH: ${{ env.APP }}
           E2E_DEVICE: ${{ env.UDID }}
 
-      - name: Stop the recording
+      - name: Collect the recording and screenshots
         if: always()
         working-directory: tour-output
         run: |
-          if [ -f recorder.pid ]; then
-            kill -INT "$(cat recorder.pid)" || true
-            # The recorder writes the end of the file after it is told to stop.
-            for i in $(seq 1 20); do kill -0 "$(cat recorder.pid)" 2> /dev/null || break; sleep 1; done
-            rm recorder.pid
-          fi
-          # Each app.screenshot() in the tour, by its label, and everything e2e kept: the JUnit report, and a
-          # trace page and video for any test that failed.
+          # The tour's video, each app.screenshot() by its label, and everything e2e kept: the JUnit report,
+          # and a trace page for any test that failed.
+          find ../.e2e/results -name '*.mp4' -path '*/video/*' | head -1 | xargs -I{} cp {} tour.mp4 || true
           find ../.e2e/results -name '*.png' -path '*/screenshots/*' -exec cp {} . \; 2> /dev/null || true
           cp -R ../.e2e e2e-results 2> /dev/null || true
           ls -la
