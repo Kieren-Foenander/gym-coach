@@ -415,7 +415,7 @@ def relaxed_fingers(side, narrow=False):
     return shape
 
 
-def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0)), contact_frame=None):
+def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0)), contact_frame=None, planted_wrist=False):
     sign = SIDES[side]
     upper, fore = segment(f"{side}Arm", f"{side}ForeArm", f"{side}Hand")
     shoulder = head(f"{side}Arm")
@@ -458,7 +458,10 @@ def pose_arm(side, grip_point, pole, grip, torso, bar=Vector((1, 0, 0)), contact
         place(fore_name, lower)
     rest_palm = REST[f"{side}ForeArm"].transposed() @ Vector(rig[f"palm_rest.{side}"])
     rest_palm.y = 0
-    aim(f"{side}ForeArmRoll", fore_axis, rest_palm.normalized(), palm)
+    # At a planted wrist the palm normal nearly parallels the forearm. Undo
+    # wrist extension before using the palm to orient the forearm's roll.
+    roll_normal = along.rotation_difference(fore_axis) @ palm if planted_wrist else palm
+    aim(f"{side}ForeArmRoll", fore_axis, rest_palm.normalized(), roll_normal)
     aim(f"{side}Hand", along, palm_axis(side), palm)
     return gap
 
@@ -5684,7 +5687,8 @@ def bake(spec, keys):
                 else:
                     out, back, up = spec.get("plant_elbow", (.58, .14, -.45))
                     pole = Vector((sign * out, back, up))
-                gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
+                gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm),
+                               planted_wrist=elevated_palms)
                 gaps.append((side + " floor wrist", gap))
                 if side in planted_sides and not planted:
                     relaxation = relax_unsupported_hand(side, wrist, along, palm, torso)

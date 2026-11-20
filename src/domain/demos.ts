@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "bench-dip",
+    views: ["front"],
+    cues: [
+      "Place your palms at the bench edge and plant both feet.",
+      "Keep your hips close as you bend your elbows back.",
+      "Press through your palms to straighten your arms.",
+    ],
+  },
+  {
     slug: "medicine-ball-slam",
     views: ["front"],
     cues: [

@@ -1,0 +1,23 @@
+{
+  "equipment": [
+    {"type": "bench", "at": [0, 0.178, 0.45], "width": 0.82, "length": 0.48}
+  ],
+  "stance": {"width": 0.34, "toe_out": 7, "y": -0.82},
+  "camera": {"angle": 68, "elevation": 10},
+  "floor_hands": [0.256, 0.04, 0.4736],
+  "hands": {"Left": "support", "Right": "support"},
+  "frames": 108,
+  "keys": [
+    {"at": 0, "pelvis": [0, -0.172, 0.5555], "lean": -8, "head": 0, "plant_elbow": [0.34, 0.9, 0.04]},
+    {"at": 0.09},
+    {"at": 0.46, "pelvis": [0, -0.21, 0.328], "lean": -3, "plant_elbow": [0.34, 0.9, 0.04]},
+    {"at": 0.56}
+  ],
+  "checkpoints": [
+    {"hand_mode": "floor-plant"},
+    {"at": 0, "elbow": [0, 20]},
+    {"at": 0.5, "elbow": [80, 125]}
+  ],
+  "palm_support": "bench",
+  "palm_toe_in": -36
+}
