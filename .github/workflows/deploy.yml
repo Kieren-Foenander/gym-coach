@@ -3,7 +3,7 @@ name: Deploy
 # Alchemy deploys one stage per branch of work (see alchemy.run.ts):
 #   a push to master         -> the "prod" stage, after the checks pass
 #   a pull request           -> its own "pr-<number>" preview, with the address posted as a comment, then the
-#                               browser tests marked @smoke run against it
+#                               browser tests tagged smoke run against it
 #   closing the pull request -> that preview is destroyed
 on:
   push:
@@ -99,20 +99,21 @@ jobs:
           SIGNUP_CODE: ${{ steps.invite.outputs.code }}
           PULL_REQUEST: ${{ github.event.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: bunx playwright install --with-deps chromium
-      # The browser tests marked @smoke, against the preview just deployed: the real Worker, D1 and KV.
+      - run: bunx @e2e-dev/web install chromium --with-deps
+      # The browser tests tagged smoke, against the preview just deployed: the real Worker, D1 and KV.
       - name: Smoke test the preview
-        run: bun run e2e
+        run: bun run e2e --tag smoke
         env:
           E2E_BASE_URL: ${{ steps.deploy.outputs.url }}
           E2E_INVITE_CODE: ${{ steps.invite.outputs.code }}
+          # e2e sends anonymous usage data unless told not to.
+          E2E_TELEMETRY_DISABLED: "1"
       - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: preview-smoke-report
-          path: |
-            playwright-report
-            test-results
+          path: .e2e
+          include-hidden-files: true
           retention-days: 14
 
   cleanup:

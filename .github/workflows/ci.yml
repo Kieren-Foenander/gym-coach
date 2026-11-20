@@ -61,7 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Playwright's own image, so screenshots render exactly as they were recorded (tools/e2e/screenshots.sh
-    # uses the same one). Its version moves with @playwright/test; test/playwright-image.test.ts checks.
+    # uses the same one). Its version moves with the playwright-core that @e2e-dev/web pins;
+    # test/playwright-image.test.ts checks.
     container:
       image: mcr.microsoft.com/playwright:v1.65.1-noble
       options: --ipc=host
@@ -75,11 +76,14 @@ jobs:
       - run: bun install --frozen-lockfile
       # Serves its own copy of the app with a fresh local database (tools/e2e/serve.ts), so it needs no secrets.
       - run: bun run e2e
+        env:
+          # e2e sends anonymous usage data unless told not to.
+          E2E_TELEMETRY_DISABLED: "1"
+      # The report, and a trace page, screenshots and any missing or different screenshot for each failed test.
       - uses: actions/upload-artifact@v5
         if: failure()
         with:
-          name: playwright-report
-          path: |
-            playwright-report
-            test-results
+          name: e2e-report
+          path: .e2e
+          include-hidden-files: true
           retention-days: 14

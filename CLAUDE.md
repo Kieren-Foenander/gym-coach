@@ -30,8 +30,8 @@ What each change needs:
   - If it reports a breaking change (a field removed, a value that can now be null), native builds already on phones would break. Keep the old field instead. If it really must go, change `apps/mobile` first and say in the pull request what happens to older builds.
 - **A migration** is a new file with the next number. Never edit, rename or delete one that is on `master`; CI fails if you do, because deployed databases have already run it.
 - **Shared rules in `src/domain/`** get unit tests in `test/`, and the native side gets tests in `apps/mobile/test/` when its screens read them.
-- **A screen that is new or changed** gets a browser test in `e2e/` for what someone does on it (`bun run e2e`). Mark a test `@smoke` if it works on an empty database; those also run against the pull request's preview deploy. A screen whose look matters gets a screenshot comparison in `e2e/screenshots.spec.ts`, showing data that doesn't change with the date. When a change is meant to alter how it looks, run the "Update screenshots" workflow on the branch and check the new images in the pull request.
-- **A native screen that is new or changed** gets a step in the native tour, `e2e/native/tour.e2e.ts`, run with [e2e](https://e2e.com) (`e2e.config.ts`). It checks what the screen shows by test id, as the browser tests do; a device reads no `data-state`, so assert on an element being there or selected. `.github/workflows/ios-tour.yml` runs it on an iOS Simulator for every pull request that touches the app, and keeps a recording and screenshots. To run it on an Android emulator, see the comment in `e2e.config.ts`.
+- **A screen that is new or changed** gets a browser test in `e2e/web/` for what someone does on it (`bun run e2e`), written with [e2e](https://e2e.com). Tag a test `smoke` (`{ tags: ["smoke"] }`) if it works on an empty database; those also run against the pull request's preview deploy. A screen whose look matters gets a screenshot comparison in `e2e/web/screenshots.e2e.ts`, showing data that doesn't change with the date. When a change is meant to alter how it looks, run the "Update screenshots" workflow on the branch and check the new images in the pull request.
+- **A native screen that is new or changed** gets a step in the native tour, `e2e/native/tour.e2e.ts`, with the same runner (`e2e.config.ts`). It checks what the screen shows by test id, as the browser tests do; a device reads no `data-state`, so assert on an element being there or selected. `.github/workflows/ios-tour.yml` runs it on an iOS Simulator for every pull request that touches the app, and keeps a recording and screenshots. To run it on an Android emulator, see the comment in `e2e.config.ts`.
 
 ## Test ids
 
@@ -58,6 +58,6 @@ The tooling here ships fast (oxlint, tsrs, TypeScript, Vite, Vitest, Alchemy), s
 4. In `apps/mobile`, move Expo, React and React Native packages only with an Expo SDK upgrade (`bunx expo install --fix`), never one by one.
 5. Run `bun run check` at the root and in `apps/mobile` before opening the pull request.
 
-`@playwright/test` and the Playwright Docker image tag (in `.github/workflows/` and `tools/e2e/screenshots.sh`) move together; `test/playwright-image.test.ts` fails until they match. Record the screenshots again after a bump.
+The `playwright-core` that `@e2e-dev/web` pins and the Playwright Docker image tag (in `.github/workflows/` and `tools/e2e/screenshots.sh`) move together; `test/playwright-image.test.ts` fails until they match. Record the screenshots again after a bump.
 
 tsrs is used for oxlint's type-aware lint only; `tsc` stays the type checker until tsrs ships a stable release for the TypeScript version this project uses. When that happens, assess switching `typecheck` to `tsrs --noEmit`.
