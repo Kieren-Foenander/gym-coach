@@ -146,6 +146,21 @@ jobs:
             -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\"}" \
             -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
 
+      # e2e drives the simulator through agent-device's XCTest runner, whose first start can take minutes on a
+      # runner and overran e2e's launch budget. Build, start and health-check it here, with its own budget and a
+      # few tries, then stop this daemon so e2e's run starts its own on the ready runner.
+      - name: Start the iOS automation runner
+        run: |
+          for attempt in 1 2 3; do
+            if bunx agent-device prepare ios-runner --platform ios --udid "$UDID" --timeout 900000; then
+              bunx agent-device daemon stop || true
+              exit 0
+            fi
+            echo "Attempt $attempt did not get the runner ready."
+            bunx agent-device daemon stop || true
+          done
+          exit 1
+
       # Reports on agent-device, Xcode and the simulator before the tour, for the log. Its own checks get 30 s,
       # which the runner's simulator can miss, and `e2e run` checks the device again anyway, so it never fails
       # the job.
