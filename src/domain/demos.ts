@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "jump-squat",
+    views: ["front"],
+    cues: [
+      "Sit into a shallow squat to load your legs.",
+      "Drive through the floor and jump straight up.",
+      "Land softly and bend your hips and knees.",
+    ],
+  },
+  {
     slug: "wall-sit",
     views: ["front"],
     cues: [
