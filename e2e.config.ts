@@ -11,7 +11,8 @@ import type { E2EConfig } from "e2e"
  *
  * A device target needs a build of the Gym Preview app with its JavaScript bundled in, pointed at a server
  * at E2E_SERVER_URL that has the tour account on it (E2E_USER_TOUR_PASSWORD is its password). E2E_APP_PATH
- * names the build: the .app from apps/mobile/e2e/build-simulator.sh, or a release .apk.
+ * names the build, which the tests install first: the .app from apps/mobile/e2e/build-simulator.sh, or a
+ * release .apk. Leave it unset when the build is installed already.
  * .github/workflows/ios-tour.yml does all of it.
  */
 
