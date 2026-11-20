@@ -1,0 +1,92 @@
+{
+  "equipment": [],
+  "supine_support": {
+    "feet": true,
+    "lumbar_contact": []
+  },
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "y": -0.53,
+    "toe_out": 5,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 28,
+    "elevation": 14
+  },
+  "frames": 110,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.03,
+        0.136
+      ],
+      "lean": -32,
+      "spine": 8,
+      "head": 0,
+      "axial_twist": -39
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.45,
+      "axial_twist": 39
+    },
+    {
+      "at": 0.55
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        91,
+        125
+      ]
+    },
+    {
+      "at": 0,
+      "side": "Right",
+      "position": {
+        "point": "Arm",
+        "y": [
+          0.14,
+          0.34
+        ]
+      }
+    },
+    {
+      "at": 0.5,
+      "side": "Left",
+      "position": {
+        "point": "Arm",
+        "y": [
+          0.14,
+          0.34
+        ]
+      }
+    }
+  ],
+  "paired_reach": [
+    0.103,
+    0.31,
+    0.14
+  ]
+}

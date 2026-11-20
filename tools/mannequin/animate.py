@@ -4265,6 +4265,16 @@ def bake(spec, keys):
             surface.record_contact(height[on_pad].min(initial=1))
             if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
                 problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
+        if "paired_reach" in spec:
+            for side, sign in SIDES.items():
+                wrist = torso.point(spec["paired_reach"], sign)
+                along = torso.direction([-.22, 1, .05], sign)
+                inward = -torso.left * sign
+                palm = (inward - along * along.dot(inward)).normalized()
+                target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+                pole = torso.direction([.32, .62, -.70], sign)
+                gap = pose_arm(side, target, pole, "neutral", torso, contact_frame=(along, palm))
+                gaps.append((side + " paired hand", gap))
         if spec.get("temple_hands"):
             turn_head = world_rotation("Head") @ REST["Head"].transposed()
             for side, sign in SIDES.items():

@@ -64,6 +64,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "russian-twist",
+    views: ["front"],
+    cues: [
+      "Sit with your knees bent and heels down.",
+      "Lean back slightly and turn your ribs from side to side.",
+      "Keep your hips steady throughout.",
+    ],
+  },
+  {
     slug: "tibialis-raise",
     views: ["front"],
     cues: [
