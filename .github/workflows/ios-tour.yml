@@ -146,8 +146,11 @@ jobs:
             -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\"}" \
             -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
 
-      # Checks agent-device, Xcode, the simulator and the build before any test runs.
+      # Reports on agent-device, Xcode and the simulator before the tour, for the log. Its own checks get 30 s,
+      # which the runner's simulator can miss, and `e2e run` checks the device again anyway, so it never fails
+      # the job.
       - name: Check the e2e setup
+        continue-on-error: true
         run: bunx e2e doctor --target ios
         env:
           E2E_DEVICE: ${{ env.UDID }}
