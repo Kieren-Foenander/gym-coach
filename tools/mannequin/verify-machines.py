@@ -140,3 +140,16 @@ spec["equipment"][0]["forearm_support"]["face"][2] -= .045
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left kickback forearm support loses skin contact" in problems.found, list(problems.lines())
 print("KICKBACK SUPPORT REGRESSIONS PASSED")
+
+top = api["load_keys"](json.loads((here / "exercises/machine-hip-thrust.json").read_text()))[2]
+spec = initial_pose("machine-hip-thrust")
+spec.update(keys=[{**top, "at": 0}], checkpoints=[])
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("machine-hip-thrust")
+spec.update(keys=[{**top, "at": 0}], checkpoints=[])
+spec["equipment"][0]["pivot"][1] += .065
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "hip thrust pad leaves the front hip crease" in problems.found, list(problems.lines())
+print("HIP THRUST PELVIS REGRESSIONS PASSED")

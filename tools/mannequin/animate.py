@@ -2019,7 +2019,8 @@ class HipThrustStation:
             bearing.location = axle
             self.parts.extend((part,False) for part in (post,base,bearing))
             self.links[side] = [CableStation.part(name,radius,metal) for name,radius in (
-                ("hip thrust lever",.024),("hip thrust grip return",.018))]
+                ("hip thrust lever",.024),("hip thrust grip return",.018),
+                ("hip thrust pad spindle",.014))]
             self.parts.extend((part,False) for part in self.links[side])
             self.handles[side] = CableStation.part("hip thrust grip",Barbell.SHAFT,metal)
             self.parts.append((self.handles[side],True))
@@ -2039,20 +2040,37 @@ class HipThrustStation:
             grip=self.centre+axis*sign*.300
             set_segment(self.links[side][0],pivot,outer,frame)
             set_segment(self.links[side][1],outer,grip+axis*sign*.073,frame)
+            set_segment(self.links[side][2], self.centre + axis * sign * (self.half - .008),
+                        grip - axis * sign * .073, frame)
             set_segment(self.handles[side],grip-axis*sign*.073,grip+axis*sign*.073,frame)
             gap=pose_arm(side,grip,torso.direction([.65,-.1,-.55],sign),"pronated",torso,axis)
             gaps.append((side+" hip thrust grip",gap))
 
     def check(self, points, faces, hands, grips, frame, problems, samples):
-        check_rendered_grips(self.handles,grips,frame,problems)
-        check_hardware_clearance(self.parts,points,faces,hands,grips,frame,problems)
-        rel=points-np.array(self.centre)
-        radial=np.linalg.norm(rel[abs(rel[:,0]) < self.half,1:],axis=1)
-        gap=radial.min(initial=1)-self.radius
-        if gap < -.007 or gap > .014:
-            problems.add(frame,"hip thrust pad contact",abs(gap))
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+
+        # Measure the contact region in the pelvis frame, which tips back during the rep.
+        hips = head("Hips")
+        rotation = world_rotation("Hips") @ REST["Hips"].transposed()
+        local = (points - np.array(hips)) @ np.array(rotation)
+        span = abs(points[:, 0] - self.centre.x) < self.half
+        front_crease = (local[:, 1] < -.07) & (local[:, 2] >= -.105) & (local[:, 2] <= .024)
+        radial = np.linalg.norm((points - np.array(self.centre))[:, 1:], axis=1)
+        gap = radial[span & front_crease].min(initial=1) - self.radius
+        if gap > .014:
+            problems.add(frame, "hip thrust pad loses pelvis contact", gap)
+        depth = self.radius - radial[span].min(initial=1)
+        if depth > .007:
+            problems.add(frame, "hip thrust pad penetrates skin", depth)
+        centre = rotation.transposed() @ (self.centre - hips)
+        # As the hips extend, the pad settles toward the thigh side of the crease.
+        upper = -.025 + .133 * rotation[2][2]
+        if not -.10 <= centre.z <= upper:
+            problems.add(frame, "hip thrust pad leaves the front hip crease",
+                         max(-.10 - centre.z, centre.z - upper))
         samples.append(np.array([part.matrix_world @ Vector(v)
-                                 for part,_ in self.parts for v in part.bound_box]))
+                                 for part, _ in self.parts for v in part.bound_box]))
 
 
 class BeltSquatStation:
