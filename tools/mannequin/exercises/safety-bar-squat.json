@@ -1,0 +1,79 @@
+{
+  "equipment": [
+    {
+      "type": "safety-bar"
+    }
+  ],
+  "stance": {
+    "width": 0.37,
+    "toe_out": 20
+  },
+  "camera": {
+    "angle": 38,
+    "elevation": 14
+  },
+  "frames": 112,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 4,
+      "bar": {
+        "at": "upper back",
+        "offset": [
+          0,
+          0.018,
+          0.038
+        ]
+      },
+      "grip": "thumb-forward",
+      "elbows": [
+        0.24,
+        0.29,
+        -1
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "pelvis": [
+        0,
+        0.147,
+        0.53
+      ],
+      "lean": 34,
+      "head": -18
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        60,
+        126
+      ]
+    },
+    {
+      "at": 0.05,
+      "knee": [
+        0,
+        15
+      ]
+    },
+    {
+      "at": 0.52,
+      "knee": [
+        90,
+        135
+      ]
+    }
+  ]
+}

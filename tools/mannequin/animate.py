@@ -650,6 +650,83 @@ class BentBar(Barbell):
         return inside, int(plate.sum()), closest
 
 
+class SafetyBar(BentBar):
+    """A cambered squat bar with shoulder pads and forward neutral grips."""
+
+    INNER = .59
+
+    def __init__(self):
+        steel = material("safety bar steel", STEEL, .8, .34)
+        foam = material("safety bar foam", PAD, .08, .67)
+        iron = material("safety bar plates", IRON, .34, .5)
+        self.root = bpy.data.objects.new("safety squat bar", None)
+        scene.collection.objects.link(self.root)
+        self.spans, self.handles, self.pads, self.plates = [], {}, {}, []
+        self.centre = Vector()
+        self.orientation = Matrix.Identity(3)
+
+        def tube(name, start, end, radius, finish, side=None):
+            start, end = Vector(start), Vector(end)
+            delta = end - start
+            part = cylinder(name, radius, delta.length, 0, finish, self.root)
+            part.location = (start + end) / 2
+            part.rotation_euler = delta.to_track_quat("Z", "Y").to_euler()
+            if finish == steel:
+                self.spans.append((np.array(start), np.array(delta.normalized()), delta.length, radius, side))
+            return part
+
+        tube("safety bar cross shaft", (-.46, .045, 0), (.46, .045, 0), self.SHAFT, steel)
+        for side, sign in SIDES.items():
+            x = sign * .163
+            a, b = (x, .045, 0), (x, -.219, -.015)
+            self.pads[side] = (np.array(a), np.array(b))
+            tube("safety bar shoulder pad", a, b, .041, foam)
+            bend = (x, -.321, -.071)
+            tube("safety bar handle bracket", b, bend, self.SHAFT, steel)
+            self.handles[side] = tube("safety bar handle", bend, (x, -.401, -.217), self.SHAFT, steel, side)
+            tube("camber drop", (sign*.46, .045, 0), (sign*.59, -.035, -.171), .022, steel)
+            tube("safety bar sleeve", (sign*.59, -.035, -.171), (sign*.91, -.035, -.171), .024, steel)
+            plate = cylinder("safety bar weight plate", .19, .047, sign*.69, iron, self.root)
+            plate.location.yz = (-.035, -.171)
+            self.plates.append(plate)
+
+    def orient(self, torso, frame):
+        self.orientation = Matrix((torso.left, -torso.forward, torso.up)).transposed()
+        self.root.rotation_euler = self.orientation.to_euler()
+        self.root.keyframe_insert("rotation_euler", frame=frame)
+
+    def grip(self, side):
+        handle = self.handles[side]
+        axis = self.orientation @ handle.rotation_euler.to_matrix().col[2]
+        return self.centre + self.orientation @ handle.location, axis
+
+    def local_points(self, points):
+        return (points - np.array(self.centre)) @ np.array(self.orientation)
+
+    def intrusions(self, points, hand_mask):
+        local = self.local_points(points)
+        shaft, _, gap = super().intrusions(local + np.array(self.centre), hand_mask)
+        x, y, z = local.T
+        radial = np.hypot(y + .035, z + .171)
+        plate = (radial < .19) & (abs(abs(x) - .69) < .0235)
+        return shaft, int(plate.sum()), gap
+
+    def check(self, points, frame, problems):
+        local = self.local_points(points)
+        for side, (start, end) in self.pads.items():
+            axis = end - start
+            distance = (local - start) @ axis / (axis @ axis)
+            radial = np.linalg.norm(local - start - distance[:, None] * axis, axis=1)
+            gap = radial[(distance > .12) & (distance < .88)].min(initial=1) - .041
+            if not -.012 <= gap <= .012:
+                label = "pad lifts off the shoulder" if gap > 0 else "pad penetrates the shoulder"
+                problems.add(frame, side + " safety bar " + label, abs(gap))
+        for plate in self.plates:
+            bottom = min((plate.matrix_world @ corner.co).z for corner in plate.data.vertices)
+            if bottom < -.002:
+                problems.add(frame, "safety bar plate crosses the floor", -bottom)
+
+
 class Landmine:
     """A floor pivot carrying a rigid shaft, a loaded sleeve and a grip attachment."""
     SHAFT = .014
@@ -4851,12 +4928,14 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "wrist-roller", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "safety-bar", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
     for item in spec.get("equipment", []):
         kind = item["type"]
+        if kind == "safety-bar":
+            barbell = SafetyBar()
         if kind == "wrist-roller":
             barbell = WristRoller()
         if kind in {"barbell", "ez-bar", "trap-bar"}:
@@ -5150,6 +5229,8 @@ def bake(spec, keys):
             else:
                 centre = span.sample("bar", resolve=lambda target: bar_centre(target, torso))
             barbell.move(Vector(centre), frame)
+            if isinstance(barbell, SafetyBar):
+                barbell.orient(torso, frame)
             if isinstance(barbell, WristRoller):
                 barbell.wind(span.sample("hand_pitch"), frame)
             if smith:
@@ -5610,6 +5691,8 @@ def bake(spec, keys):
             closest["bar"] = min(closest["bar"], gap)
             if shaft or plate:
                 problems.add(frame, f"the bar passes through the body ({'plate' if plate else 'shaft'})", -gap)
+            if isinstance(barbell, SafetyBar):
+                barbell.check(everything, frame, problems)
         if dumbbells:
             corners = np.array(dumbbells.corners())
             samples.append(corners)

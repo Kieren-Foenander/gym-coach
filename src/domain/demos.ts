@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "safety-bar-squat",
+    views: ["front"],
+    cues: [
+      "Set the pads across your shoulders and take the handles.",
+      "Sit down between your feet with your chest braced.",
+      "Drive through both feet to stand.",
+    ],
+  },
+  {
     slug: "sled-pull",
     views: ["front"],
     cues: [
