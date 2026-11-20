@@ -69,6 +69,9 @@ export default {
   workers: 1,
   timeout: slow ? 600_000 : 120_000,
   actionTimeout: slow ? 120_000 : 30_000,
+  // How long a check waits for what it expects, as the Playwright tests did: a deployed preview's database
+  // takes a few seconds to save a plan.
+  assertionTimeout: 10_000,
   reporters: ["list", "junit"],
   video: "retain-on-failure",
   credentials: {
