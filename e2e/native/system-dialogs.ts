@@ -26,9 +26,13 @@ export const dismissSavePassword = async (device: Device, within = SAVE_PASSWORD
   await notNow(device).tap()
 }
 
-/** Taps "Not Now" if the save-password sheet is over the app right now, in case it came after the wait. */
-export const dismissSavePasswordIfShown = async (device: Device) => {
-  if (device.unstable_raw.platform !== "ios") return
+/** Taps "Not Now" if the save-password sheet is over the app right now. Answers whether it was. */
+export const dismissSavePasswordIfShown = async (device: Device): Promise<boolean> => {
+  if (device.unstable_raw.platform !== "ios") return false
 
-  if (await notNow(device).isVisible()) await notNow(device).tap()
+  if (!(await notNow(device).isVisible())) return false
+
+  await notNow(device).tap()
+
+  return true
 }

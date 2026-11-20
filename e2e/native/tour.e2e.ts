@@ -33,8 +33,24 @@ describe("a tour of the main screens", { serial: true }, () => {
     await device.dismissKeyboard()
     await screen.getByTestId(testIds.login.submit).tap()
 
-    await expect(screen.getByTestId(testIds.nav.tab("today"))).toBeSelected({ timeout: 60_000 })
-    await dismissSavePassword(device)
+    // Sign-in lands on Today, but iOS can lay its save-password sheet over the app before or after that.
+    // Clear it whenever it shows while waiting, and wait for it afterwards only if it hasn't come yet.
+    const today = screen.getByTestId(testIds.nav.tab("today"))
+    let dismissed = false
+
+    await expect
+      .poll(
+        async () => {
+          dismissed = (await dismissSavePasswordIfShown(device)) || dismissed
+
+          return today.isVisible()
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true)
+    await expect(today).toBeSelected()
+
+    if (!dismissed) await dismissSavePassword(device)
     await app.screenshot("02-today")
   })
 
