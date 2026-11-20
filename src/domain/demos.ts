@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "plank",
+    views: ["front"],
+    cues: [
+      "Set your palms under your shoulders and extend both legs.",
+      "Brace your abdomen and squeeze your glutes.",
+      "Keep your body in a straight line as you breathe.",
+    ],
+  },
+  {
     slug: "incline-push-up",
     views: ["front"],
     cues: [
