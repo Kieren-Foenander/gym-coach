@@ -595,3 +595,7 @@ as the anchor height. Set `rest_length` in metres to the unstretched
 length between the fixed pin and the attachment eye. The strip narrows
 as it lengthens. Each frame must keep it clear of the body and between
 1.05 and 2.5 times its rest length.
+
+A `thigh-band` fits a closed strip just above the knees. Each frame uses
+the posed thigh skin to fit the loop around both legs and checks its
+perimeter against `rest_length`.

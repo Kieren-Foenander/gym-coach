@@ -1123,6 +1123,92 @@ class BandStation(CableStation):
         check_hardware_clearance(self.parts, points, faces, np.zeros(len(points), dtype=bool), {}, frame, problems)
 
 
+class ThighBand:
+    """A closed elastic loop fitted around both thigh cross sections."""
+
+    COUNT = 24
+
+    def __init__(self, config):
+        self.rest_length = config["rest_length"]
+        angles = np.arange(self.COUNT) * math.tau / self.COUNT
+        self.normals = np.column_stack((np.cos(angles), np.sin(angles)))
+        self.corners = np.linalg.inv(np.stack((self.normals, np.roll(self.normals, -1, axis=0)), axis=1))
+        faces = []
+        for k in range(self.COUNT):
+            n = (k + 1) % self.COUNT
+            faces.append((k, n, n + self.COUNT, k + self.COUNT))
+        mesh = bpy.data.meshes.new("thigh band webbing")
+        mesh.from_pydata([(0, 0, 0)] * (2 * self.COUNT), [], faces)
+        self.strip = bpy.data.objects.new("thigh band webbing", mesh)
+        scene.collection.objects.link(self.strip)
+        self.strip.data.materials.append(material("amber resistance band", (.60, .205, .035), .03, .47))
+        thickness = self.strip.modifiers.new("rubber thickness", "SOLIDIFY")
+        thickness.thickness = .002
+        thickness.offset = 1
+        self.strip.shape_key_add(name="Basis")
+
+    def pose(self, points, contact, frame, problems, samples):
+        hips = [head(side + "UpLeg") for side in SIDES]
+        knees = [head(side + "Leg") for side in SIDES]
+        axis = sum((knee - hip for hip, knee in zip(hips, knees)), Vector()).normalized()
+        centre = sum((hip.lerp(knee, .72) for hip, knee in zip(hips, knees)), Vector()) / 2
+        u = axis.orthogonal().normalized()
+        v = axis.cross(u)
+        basis = np.array([u, v]).T
+        offsets = points - np.array(centre)
+        height = offsets @ np.array(axis)
+        contour = offsets @ basis
+        supports = []
+        for side in SIDES:
+            thigh = np.unique(contact.vertices[contact.part == side + " thigh"])
+            patch = contour[thigh[np.abs(height[thigh]) < .035]]
+            if not len(patch):
+                problems.add(frame, side + " thigh band loses contact", .035)
+                return
+            supports.append((patch @ self.normals.T).max(axis=0))
+        outer = np.maximum(*supports)
+        if any((outer - side).min() > .009 for side in supports):
+            problems.add(frame, "thigh band loses skin contact", .009)
+        walls = np.stack((outer, np.roll(outer, -1)), axis=1) + .003
+        ring = (self.corners @ walls[:, :, None])[:, :, 0]
+        perimeter = np.linalg.norm(ring - np.roll(ring, -1, axis=0), axis=1).sum()
+        ratio = perimeter / self.rest_length
+        if not 1.05 <= ratio <= 2.5:
+            problems.add(frame, "thigh band outside its stretch range",
+                         max(1.05 * self.rest_length - perimeter, perimeter - 2.5 * self.rest_length))
+        world = ring @ basis.T + np.array(centre)
+        half_width = .025 / math.sqrt(max(1, ratio)) * np.array(axis)
+        vertices = np.vstack((world - half_width, world + half_width))
+        pose = self.strip.shape_key_add(name=f"Frame {frame}", from_mix=False)
+        for vertex, point in zip(pose.data, vertices):
+            vertex.co = point
+        for at, value in ((frame - 1, 0), (frame, 1), (frame + 1, 0)):
+            pose.value = value
+            pose.keyframe_insert("value", frame=at)
+        pose.value = 1
+        samples.append(vertices)
+
+
+def pose_clamshell(pelvis, opening):
+    """Keep the lower thigh and both ankles still as the upper knee opens."""
+    down = pelvis @ Vector((0, 0, -1))
+    forward = pelvis @ Vector((0, -1, 0))
+    upper = (.77 * down + .64 * forward).normalized()
+    lower = (.82 * down - .57 * forward).normalized()
+    swing("LeftUpLeg", upper)
+    swing("LeftLeg", lower)
+    hip = head("RightUpLeg")
+    ankle = head("LeftFoot") + Vector((0, 0, .085))
+    first, second = segment("RightUpLeg", "RightLeg", "RightFoot")
+    pole = Matrix.Rotation(math.radians(opening), 3, down) @ forward
+    knee, _ = bend(hip, ankle, first, second, pole)
+    swing("RightUpLeg", (knee - hip).normalized())
+    swing("RightLeg", (ankle - knee).normalized())
+    for side in SIDES:
+        for bone in ("Foot", "ToeBase"):
+            place(side + bone, pelvis @ REST[side + bone])
+
+
 def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems):
     """Check fixed and moving mesh parts against posed skin, including actual fists."""
     skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
@@ -4241,7 +4327,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4263,6 +4349,7 @@ def bake(spec, keys):
         bench.surfaces.extend(preacher.surfaces)
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
+    thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     tension_stations = {"cable": CableStation, "resistance-band": BandStation}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
                    if e["type"] in tension_stations), None)
@@ -4435,6 +4522,9 @@ def bake(spec, keys):
         elif roman_chair:
             gaps = []
             roman_chair.pose_legs(gaps)
+        elif spec.get("clamshell"):
+            gaps = []
+            pose_clamshell(pelvis, span.sample("opening"))
         elif spec.get("extended_legs"):
             gaps = []
             pose_extended_legs(pelvis, span.sample("abduction", 0))
@@ -4893,6 +4983,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if thigh_band:
+            thigh_band.pose(everything, contact, frame, problems, samples)
         if ground_gait is not None or treadmill:
             check_gait(spec, gait_phase, everything, contact, frame, problems, treadmill)
         if ground_gait is not None:

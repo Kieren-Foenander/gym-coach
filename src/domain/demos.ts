@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "clamshell",
+    views: ["front"],
+    cues: [
+      "Lie on your side with your knees bent and the band above them.",
+      "Keep your feet together as you open the top knee.",
+      "Lower slowly without rolling your hips back.",
+    ],
+  },
+  {
+    slug: "banded-lateral-walk",
+    views: ["front"],
+    cues: [
+      "Place the band just above your knees and soften your knees.",
+      "Step sideways while keeping your toes ahead and hips level.",
+      "Bring the trailing foot in without letting the band go slack.",
+    ],
+  },
+  {
     slug: "band-row",
     views: ["back"],
     cues: [
