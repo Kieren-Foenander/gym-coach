@@ -162,7 +162,9 @@ jobs:
           xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/tour.mp4" &
           echo $! > "$OUT/recorder.pid"
           sleep 2
-          bunx e2e run --target ios --retries 0 --video off
+          # In CI e2e retries a failed test once, from the start of the group: the runner's simulator now and then
+          # times out on a step that passes the next time.
+          bunx e2e run --target ios --video off
         env:
           E2E_DEVICE: ${{ env.UDID }}
 
