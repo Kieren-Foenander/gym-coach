@@ -308,8 +308,8 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
             ankle += Vector((lateral[0] if lateral else 0, y, clearance)) + turned @ (pitch @ pivot - pivot)
         thigh, shin = segment(f"{side}UpLeg", f"{side}Leg", f"{side}Foot")
         hip = head(f"{side}UpLeg")
-        knee_pole = spec.get("stance", {}).get("knee_direction", {}).get(side)
-        pole = turned @ Vector(knee_pole) if knee_pole else turned @ forward
+        knee_pole = key.get("knee_pole_" + side.lower(), spec.get("stance", {}).get("knee_direction", {}).get(side))
+        pole = turned @ Vector(knee_pole) if knee_pole is not None else turned @ forward
         if support:
             ankle = support.point(ankle)
             pole = support.rotation @ pole
@@ -4047,7 +4047,7 @@ def bake(spec, keys):
             suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis,
                              overhead=True, lift=span.sample("hang_lift", 0))
             torso = Torso()
-        for field in ("foot_left", "foot_right", "supine_leg_left", "supine_leg_right", "free_leg_left", "free_leg_right"):
+        for field in ("foot_left", "foot_right", "supine_leg_left", "supine_leg_right", "free_leg_left", "free_leg_right", "knee_pole_left", "knee_pole_right"):
             if field in a:
                 key[field] = span.sample(field)
         if sled:

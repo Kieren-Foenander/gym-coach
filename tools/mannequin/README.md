@@ -561,3 +561,7 @@ knee bend as a supine leg, measured from forward-horizontal.
 exercise uses floor-plant checkpoints, it also keeps the loaded shoulder
 over the wrist. Set `relaxed_reach` to bring the fingers closer
 together as the palm leaves the floor.
+
+For a kneeling lift with a changing knee direction, key
+`knee_pole_left` or `knee_pole_right` in stance coordinates. The
+floor-contact and alignment checks still apply to the supporting limbs.

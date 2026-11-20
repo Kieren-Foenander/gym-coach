@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "donkey-kick",
+    views: ["front"],
+    cues: [
+      "Start on your hands and knees.",
+      "Keep one knee bent as you press that heel toward the ceiling.",
+      "Lower slowly while keeping your hips square.",
+    ],
+  },
+  {
+    slug: "fire-hydrant",
+    views: ["front"],
+    cues: [
+      "Set up with your hands under your shoulders and knees under your hips.",
+      "Lift one bent knee out to the side without turning your torso.",
+      "Lower under control.",
+    ],
+  },
+  {
     slug: "decline-crunch",
     views: ["front"],
     cues: [
