@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "nordic-curl",
+    views: ["front"],
+    cues: [
+      "Kneel with your ankles secured under the roller.",
+      "Keep a straight line from your knees to your shoulders as you lower.",
+      "Pull yourself upright with your hamstrings.",
+    ],
+  },
+  {
     slug: "outdoor-run",
     views: ["front"],
     cues: [

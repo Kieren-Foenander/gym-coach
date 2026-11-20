@@ -3199,6 +3199,58 @@ class RomanChair:
                                  for part, _ in self.parts for corner in part.bound_box]))
 
 
+class NordicBench:
+    """A low knee pad and ankle roller keep the shins fixed during the curl."""
+
+    def __init__(self, config):
+        self.knees = Vector(config["knees"])
+        metal = material("Nordic bench frame", IRON, .55, .42)
+        foam = material("Nordic bench pads", PAD, .05, .7)
+        self.pad = SupportPad("Nordic knee pad", {
+            "face": [0, .055, config["pad_height"]], "size": [.42, .33], "split": True,
+        }, foam, metal)
+        self.roller = Vector(config["roller"])
+        self.radius = .043
+        roller = CableStation.part("Nordic ankle roller", self.radius, foam)
+        width = Vector((.253, 0, 0))
+        set_segment(roller, self.roller - width, self.roller + width, 1)
+        self.parts = []
+        for sign in (-1, 1):
+            x = sign * .266
+            post = box("Nordic roller upright", (.052, .065, self.roller.z),
+                       (x, self.roller.y, self.roller.z / 2), metal)
+            rail = box("Nordic base rail", (.061, .68, .035), (x, .18, .0175), metal)
+            self.parts.extend(((post, False), (rail, False)))
+        self.parts.append((box("Nordic platform base", (.56, .33, .025), (0, .055, .0125), metal), False))
+
+    def pose_legs(self, pelvis):
+        for side in SIDES:
+            swing(side + "UpLeg", pelvis @ Vector((0, 0, -1)))
+        mid = (head("LeftLeg") + head("RightLeg")) / 2
+        place("Hips", pelvis @ REST["Hips"], head("Hips") + self.knees - mid)
+        for side in SIDES:
+            swing(side + "Leg", Vector((0, 1, 0)))
+            foot = Matrix.Rotation(math.radians(12), 3, "X")
+            for bone in ("Foot", "ToeBase"):
+                place(side + bone, foot @ REST[side + bone])
+
+    def check(self, points, contact, hands, frame, problems, samples):
+        check_hardware_clearance(self.parts, points, contact.faces, hands, {}, frame, problems)
+        self.pad.check(points, frame, problems)
+        rel = points - np.array(self.roller)
+        distances = np.linalg.norm(rel[:, 1:], axis=1) - self.radius
+        if distances[abs(rel[:, 0]) < .253].min(initial=1) < -.006:
+            problems.add(frame, "Nordic roller penetrates the ankles", -distances.min())
+        for side, sign in SIDES.items():
+            ankle = np.array(head(side + "Foot"))
+            near = np.linalg.norm(points - ankle, axis=1) < .12
+            gap = distances[near & (rel[:, 0] * sign > 0) & (abs(rel[:, 0]) < .253)].min(initial=1)
+            if gap > .014:
+                problems.add(frame, side + " ankle loses Nordic roller contact", gap)
+        samples.append(np.array([part.matrix_world @ Vector(corner)
+                                 for part, _ in self.parts for corner in part.bound_box]))
+
+
 class CoreBench:
     """A decline bench with an ankle restraint, or a flat bench with fixed grips."""
 
@@ -4032,7 +4084,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "roman-chair", "nordic-bench"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4058,6 +4110,7 @@ def bake(spec, keys):
     belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
+    nordic = next((NordicBench(e) for e in spec.get("equipment", []) if e["type"] == "nordic-bench"), None)
     roman_chair = next((RomanChair(e) for e in spec.get("equipment", []) if e["type"] == "roman-chair"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
@@ -4163,6 +4216,8 @@ def bake(spec, keys):
         pelvis = pose_trunk(key)
         if roman_chair:
             roman_chair.anchor(pelvis)
+        if nordic:
+            nordic.pose_legs(pelvis)
         if core_bench and core_bench.flag:
             core_bench.anchor_flag(contact)
         if "shoulder_y" not in a and "pelvis" not in key:
@@ -4208,6 +4263,8 @@ def bake(spec, keys):
         if assist:
             gaps = []
             assist.pose(span, torso, frame, gaps, problems)
+        elif nordic:
+            gaps = []
         elif roman_chair:
             gaps = []
             roman_chair.pose_legs(gaps)
@@ -4617,6 +4674,8 @@ def bake(spec, keys):
             hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
         if roman_chair:
             roman_chair.check(everything, contact, hands, frame, problems, samples)
+        if nordic:
+            nordic.check(everything, contact, hands, frame, problems, samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
         if wall:

@@ -1,0 +1,23 @@
+{
+  "equipment": [{
+    "type": "nordic-bench",
+    "knees": [0, 0, 0.120],
+    "pad_height": 0.071,
+    "roller": [0, 0.36, 0.206]
+  }],
+  "paired_reach": [0.115, 0.20, 0.13],
+  "hands": {"Left": "relaxed", "Right": "relaxed"},
+  "camera": {"angle": 70, "elevation": 12},
+  "frames": 120,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.52], "lean": 2},
+    {"at": 0.11},
+    {"at": 0.47, "lean": 70},
+    {"at": 0.58}
+  ],
+  "checkpoints": [
+    {"at": 0.02, "knee": [80, 97]},
+    {"at": 0.52, "knee": [15, 27]},
+    {"at": 0.52, "position": {"point": "Hips", "relative_to": "Leg", "y": [-0.44, -0.41]}}
+  ]
+}
