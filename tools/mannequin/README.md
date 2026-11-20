@@ -516,3 +516,16 @@ pelvis's backward direction.
 Use the `relaxed` hand shape for an unloaded open hand. With
 `thigh_reach`, the palm follows the thigh surface. Key the contact
 position as a fraction of the distance from the hip to the knee.
+
+For a supine leg that lifts off the floor, key `supine_leg_left` or
+`supine_leg_right` as `[thigh pitch, knee bend]` in degrees. Thigh
+pitch starts at zero along the floor and rises to 90 over the hip.
+The bake derives the shin pitch and foot orientation from that pose.
+Use `unloaded_arm_left` and `unloaded_arm_right` to override the shared
+`unloaded_arm` direction for an alternating reach.
+
+`pelvis_contact` and `lumbar_contact` take phase ranges when a curl
+intentionally lifts those regions. Both default to the whole loop.
+`axial_twist` turns the upper spine around the torso's long axis.
+`upper_back_contact` pins the upper back during a reverse curl.
+`temple_hands` keeps relaxed fingertips beside the head as the trunk turns.

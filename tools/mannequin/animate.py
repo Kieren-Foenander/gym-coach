@@ -206,6 +206,9 @@ def pose_trunk(key):
         turn(name, left, key.get("spine", 0) / 3)
         if "side_bend" in key:
             turn(name, forward, key["side_bend"] / 3)
+    if "axial_twist" in key:
+        for name in ("Spine1", "Spine2"):
+            turn(name, Torso().up, key["axial_twist"] / 2)
     if "torso_twist" in key:
         turn("Spine", Vector((0, 0, 1)), key["torso_twist"])
     for name in ("Neck", "Head"):
@@ -251,6 +254,17 @@ def pose_legs(spec, key, pelvis, except_side=None):
     forward = Matrix.Rotation(math.radians(key.get("yaw", 0)), 3, "Z") @ Vector((0, -1, 0))
     for side, (ankle, yaw) in ankles(spec, key).items():
         if side == except_side:
+            continue
+        supine_leg = key.get("supine_leg_" + side.lower())
+        if supine_leg is not None:
+            thigh_pitch, knee_bend = supine_leg
+            shin_pitch = thigh_pitch - knee_bend
+            for bone, pitch in (("UpLeg", thigh_pitch), ("Leg", shin_pitch)):
+                angle = math.radians(pitch)
+                swing(side + bone, Vector((0, -math.cos(angle), math.sin(angle))))
+            foot = Matrix.Rotation(math.radians(-shin_pitch - 12), 3, "X")
+            place(side + "Foot", foot @ REST[side + "Foot"])
+            place(side + "ToeBase", foot @ REST[side + "ToeBase"])
             continue
         turned = Matrix.Rotation(math.radians(yaw), 3, "Z")
         pitch = Matrix.Identity(3)
@@ -3174,6 +3188,7 @@ class SkinContact:
 
         self.pelvis_vertices = [i for i, name in enumerate(owner) if name == "Hips"]
         self.lumbar_vertices = [i for i, name in enumerate(owner) if name == "Spine"]
+        self.upper_back_vertices = [i for i, name in enumerate(owner) if name == "Spine2"]
 
         self.head_vertices = [i for i, name in enumerate(owner) if name == "Head"]
 
@@ -3184,11 +3199,17 @@ class SkinContact:
             pitch = math.degrees(math.atan2(-forward.dot(torso.up), forward.dot(torso.forward)))
             if pitch < -5:
                 problems.add(frame, bone + " extends during supine support", -pitch, "degrees")
-        regions = [("pelvis", self.pelvis_vertices, .012), ("lower back", self.lumbar_vertices, .028)]
+        regions = []
+        for key, label, vertices, maximum, default in (
+            ("pelvis_contact", "pelvis", self.pelvis_vertices, .012, [[0, 1]]),
+            ("lumbar_contact", "lower back", self.lumbar_vertices, .028, [[0, 1]]),
+            ("head_contact", "head", self.head_vertices, .008, []),
+            ("upper_back_contact", "upper back", self.upper_back_vertices, .012, []),
+        ):
+            if any(start <= phase <= end for start, end in support.get(key, default)):
+                regions.append((label, vertices, maximum))
         if support.get("feet"):
             regions.extend((side + " foot", vertices, .010) for side, vertices in self.foot_vertices.items())
-        if any(start <= phase <= end for start, end in support.get("head_contact", [])):
-            regions.append(("head", self.head_vertices, .008))
         for label, vertices, maximum in regions:
             gap = points[vertices, 2].min()
             if gap > maximum:
@@ -3750,7 +3771,7 @@ def bake(spec, keys):
             mod.show_viewport = False
         span = PoseSpan(keys, (frame - 1) / frames)
         a = span.keys[1]
-        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "side_bend", "torso_twist") if field in a}
+        key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "side_bend", "torso_twist", "axial_twist") if field in a}
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
@@ -3780,7 +3801,7 @@ def bake(spec, keys):
             suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis,
                              overhead=True, lift=span.sample("hang_lift", 0))
             torso = Torso()
-        for field in ("foot_left", "foot_right"):
+        for field in ("foot_left", "foot_right", "supine_leg_left", "supine_leg_right"):
             if field in a:
                 key[field] = span.sample(field)
         if sled:
@@ -3972,6 +3993,17 @@ def bake(spec, keys):
             surface.record_contact(height[on_pad].min(initial=1))
             if height[on_pad].min(initial=1) < -.002 or np.count_nonzero(on_pad & (np.abs(height)<.004)) < 20:
                 problems.add(frame, side + " open palm loses bench contact", abs(height[on_pad].min(initial=1)))
+        if spec.get("temple_hands"):
+            turn_head = world_rotation("Head") @ REST["Head"].transposed()
+            for side, sign in SIDES.items():
+                wrist = head("Head") + turn_head @ Vector((sign * .192, -.016, .03))
+                along = (turn_head @ Vector((-sign * .66, 0, .75))).normalized()
+                inward = turn_head @ Vector((-sign, 0, 0))
+                palm = (inward - along * along.dot(inward)).normalized()
+                target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
+                pole = torso.direction([1, .27, -.10], sign)
+                gap = pose_arm(side, target, pole, "neutral", torso, contact_frame=(along, palm))
+                gaps.append((side + " temple hand", gap))
         if "thigh_reach" in a:
             skin, _ = evaluated_points(body)
             for side, sign in SIDES.items():
@@ -3994,9 +4026,9 @@ def bake(spec, keys):
                 if distance > .010:
                     problems.add(frame, side + " palm loses thigh contact", distance)
         if "unloaded_arm" in a:
-            upper = span.sample("unloaded_arm")
             curl = span.sample("unloaded_curl", 10)
             for side, sign in SIDES.items():
+                upper = span.sample("unloaded_arm_" + side.lower(), span.sample("unloaded_arm"))
                 arm = {"upper_arm": upper, "curl": curl}
                 _, target = held_point(side, arm, torso)
                 pole = torso.direction(upper, sign)
@@ -4021,7 +4053,8 @@ def bake(spec, keys):
                     out, back, up = span.sample("plant_elbow", spec.get("plant_elbow", (.65, .008, .28)))
                     pole = Vector((sign * out, back, up))
                 else:
-                    pole = Vector((sign * .58, .14, -.45))
+                    out, back, up = spec.get("plant_elbow", (.58, .14, -.45))
+                    pole = Vector((sign * out, back, up))
                 gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
                 gaps.append((side + " floor wrist", gap))
                 if side in planted_sides and not planted:

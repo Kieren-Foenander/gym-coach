@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "lying-leg-raise",
+    views: ["front"],
+    cues: [
+      "Lie on your back and brace your lower back against the floor.",
+      "Raise both legs together with a soft bend in the knees.",
+      "Lower slowly as far as you can keep your back down.",
+    ],
+  },
+  {
+    slug: "flutter-kick",
+    views: ["front"],
+    cues: [
+      "Lie on your back with your legs extended off the floor.",
+      "Alternate short kicks from the hips.",
+      "Keep your lower back down and your legs moving smoothly.",
+    ],
+  },
+  {
     slug: "crunch",
     views: ["front"],
     cues: [
