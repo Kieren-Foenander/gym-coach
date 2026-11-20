@@ -37,6 +37,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "superman",
+    views: ["front"],
+    cues: [
+      "Lie face down and reach both arms forward.",
+      "Lift your arms, chest and legs slightly while keeping your neck in line.",
+      "Lower slowly and keep your pelvis against the floor.",
+    ],
+  },
+  {
     slug: "decline-crunch",
     views: ["front"],
     cues: [

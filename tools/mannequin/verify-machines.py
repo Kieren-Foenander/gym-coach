@@ -262,3 +262,10 @@ spec["stance"]["y"] -= .11
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left hip is not over the knee" in problems.found, list(problems.lines())
 print("KNEELING STACK REGRESSION PASSED")
+
+spec = initial_pose("superman")
+spec.pop("hands")
+spec["keys"][0]["pelvis"][2] += .045
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "abdomen loses prone floor support" in problems.found, list(problems.lines())
+print("PRONE FLOOR SUPPORT REGRESSION PASSED")

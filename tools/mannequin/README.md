@@ -562,6 +562,12 @@ exercise uses floor-plant checkpoints, it also keeps the loaded shoulder
 over the wrist. Set `relaxed_reach` to bring the fingers closer
 together as the palm leaves the floor.
 
+Set `prone_support` for a face-down floor exercise that keeps the front
+of the pelvis and abdomen down. It checks both skin patches each frame
+and interprets free-leg pitch from backward-horizontal while the
+figure faces the floor. `unloaded_palm` optionally specifies the
+unloaded hands' palm direction in torso coordinates.
+
 For a kneeling lift with a changing knee direction, key
 `knee_pole_left` or `knee_pole_right` in stance coordinates. The
 floor-contact and alignment checks still apply to the supporting limbs.

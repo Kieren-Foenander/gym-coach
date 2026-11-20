@@ -290,11 +290,13 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
         leg_pitch = key.get("supine_leg_" + side.lower(), key.get("free_leg_" + side.lower()))
         if leg_pitch is not None:
             thigh_pitch, knee_bend = leg_pitch
-            shin_pitch = thigh_pitch - knee_bend
+            prone = bool(spec.get("prone_support"))
+            shin_pitch = thigh_pitch + knee_bend if prone else thigh_pitch - knee_bend
             for bone, pitch in (("UpLeg", thigh_pitch), ("Leg", shin_pitch)):
                 angle = math.radians(pitch)
-                swing(side + bone, Vector((0, -math.cos(angle), math.sin(angle))))
-            foot = Matrix.Rotation(math.radians(-shin_pitch - 12), 3, "X")
+                swing(side + bone, Vector((0, math.cos(angle) if prone else -math.cos(angle), math.sin(angle))))
+            foot_pitch = 168 + shin_pitch if prone else -shin_pitch - 12
+            foot = Matrix.Rotation(math.radians(foot_pitch), 3, "X")
             place(side + "Foot", foot @ REST[side + "Foot"])
             place(side + "ToeBase", foot @ REST[side + "ToeBase"])
             continue
@@ -3423,6 +3425,12 @@ class SkinContact:
         if gap > .012:
             problems.add(frame, "upper foot loses its stack", gap)
 
+    def check_prone_support(self, frame, points, problems):
+        for label, vertices in (("front of the pelvis", self.pelvis_vertices), ("abdomen", self.lumbar_vertices)):
+            gap = points[vertices, 2].min()
+            if not -.008 <= gap <= .016:
+                problems.add(frame, label + " loses prone floor support", abs(gap))
+
     def check_unsupported_feet(self, frame, points, clearances, problems):
         for side, minimum in clearances.items():
             height = points[self.foot_vertices[side], 2].min()
@@ -4285,7 +4293,7 @@ def bake(spec, keys):
                 pole = torso.direction(upper, sign)
                 elbow = head(side + "Arm") + pole * segment(side + "Arm", side + "ForeArm", side + "Hand")[0]
                 along = (target - elbow).normalized()
-                inward = -torso.left * sign
+                inward = torso.direction(spec["unloaded_palm"], sign) if "unloaded_palm" in spec else -torso.left * sign
                 palm = (inward - along * along.dot(inward)).normalized()
                 gap = pose_arm(side, target + palm * GRIP[side][1], pole, "neutral",
                                torso, contact_frame=(along, palm))
@@ -4497,6 +4505,8 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if spec.get("prone_support"):
+            contact.check_prone_support(frame, everything, problems)
         if "unsupported_feet" in spec:
             contact.check_unsupported_feet(frame, everything, spec["unsupported_feet"], problems)
         if "grounded_heels" in spec:
