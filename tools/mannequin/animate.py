@@ -3468,7 +3468,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "elliptical", "stair-climber", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3495,6 +3495,8 @@ def bake(spec, keys):
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
+    wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
+    wall = SupportPad("wall back contact", wall_config, material("wall", (.12, .13, .145), .04, .72), None) if wall_config else None
     standing_cardio_types = {"elliptical": Elliptical, "stair-climber": StairClimber}
     standing_cardio = next((standing_cardio_types[e["type"]](e) for e in spec.get("equipment", [])
                             if e["type"] in standing_cardio_types), None)
@@ -3924,6 +3926,10 @@ def bake(spec, keys):
             hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
+        if wall:
+            wall.check(everything, frame, problems)
+            samples.append(np.array([wall.face + Vector((sign * wall.width / 2, 0, z))
+                                     for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
         if standing_cardio:
             standing_cardio.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if rower:

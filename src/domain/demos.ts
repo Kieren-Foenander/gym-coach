@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "wall-sit",
+    views: ["front"],
+    cues: [
+      "Rest your back against a wall and step your feet forward.",
+      "Slide down until your knees are near a right angle.",
+      "Keep both feet flat and breathe steadily as you hold.",
+    ],
+  },
+  {
     slug: "elliptical",
     views: ["front"],
     cues: [
