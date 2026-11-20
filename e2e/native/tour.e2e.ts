@@ -1,6 +1,6 @@
 import { beforeEach } from "@e2e-dev/mobile"
 import { credentials, describe, expect } from "e2e"
-import { dismissSavePassword, dismissSystemDialog, serverUrl, test, testIds } from "./support"
+import { dismissSavePassword, dismissSavePasswordIfShown, serverUrl, test, testIds } from "./support"
 
 /**
  * A tour of the native app's main screens: sign in, then each tab, with a screenshot of each.
@@ -13,8 +13,8 @@ describe("a tour of the main screens", { serial: true }, () => {
   // the first test opens the app there is no screen to read, so it starts checking after that.
   let opened = false
 
-  beforeEach(async ({ device }) => {
-    if (opened) await dismissSystemDialog(device)
+  beforeEach(async ({ screen }) => {
+    if (opened) await dismissSavePasswordIfShown(screen)
   })
 
   test("signs in to Today", async ({ app, device, screen }) => {
@@ -41,7 +41,7 @@ describe("a tour of the main screens", { serial: true }, () => {
     await expect
       .poll(
         async () => {
-          dismissed = (await dismissSystemDialog(device)) || dismissed
+          dismissed = (await dismissSavePasswordIfShown(screen)) || dismissed
 
           return today.isVisible()
         },
@@ -50,7 +50,7 @@ describe("a tour of the main screens", { serial: true }, () => {
       .toBe(true)
     await expect(today).toBeSelected()
 
-    if (!dismissed) await dismissSavePassword(device)
+    if (!dismissed) await dismissSavePassword(screen)
     await app.screenshot("02-today")
   })
 

@@ -1,37 +1,31 @@
-import type { Device } from "@e2e-dev/mobile"
-import { expect } from "e2e"
+import { expect, type Screen } from "e2e"
 
 /**
  * Dialogs that the operating system shows over the app, such as iOS's offer to save the password after a
- * sign-in. They are not the app's, so they have no test ids and the app's screen tree doesn't hold them:
- * `device.alert` reaches them, and agent-device taps the button that says no ("Not Now", "Cancel",
- * "Don't Allow").
+ * sign-in. They are not the app's, so they have no test ids, and `device.alert` doesn't count this one as
+ * an alert. It does show in the screen tree, as another app's window, so this file finds its button by its
+ * words: the one place a test does, which test/test-ids.test.ts allows.
  */
 
-/** Dismisses a system dialog over the app if there is one. Answers whether there was. */
-export const dismissSystemDialog = async (device: Device): Promise<boolean> => {
-  if (device.unstable_raw.platform !== "ios") return false
+/** Taps "Not Now" if iOS's save-password sheet is over the app. Answers whether it was. Android never shows it. */
+export const dismissSavePasswordIfShown = async (screen: Screen): Promise<boolean> => {
+  const notNow = screen.getByRole("button", "Not Now")
 
-  try {
-    await device.alert("dismiss")
+  if (!(await notNow.isVisible())) return false
 
-    return true
-  } catch {
-    return false
-  }
+  await notNow.tap()
+
+  return true
 }
 
-// The save-password sheet can take a long time to come on a CI runner's simulator (E2E_SLOW_DEVICE, see
-// e2e.config.ts).
+// The sheet can take a long time to come on a CI runner's simulator (E2E_SLOW_DEVICE, see e2e.config.ts).
 const SAVE_PASSWORD_WAIT = process.env.E2E_SLOW_DEVICE ? 120_000 : 15_000
 
-/** Waits for iOS's offer to save the password after a sign-in, and dismisses it. Android never offers. */
-export const dismissSavePassword = async (device: Device, within = SAVE_PASSWORD_WAIT) => {
-  if (device.unstable_raw.platform !== "ios") return
-
+/** Waits for iOS's offer to save the password after a sign-in, and dismisses it. */
+export const dismissSavePassword = async (screen: Screen, within = SAVE_PASSWORD_WAIT) => {
   try {
-    await expect.poll(() => dismissSystemDialog(device), { timeout: within }).toBe(true)
+    await expect.poll(() => dismissSavePasswordIfShown(screen), { timeout: within }).toBe(true)
   } catch {
-    // It never came.
+    // It never came, as on Android.
   }
 }
