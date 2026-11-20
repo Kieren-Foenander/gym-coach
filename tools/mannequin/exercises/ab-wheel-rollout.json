@@ -1,0 +1,166 @@
+{
+  "equipment": [
+    {
+      "type": "ab-wheel",
+      "radius": 0.125,
+      "knees": [
+        0,
+        0.22,
+        0.054
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.23
+  },
+  "camera": {
+    "angle": 68,
+    "elevation": 13
+  },
+  "frames": 124,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.15,
+        0.44
+      ],
+      "lean": 65,
+      "head": -8,
+      "thigh_lean": 13,
+      "wheel_y": -0.576,
+      "elbows": [
+        0.42,
+        -0.34,
+        -1
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.19,
+      "wheel_y": -0.675,
+      "lean": 67.2,
+      "head": -7.4,
+      "thigh_lean": 20.03,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.28,
+      "wheel_y": -0.869,
+      "lean": 72,
+      "head": -6,
+      "thigh_lean": 35.5,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.36,
+      "wheel_y": -1.004,
+      "lean": 76.31,
+      "head": -4.76,
+      "thigh_lean": 49.45,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.46,
+      "lean": 79,
+      "head": -4,
+      "thigh_lean": 58,
+      "wheel_y": -1.072,
+      "elbows": [
+        0.5,
+        -0.29,
+        -0.65
+      ]
+    },
+    {
+      "at": 0.57
+    },
+    {
+      "at": 0.66,
+      "wheel_y": -1.004,
+      "lean": 76.31,
+      "head": -4.76,
+      "thigh_lean": 49.45,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.75,
+      "wheel_y": -0.869,
+      "lean": 72,
+      "head": -6,
+      "thigh_lean": 35.5,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.84,
+      "wheel_y": -0.675,
+      "lean": 67.2,
+      "head": -7.4,
+      "thigh_lean": 20.03,
+      "elbows": [
+        0.48,
+        -0.3,
+        -0.83
+      ]
+    },
+    {
+      "at": 0.94,
+      "wheel_y": -0.576,
+      "lean": 65,
+      "head": -8,
+      "thigh_lean": 13
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        2,
+        31
+      ]
+    },
+    {
+      "at": 0.51,
+      "position": {
+        "point": "handle",
+        "relative_to": "Arm",
+        "y": [
+          -0.61,
+          -0.43
+        ]
+      }
+    },
+    {
+      "at": 0.51,
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.24,
+          0.4
+        ]
+      }
+    }
+  ]
+}

@@ -1274,6 +1274,65 @@ class PlyoBox:
         samples.append(np.array([self.box.matrix_world @ Vector(v) for v in self.box.bound_box]))
 
 
+class AbWheel:
+    """A ground-contact wheel with a fixed transverse axle and two grips."""
+
+    def __init__(self, config):
+        self.radius = config["radius"]
+        self.knees = Vector(config["knees"])
+        axis = Vector((1, 0, 0))
+        self.root = bpy.data.objects.new("ab wheel axle", None)
+        scene.collection.objects.link(self.root)
+        metal = material("ab wheel axle steel", STEEL, .65, .41)
+        rubber = material("ab wheel rubber", (.06, .075, .086), .06, .8)
+        rim = material("ab wheel rim", (.19, .21, .24), .5, .46)
+        self.wheel = cylinder("ab wheel tyre", self.radius, .093, 0, rubber, self.root)
+        for side, sign in SIDES.items():
+            hub = cylinder("ab wheel hub", self.radius * .6, .014, sign * .048, rim, self.root)
+            hub.rotation_euler = (0, math.pi / 2, 0)
+        self.wheel.rotation_euler = (0, math.pi / 2, 0)
+        self.handles = {side: CableStation.part(side + " ab wheel grip", Barbell.SHAFT, rubber) for side in SIDES}
+        self.axis = axis
+
+    def support(self, span, pelvis):
+        thigh = Matrix.Rotation(math.radians(span.sample("thigh_lean")), 3, "X") @ Vector((0, 0, -1))
+        for side in SIDES:
+            swing(side + "UpLeg", thigh)
+        midpoint = (head("LeftLeg") + head("RightLeg")) / 2
+        place("Hips", pelvis @ REST["Hips"], head("Hips") + self.knees - midpoint)
+        for side in SIDES:
+            swing(side + "Leg", Vector((0, 1, 0)))
+            foot = Matrix.Rotation(math.radians(164), 3, "X")
+            for bone in ("Foot", "ToeBase"):
+                place(side + bone, foot @ REST[side + bone])
+
+    def pose(self, span, torso, frame, gaps):
+        y = span.sample("wheel_y")
+        self.root.location = (0, y, self.radius)
+        self.root.keyframe_insert("location", frame=frame)
+        # The tread rolls through the same distance that the axle translates.
+        self.root.rotation_euler.x = -y / self.radius
+        self.root.keyframe_insert("rotation_euler", frame=frame)
+        for side, sign in SIDES.items():
+            centre = Vector((sign * .17, y, self.radius))
+            set_segment(self.handles[side], centre - self.axis * .12, centre + self.axis * .12, frame)
+            elbow = torso.direction(span.sample("elbows"), sign)
+            gaps.append((side + " ab wheel grip",
+                         pose_arm(side, centre, elbow, "pronated", torso, self.axis)))
+
+    def check(self, points, contact, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance([(self.wheel, False), *((part, True) for part in self.handles.values())],
+                                 points, contact.faces, hands, grips, frame, problems)
+        for side in SIDES:
+            knee = np.array(head(side + "Leg"))
+            patch = points[np.linalg.norm(points - knee, axis=1) < .10]
+            height = patch[:, 2].min(initial=1)
+            if not -.008 <= height <= .014:
+                problems.add(frame, side + " knee loses rollout support", abs(height))
+        samples.append(np.array([self.wheel.matrix_world @ Vector(v) for v in self.wheel.bound_box]))
+
+
 def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems):
     """Check fixed and moving mesh parts against posed skin, including actual fists."""
     skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
@@ -4392,7 +4451,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4416,6 +4475,7 @@ def bake(spec, keys):
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
+    ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
     tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
                    if e["type"] in tension_stations), None)
@@ -4462,7 +4522,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
     handled_station = next((item for item in (
-        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
+        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral, ab_wheel,
         pullup, dip_bars, captains_chair, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
@@ -4534,6 +4594,8 @@ def bake(spec, keys):
         pelvis = pose_trunk(key)
         if roman_chair:
             roman_chair.anchor(pelvis)
+        if ab_wheel:
+            ab_wheel.support(span, pelvis)
         if nordic:
             nordic.pose_legs(pelvis)
         if core_bench and core_bench.flag:
@@ -4583,7 +4645,7 @@ def bake(spec, keys):
         if assist:
             gaps = []
             assist.pose(span, torso, frame, gaps, problems)
-        elif nordic:
+        elif ab_wheel or nordic:
             gaps = []
         elif roman_chair:
             gaps = []
@@ -4757,6 +4819,8 @@ def bake(spec, keys):
                 gaps.append((side+" hand", gap))
         if machine:
             machine.pose(span, torso, grips, frame, gaps, problems)
+        if ab_wheel:
+            ab_wheel.pose(span, torso, frame, gaps)
         if cables:
             cables.pose(span, torso, grips, frame, gaps, problems)
         if contact_load:
@@ -5053,6 +5117,8 @@ def bake(spec, keys):
             thigh_band.pose(everything, contact, frame, problems, samples)
         if plyo_box:
             plyo_box.check(everything, contact, phase, frame, problems, samples)
+        if ab_wheel:
+            ab_wheel.check(everything, contact, hands, grips, frame, problems, samples)
         if ground_gait is not None or treadmill:
             check_gait(spec, gait_phase, everything, contact, frame, problems, treadmill)
         if ground_gait is not None:

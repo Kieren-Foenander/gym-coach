@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "ab-wheel-rollout",
+    views: ["front"],
+    cues: [
+      "Kneel and grip the wheel with straight arms.",
+      "Roll forward as far as you can keep your ribs down.",
+      "Pull the wheel back without arching your lower back.",
+    ],
+  },
+  {
     slug: "box-jump",
     views: ["front"],
     cues: [
