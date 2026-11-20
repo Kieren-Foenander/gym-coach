@@ -102,8 +102,12 @@ describe("screens", () => {
   })
 })
 
-describe("browser tests", () => {
-  const specs = files("e2e", /\.ts$/)
+// The operating system's own dialogs have no test ids, so the native tests find them by their words in one
+// file, e2e/native/system-dialogs.ts, which these rules leave out.
+const SYSTEM_DIALOGS = join("e2e", "native", "system-dialogs.ts")
+
+describe("browser and device tests", () => {
+  const specs = files("e2e", /\.ts$/).filter((path) => path !== SYSTEM_DIALOGS)
 
   it("find elements by test id only", () => {
     expect(
