@@ -1,0 +1,211 @@
+{
+  "equipment": [],
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.18,
+    "y": 0.002,
+    "toe_out": 5
+  },
+  "camera": {
+    "angle": 22,
+    "elevation": 8,
+    "margin": 1.44
+  },
+  "frames": 186,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.92
+      ],
+      "lean": 0,
+      "unloaded_arm": [
+        0.18,
+        0.04,
+        -1
+      ],
+      "unloaded_curl": 7,
+      "foot_left": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "foot_right": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "at": 0.1,
+      "pelvis": [
+        0,
+        0,
+        0.86
+      ],
+      "unloaded_arm": [
+        0.42,
+        0.05,
+        -0.91
+      ]
+    },
+    {
+      "at": 0.26,
+      "pelvis": [
+        0,
+        0,
+        0.985
+      ],
+      "unloaded_arm": [
+        0.99,
+        0.1,
+        0.18
+      ],
+      "foot_left": [
+        0,
+        0.1,
+        13,
+        0.128
+      ],
+      "foot_right": [
+        0,
+        0.1,
+        13,
+        -0.128
+      ]
+    },
+    {
+      "at": 0.42,
+      "pelvis": [
+        0,
+        0,
+        0.881
+      ],
+      "unloaded_arm": [
+        0.41,
+        0.085,
+        1
+      ],
+      "foot_left": [
+        0,
+        0,
+        0,
+        0.235
+      ],
+      "foot_right": [
+        0,
+        0,
+        0,
+        -0.235
+      ]
+    },
+    {
+      "at": 0.52
+    },
+    {
+      "at": 0.66,
+      "pelvis": [
+        0,
+        0,
+        0.985
+      ],
+      "unloaded_arm": [
+        0.99,
+        0.1,
+        0.18
+      ],
+      "foot_left": [
+        0,
+        0.1,
+        13,
+        0.128
+      ],
+      "foot_right": [
+        0,
+        0.1,
+        13,
+        -0.128
+      ]
+    },
+    {
+      "at": 0.83,
+      "pelvis": [
+        0,
+        0,
+        0.92
+      ],
+      "lean": 0,
+      "unloaded_arm": [
+        0.18,
+        0.04,
+        -1
+      ],
+      "unloaded_curl": 7,
+      "foot_left": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "foot_right": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "at": 0.91
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.47,
+      "side": "Left",
+      "position": {
+        "point": "Foot",
+        "x": [
+          0.29,
+          0.36
+        ]
+      }
+    },
+    {
+      "at": 0.47,
+      "position": {
+        "point": "Hand",
+        "z": [
+          1.6,
+          1.82
+        ]
+      }
+    },
+    {
+      "at": 0.26,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.13,
+          0.25
+        ]
+      }
+    },
+    {
+      "at": 0.66,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.13,
+          0.25
+        ]
+      }
+    }
+  ]
+}

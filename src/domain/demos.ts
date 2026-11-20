@@ -82,6 +82,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "jumping-jacks",
+    views: ["front"],
+    cues: [
+      "Start with feet together and arms at your sides.",
+      "Jump your feet apart as your arms sweep overhead.",
+      "Land softly and jump back to the start.",
+    ],
+  },
+  {
     slug: "l-sit",
     views: ["front"],
     cues: [
