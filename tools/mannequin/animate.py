@@ -1808,6 +1808,32 @@ class LateralRaiseStation:
                                  for part, _ in self.parts for corner in part.bound_box]))
 
 
+def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0):
+    pitch = math.radians(incline)
+    for side, sign in SIDES.items():
+        stride = PoseSpan(keys, phase + (0 if side == "Left" else .5))
+        y, lift, heel = stride.sample("gait")
+        contacts[side] = lift < .002
+        ankle_bone = rig.data.bones[side + "Foot"].head_local
+        toe_bone = rig.data.bones[side + "ToeBase"].head_local
+        ankle_height = height - (y - (ankle_bone.y - toe_bone.y)) * math.tan(pitch) + lift
+        # The toe pivots on the inclined belt as the heel rises.
+        key["foot_" + side.lower()] = [y, ankle_height, heel - incline]
+        key.setdefault("sled_toe_pitch", {})[side] = -incline
+        upper = stride.sample("arm_swing")
+        curl = stride.sample("arm_bend")
+        _, hand = held_point(side, {"upper_arm":upper,"curl":curl,"flex_toward":[0,1,0]}, torso)
+        pole = torso.direction(upper, sign)
+        upper_length, _ = segment(side + "Arm", side + "ForeArm", side + "Hand")
+        elbow = head(side + "Arm") + pole * upper_length
+        along = (hand - elbow).normalized()
+        inward = -torso.left * sign
+        palm = (inward - along * along.dot(inward)).normalized()
+        hand += palm * GRIP[side][1]
+        gap = pose_arm(side, hand, pole, "neutral", torso, contact_frame=(along,palm))
+        gaps.append((side + " gait arm", gap))
+
+
 class Treadmill:
     """An inclined deck and a phase-shifted repeating gait on the belt."""
 
@@ -1840,33 +1866,11 @@ class Treadmill:
             self.rib_positions.append((index,part))
 
     def pose(self, spec, keys, phase, key, torso, frame, gaps):
-        pitch = math.radians(self.pitch)
         for index, seam in self.rib_positions:
             travel = ((index / len(self.rib_positions) + phase * .75) % 1) * 1.56 - .78
             seam.location = self.face + self.rotation @ Vector((0,travel,.001))
             seam.keyframe_insert("location", frame=frame)
-        for side, sign in SIDES.items():
-            stride = PoseSpan(keys, phase + (0 if side == "Left" else .5))
-            y, lift, heel = stride.sample("gait")
-            self.contacts[side] = lift < .002
-            ankle_bone = rig.data.bones[side + "Foot"].head_local
-            toe_bone = rig.data.bones[side + "ToeBase"].head_local
-            height = self.height - (y - (ankle_bone.y - toe_bone.y)) * math.tan(pitch) + lift
-            # The toe pivots on the inclined belt as the heel rises.
-            key["foot_" + side.lower()] = [y, height, heel - self.pitch]
-            key.setdefault("sled_toe_pitch", {})[side] = -self.pitch
-            upper = stride.sample("arm_swing")
-            curl = stride.sample("arm_bend")
-            _, hand = held_point(side, {"upper_arm":upper,"curl":curl,"flex_toward":[0,1,0]}, torso)
-            pole = torso.direction(upper, sign)
-            upper_length, _ = segment(side + "Arm", side + "ForeArm", side + "Hand")
-            elbow = head(side + "Arm") + pole * upper_length
-            along = (hand - elbow).normalized()
-            inward = -torso.left * sign
-            palm = (inward - along * along.dot(inward)).normalized()
-            hand += palm * GRIP[side][1]
-            gap = pose_arm(side, hand, pole, "neutral", torso, contact_frame=(along,palm))
-            gaps.append((side + " treadmill arm", gap))
+        pose_gait(keys, phase, key, torso, gaps, self.contacts, self.height, self.pitch)
 
     def check(self, points, faces, hands, frame, problems, samples):
         check_hardware_clearance(self.parts, points, faces, hands, {}, frame, problems)
@@ -4017,11 +4021,17 @@ def bake(spec, keys):
     if bench:
         samples.append(np.array([obj.matrix_world @ Vector(corner) for obj in scene.objects
                                  if obj.name.startswith("bench ") for corner in obj.bound_box]))
+    ground_gait = spec.get("ground_gait")
+    gait_contacts = {}
     for frame in range(1, frames + 1):
         scene.frame_set(frame)
         for mod in correctives.values():
             mod.show_viewport = False
-        span = PoseSpan(keys, (frame - 1) / frames)
+        phase = (frame - 1) / frames
+        gait_phase = phase
+        if ground_gait is not None:
+            gait_phase = phase * ground_gait.get("cycles", 1) - ground_gait.get("surge", 0) * math.sin(math.tau * phase)
+        span = PoseSpan(keys, gait_phase)
         a = span.keys[1]
         key = {field: span.sample(field) for field in ("pelvis", "lean", "spine", "head", "neck_retraction", "yaw", "roll", "side_bend", "torso_twist", "axial_twist") if field in a}
         if guided_squat:
@@ -4063,7 +4073,8 @@ def bake(spec, keys):
         if sled:
             sled.pose(spec, span, key, frame, problems)
         activity_gaps = []
-        phase = (frame - 1) / frames
+        if ground_gait is not None:
+            pose_gait(keys, gait_phase, key, torso, activity_gaps, gait_contacts)
         if standing_cardio:
             standing_cardio.pose(spec, keys, phase, key, torso, frame, activity_gaps)
         if treadmill:
@@ -4507,6 +4518,11 @@ def bake(spec, keys):
         if cables:
             cables.check_grips(grips, frame, problems)
             cables.check(everything, contact.faces, frame, problems, samples)
+        if ground_gait is not None:
+            for side, planted in gait_contacts.items():
+                clearance = everything[contact.foot_vertices[side], 2].min()
+                if planted and not -.010 <= clearance <= .012:
+                    problems.add(frame, side + " stance foot loses ground contact", abs(clearance))
         if spec.get("prone_support"):
             contact.check_prone_support(frame, everything, problems)
         if "unsupported_feet" in spec:

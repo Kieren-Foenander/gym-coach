@@ -19,6 +19,42 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "outdoor-run",
+    views: ["front"],
+    cues: [
+      "Lean slightly forward with your gaze ahead.",
+      "Land lightly and drive the opposite arm with each stride.",
+      "Keep your shoulders and hands relaxed.",
+    ],
+  },
+  {
+    slug: "walk",
+    views: ["front"],
+    cues: [
+      "Stand tall and let your arms swing naturally.",
+      "Roll through each step from heel to toe.",
+      "Keep an even rhythm.",
+    ],
+  },
+  {
+    slug: "hike",
+    views: ["front"],
+    cues: [
+      "Lean slightly forward and keep your gaze ahead.",
+      "Lift your feet to clear uneven ground.",
+      "Match your step length to the terrain.",
+    ],
+  },
+  {
+    slug: "sprint-intervals",
+    views: ["front"],
+    cues: [
+      "Build speed with quick steps and strong arm drive.",
+      "Sprint for the work interval.",
+      "Ease back into a slower stride for recovery.",
+    ],
+  },
+  {
     slug: "back-extension",
     views: ["front"],
     cues: [

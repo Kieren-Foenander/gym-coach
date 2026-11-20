@@ -572,4 +572,10 @@ For a kneeling lift with a changing knee direction, key
 `knee_pole_left` or `knee_pole_right` in stance coordinates. The
 floor-contact and alignment checks still apply to the supporting limbs.
 
+Set `ground_gait: {}` to reuse the treadmill gait on the floor without
+equipment. The stance feet are checked against the floor throughout
+their contact phases. A longer loop can set `cycles` and `surge` to
+vary cadence between slower and faster strides while keeping both arms
+and legs in phase.
+
 Set `heel_pivot` to centre the ankle rotation on the heel for a toe raise.
