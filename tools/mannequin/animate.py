@@ -1923,6 +1923,67 @@ class CycleStation:
         samples.append(np.array(self.bounds))
 
 
+class RowingErg:
+    """The carriage slides along a floor rail while a chain pulls the flywheel."""
+
+    def __init__(self, config):
+        self.foot_y, self.foot_z = config["footplate"]
+        self.seat_z = config["seat_height"]
+        self.anchor = Vector((0, -1.16, .58))
+        frame = material("rowing erg frame", (.09, .102, .122), .52, .42)
+        finish = material("rowing erg upholstery", PAD, .08, .63)
+        self.seat = box("rowing erg sliding seat", (.32, .26, .067), (0, 0, 0), finish)
+        rail = box("rowing erg guide", (.09, 1.75, .082), (0, .06, self.seat_z - .104), frame)
+        wheel = cylinder("rowing erg flywheel", .237, .22, 0, frame, None)
+        wheel.location = (0, -1.16, .34)
+        supports = (
+            box("rowing erg rear foot", (.50, .115, self.seat_z - .08), (0, .87, (self.seat_z - .08) / 2), frame),
+            box("rowing erg front foot", (.56, .16, .14), (0, -1.16, .07), frame),
+        )
+        connector = CableStation.part("rowing erg front frame", .043, frame)
+        set_segment(connector, Vector((0, -.81, self.seat_z - .104)), wheel.location, 1)
+        platform_mount = box("rowing erg foot rest crossbeam", (.46, .13, .05),
+                             (0, self.foot_y, self.foot_z - .038), frame)
+        stays = CableStation.part("rowing erg platform brace", .039, frame)
+        set_segment(stays, Vector((0, self.foot_y, self.foot_z - .038)),
+                    Vector((0, self.foot_y, self.seat_z - .104)), 1)
+        self.parts = [(part, False) for part in (rail, wheel, connector, platform_mount, stays, *supports)]
+        for sign in (-1, 1):
+            box("rowing erg foot rest", (.145, .30, self.foot_z),
+                (sign * .166, self.foot_y, self.foot_z / 2), frame)
+        bar = CableStation.part("rowing erg handle", Barbell.SHAFT, frame)
+        self.handles = dict.fromkeys(SIDES, bar)
+        self.chain = CableStation.part("rowing erg chain", .005, frame)
+        self.parts.extend(((bar, True), (self.chain, False)))
+
+    def pose(self, span, torso, frame, gaps):
+        centre = Vector(span.sample("row_handle"))
+        axis = Vector((1, 0, 0))
+        set_segment(self.handles["Left"], centre - axis * .29, centre + axis * .29, frame)
+        set_segment(self.chain, self.anchor, centre, frame)
+        self.seat.location = (0, span.sample("seat_travel"), self.seat_z - .0335)
+        self.seat.keyframe_insert("location", frame=frame)
+        for side, sign in SIDES.items():
+            target = centre + axis * sign * .205
+            pole = torso.direction([.43, -.30, -.76], sign)
+            gaps.append((side + " rowing erg grip", pose_arm(side, target, pole, "pronated", torso, axis)))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        over = (abs(points[:, 0]) < .16) & (abs(points[:, 1] - self.seat.location.y) < .13)
+        gap = points[over & (abs(points[:, 2] - self.seat_z) < .09), 2].min(initial=1) - self.seat_z
+        if not -.007 <= gap <= .015:
+            problems.add(frame, "rowing seat loses contact", abs(gap))
+        for side, sign in SIDES.items():
+            over = (abs(points[:, 0] - sign * .166) < .073) & (abs(points[:, 1] - self.foot_y) < .15)
+            sole = points[over, 2].min(initial=1) - self.foot_z
+            if abs(sole) > .012:
+                problems.add(frame, side + " foot loses rowing foot rest", abs(sole))
+        samples.append(np.array([part.matrix_world @ Vector(v)
+                                 for part, _ in self.parts for v in part.bound_box]))
+
+
 class RotaryTorsoStation:
     """Chest pads and grips turn around a vertical axle above the fixed seat."""
 
@@ -3273,7 +3334,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3300,6 +3361,7 @@ def bake(spec, keys):
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
+    rower = next((RowingErg(e) for e in spec.get("equipment", []) if e["type"] == "rowing-erg"), None)
     cycle = next((CycleStation(e) for e in spec.get("equipment", []) if e["type"] == "cycle-station"), None)
     lateral = next((LateralRaiseStation(e) for e in spec.get("equipment", []) if e["type"] == "lateral-station"), None)
     trunk_station = next((RotatingTrunkStation(e) for e in spec.get("equipment", []) if e["type"] == "trunk-station"), None)
@@ -3326,7 +3388,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        cycle, belt_squat, rotary, hip_thrust, calf, roller,
+        rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3419,6 +3481,8 @@ def bake(spec, keys):
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
         gaps.extend(activity_gaps)
+        if rower:
+            rower.pose(span, torso, frame, gaps)
         if belt_squat:
             belt_squat.pose(torso,frame,gaps)
         if rotary:
@@ -3707,6 +3771,8 @@ def bake(spec, keys):
             hip_thrust.check(everything,contact.faces,hands,grips,frame,problems,samples)
         if treadmill:
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
+        if rower:
+            rower.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if cycle:
             cycle.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if lateral:

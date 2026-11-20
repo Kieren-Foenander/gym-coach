@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "rowing-machine",
+    views: ["front"],
+    cues: [
+      "Set your feet on the footrests and reach forward with straight arms.",
+      "Drive through your legs, then open your hips and pull to your lower ribs.",
+      "Reach your hands forward before bending your knees to return.",
+    ],
+  },
+  {
     slug: "belt-squat",
     views: ["front"],
     cues: [
