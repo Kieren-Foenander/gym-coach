@@ -27,7 +27,8 @@ env:
   APP_VARIANT: preview
   APP_ID: com.kierenfoenander.gym.preview
   # The build's default server address. The simulator shares the runner's network, so this is the server below.
-  EXPO_PUBLIC_GYM_SERVER_URL: http://localhost:1337
+  # An IP address rather than localhost, which the simulator tries over IPv6 first.
+  EXPO_PUBLIC_GYM_SERVER_URL: http://127.0.0.1:1337
   TOUR_EMAIL: tour@example.com
   TOUR_PASSWORD: tour-password-not-secret
   OUT: ${{ github.workspace }}/tour-output
@@ -58,27 +59,6 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: apps/mobile
 
-      - name: Start the server
-        run: |
-          mkdir -p "$OUT"
-          nohup bun run dev --no-input --stage ci-ios-tour > "$OUT/server.log" 2>&1 &
-          for i in $(seq 1 90); do
-            curl -sf -X POST http://localhost:1337/api/v1/account/signup-status > /dev/null && exit 0
-            sleep 2
-          done
-          cat "$OUT/server.log"
-          exit 1
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Make the tour account and load the seed history
-        run: |
-          curl -sf -X POST http://localhost:1337/api/v1/account/sign-up \
-            -H 'content-type: application/json' \
-            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
-          bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
-
       - name: Generate the iOS project
         working-directory: apps/mobile
         run: npx expo prebuild --platform ios --clean
@@ -90,6 +70,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           set -o pipefail
+          mkdir -p "$OUT"
           xcodebuild \
             -workspace ios/GymPreview.xcworkspace -scheme GymPreview \
             -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
@@ -109,6 +90,36 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl list devices | grep "$UDID"
 
+      - name: Start the server
+        run: |
+          mkdir -p "$OUT"
+          nohup bun run dev --no-input --stage ci-ios-tour > "$OUT/server.log" 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" > /dev/null && exit 0
+            sleep 2
+          done
+          cat "$OUT/server.log"
+          exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Make the tour account and load the seed history
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-up" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
+          bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
+
+      # The app gives up on a request after 15 seconds. Sign in once here, so the server has served the route
+      # before the app asks, and the log shows how long it took.
+      - name: Check the server answers a sign-in
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-in" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\"}" \
+            -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
+
       - name: Install Maestro
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -120,6 +131,7 @@ jobs:
           xcrun simctl io "$UDID" recordVideo --codec=h264 --force tour.mp4 &
           echo $! > recorder.pid
           sleep 2
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" -o /dev/null -w 'server answered in %{time_total}s\n'
           maestro --device "$UDID" test ../apps/mobile/e2e/tour.yaml \
             --test-output-dir maestro \
             --format junit --output maestro/report.xml \
