@@ -69,6 +69,12 @@ local coordinates. Drive the handle from the mechanism and solve the body to tha
 handle. Add a known-good motion and a deliberately bad travel or contact case when
 introducing each apparatus.
 
+Use `pullup-bar` for unsupported hangs. Its `at` position is the centre
+of the grip line, and `grip_width` is the distance from that centre to
+each hand. The frame checks grip contact, hardware clearance, and whether
+the lowest skin vertex on each foot stays at least 10 cm above the floor
+on every frame.
+
 ### Choosing a colour
 
 ```sh

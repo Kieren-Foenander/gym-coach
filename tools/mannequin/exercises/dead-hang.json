@@ -5,18 +5,19 @@
       "at": [
         0,
         -0.06,
-        2.11
+        2.33
       ],
       "grip_width": 0.295
     }
   ],
   "stance": {
-    "width": 0.22,
-    "toe_out": 6,
+    "width": 0.16,
+    "toe_out": 2,
     "y": 0.067
   },
   "camera": {
-    "angle": 47
+    "angle": 24,
+    "elevation": 5
   },
   "frames": 78,
   "keys": [
@@ -30,34 +31,38 @@
       "lean": 0,
       "shoulder_y": 0.015,
       "foot_left": [
-        0,
-        0.259,
-        0
+        0.02,
+        0.375,
+        37
       ],
       "foot_right": [
+        0.02,
+        0.375,
+        37
+      ],
+      "clavicle": [
         0,
-        0.259,
-        0
+        12
       ]
     }
   ],
   "checkpoints": [
     {
       "elbow": [
-        1,
+        0,
         13
       ],
       "knee": [
         0,
-        22
+        23
       ]
     },
     {
       "position": {
         "point": "Foot",
         "z": [
-          0.26,
-          0.41
+          0.48,
+          0.54
         ]
       }
     }

@@ -1991,9 +1991,13 @@ class PullupBar:
             pole = torso.direction([.42, .47, -.14], sign)
             gaps.append((side + " pull-up grip", pose_arm(side, target, pole, "pronated", torso, axis)))
 
-    def check(self, points, faces, hands, grips, frame, problems, samples):
+    def check(self, points, contact, hands, grips, frame, problems, samples):
         check_rendered_grips(self.handles, grips, frame, problems)
-        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
+        for side, vertices in contact.foot_vertices.items():
+            height = points[vertices, 2].min()
+            if height < .10:
+                problems.add(frame, side + " foot below hanging clearance", .10 - height)
         samples.append(np.array([part.matrix_world @ Vector(v)
                                  for part, _ in self.parts for v in part.bound_box]))
 
@@ -3107,6 +3111,10 @@ class SkinContact:
         names = {group.index: group.name for group in body.vertex_groups}
         owner = [names[max(v.groups, key=lambda g: g.weight).group] if v.groups else "" for v in body.data.vertices]
         self.part = np.array([PARTS.get(owner[i], owner[i]) for i in self.vertices[:, 0]])
+        self.foot_vertices = {
+            side: [i for i, name in enumerate(owner) if name in (side + "Foot", side + "ToeBase")]
+            for side in SIDES
+        }
         self.trunk_vertices = [i for i, name in enumerate(owner) if PARTS.get(name) == "trunk"]
 
     def check_resting_forearms(self, frame, points, problems):
@@ -3665,13 +3673,11 @@ def bake(spec, keys):
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
-        if pullup and "shoulder_y" in a:
-            suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis, overhead=True)
-        elif "shoulder_y" in a:
+        if "shoulder_y" not in a and "pelvis" not in key:
+            raise ValueError("A pose needs a pelvis position or a suspended shoulder_y")
+        if not pullup and "shoulder_y" in a:
             suspend_from_bar(span.sample("bar"), span.sample("grip_width", 0.25),
                              span.sample("shoulder_y"), pelvis)
-        elif "pelvis" not in key:
-            raise ValueError("A pose needs a pelvis position or a suspended shoulder_y")
         torso = Torso()
         if smith and isinstance(a.get("bar"), dict):
             target = span.sample("bar", resolve=lambda value: bar_centre(value, torso))
@@ -3689,6 +3695,9 @@ def bake(spec, keys):
                 turn_back = Matrix.Rotation(sign * retract, 3, torso.up)
                 turn_up = Matrix.Rotation(sign * elevate, 3, torso.forward)
                 swing(name, turn_back @ turn_up @ direction)
+        if pullup:
+            suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis, overhead=True)
+            torso = Torso()
         for field in ("foot_left", "foot_right"):
             if field in a:
                 key[field] = span.sample(field)
@@ -4066,7 +4075,7 @@ def bake(spec, keys):
             samples.append(np.array([wall.face + Vector((sign * wall.width / 2, 0, z))
                                      for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
         if pullup:
-            pullup.check(everything, contact.faces, hands, grips, frame, problems, samples)
+            pullup.check(everything, contact, hands, grips, frame, problems, samples)
         if standing_cardio:
             standing_cardio.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if rower:

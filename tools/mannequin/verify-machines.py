@@ -163,3 +163,16 @@ spec["keys"][0]["pelvis"][2] += .22
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert any("foot loses cardio tread contact" in label for label in problems.found), list(problems.lines())
 print("STEP MILL SUPPORT REGRESSIONS PASSED")
+
+spec = initial_pose("dead-hang")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("dead-hang")
+spec["equipment"][0]["at"][2] -= .29
+for side in ("left", "right"):
+    spec["keys"][0]["foot_" + side][1] -= .29
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+for side in ("Left", "Right"):
+    assert side + " foot below hanging clearance" in problems.found, list(problems.lines())
+print("HANGING FOOT CLEARANCE REGRESSIONS PASSED")
