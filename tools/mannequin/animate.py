@@ -2823,8 +2823,8 @@ class PullStation:
 
 
 class Bench:
-    def __init__(self, at, length=1.2, angle=None, support="back"):
-        self.top, self.length = Vector(at), length
+    def __init__(self, at, length=1.2, angle=None, support="back", width=.30):
+        self.top, self.length, self.width = Vector(at), length, width
         pad = material("pad", PAD, 0.0, 0.7)
         frame = material("frame", IRON, 0.6, 0.4)
         x, y, z = self.top
@@ -2855,7 +2855,7 @@ class Bench:
             box("bench rail", (.065, support_y + .23, .06),
                 (x, y + direction*(support_y - .21)/2, .09), frame)
             return
-        flat_pad = box("bench pad", (0.3, length, 0.08), (x, y, z - 0.04), pad)
+        flat_pad = box("bench pad", (self.width, length, 0.08), (x, y, z - 0.04), pad)
         self.surfaces.append(self.surface(flat_pad))
         box("bench spine", (0.08, length * 0.9, 0.06), (x, y, z - 0.11), frame)
         for end in (-1, 1):
@@ -2886,7 +2886,7 @@ class Bench:
                     gaps.append(float(local[over,2].min()))
             return min(gaps, default=math.inf)
         rel = points - np.array(self.top)
-        over = (np.abs(rel[:, 0]) < 0.15) & (np.abs(rel[:, 1]) < self.length / 2) & (rel[:, 2] > -0.08)
+        over = (np.abs(rel[:, 0]) < self.width / 2) & (np.abs(rel[:, 1]) < self.length / 2) & (rel[:, 2] > -0.08)
         return float(rel[over, 2].min()) if over.any() else math.inf
 
 
@@ -3350,12 +3350,18 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical", "hand_mode"}
+        unknown = set(check) - {"at", "during", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical", "hand_mode"}
         if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical", "hand_mode"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
-        times = range(1, frames + 1) if phase is None else [min(frames, 1 + round(phase * frames))]
+        if "during" in check:
+            start, end = check["during"]
+            if phase is not None or not 0 <= start < end <= 1:
+                raise ValueError("Checkpoint interval must be an increasing pair in [0, 1]")
+            times = [f for f in range(1, frames + 1) if start <= (f - 1) / frames < end]
+        else:
+            times = range(1, frames + 1) if phase is None else [min(frames, 1 + round(phase * frames))]
         for frame in times:
             scheduled.setdefault(frame, []).append(check)
     return scheduled
@@ -3493,7 +3499,7 @@ def bake(spec, keys):
     bell_spec = next((e for e in spec.get("equipment", []) if e["type"] == "kettlebells"), None)
     if bell_spec:
         dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES, bell_spec.get("shared", False))
-    bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back")) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
+    bench = next((Bench(e["at"], e.get("length", 1.2), e.get("angle"), e.get("support", "back"), e.get("width", .30)) for e in spec.get("equipment", []) if e["type"] == "bench"), None)
     preacher = next((PreacherPad(e["arm_pad"]) for e in spec.get("equipment", []) if "arm_pad" in e), None)
     if preacher:
         bench.surfaces.extend(preacher.surfaces)
@@ -3553,8 +3559,13 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
-    if any(check.get("hand_mode") == "floor-plant" for checks in checkpoints.values() for check in checks) and not floor_hands:
+    planted_sides = {side for check in spec.get("checkpoints", []) if check.get("hand_mode") == "floor-plant"
+                     for side in ([check["side"]] if "side" in check else SIDES)}
+    if planted_sides and not floor_hands:
         raise ValueError("Floor-plant checkpoints need floor_hands")
+    elevated_palms = spec.get("palm_support") == "bench"
+    if elevated_palms and (not bench or bench.pads or not planted_sides):
+        raise ValueError("Elevated palms need a flat bench and floor-plant checkpoints")
     has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     wrists = wrist_collision_points()
@@ -3810,22 +3821,36 @@ def bake(spec, keys):
                                torso, contact_frame=(along, palm))
                 gaps.append((side + " unloaded arm", gap))
         if floor_hands:
-            along, palm = Vector((0, -1, 0)), Vector((0, 0, -1))
+            palm = Vector((0, 0, -1))
             for side, sign in SIDES.items():
+                palm_yaw = math.radians(spec.get("palm_toe_in", 0))
+                along = Vector((-sign * math.sin(palm_yaw), -math.cos(palm_yaw), 0))
                 radius, y, z = floor_hands
-                wrist = Vector((sign * radius, y, z))
+                wrist = Vector(span.sample("plant_" + side.lower(), (sign * radius, y, z)))
                 target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
                 planted = any(check.get("hand_mode") == "floor-plant" and check.get("side", side) == side
                               for check in checkpoints.get(frame, ()))
-                pole = Vector((sign * .65, .008, .28)) if planted else Vector((sign * .58, .14, -.45))
+                if side in planted_sides:
+                    out, back, up = span.sample("plant_elbow", spec.get("plant_elbow", (.65, .008, .28)))
+                    pole = Vector((sign * out, back, up))
+                else:
+                    pole = Vector((sign * .58, .14, -.45))
                 gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
                 gaps.append((side + " floor wrist", gap))
+                if side in planted_sides and not planted:
+                    continue
                 surface = grips[side]
                 transform = surface.transform
                 heights = surface.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
-                gap = heights.min(initial=1)
+                on_surface = np.ones(len(heights), dtype=bool)
+                if elevated_palms:
+                    positions = surface.points @ np.array(transform.to_3x3()).T + np.array(transform.translation)
+                    rel = positions - np.array(bench.top)
+                    heights = rel[:, 2]
+                    on_surface = (abs(rel[:, 0]) < bench.width / 2) & (abs(rel[:, 1]) < bench.length / 2)
+                gap = heights[on_surface].min(initial=1)
                 surface.record_contact(gap)
-                near = np.abs(heights) < .004
+                near = on_surface & (np.abs(heights) < .004)
                 if planted:
                     direction = transform.to_3x3().transposed() @ along
                     forward = surface.points @ np.array(direction) + (transform.translation - wrist).dot(along)

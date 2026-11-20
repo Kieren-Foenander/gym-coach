@@ -373,6 +373,14 @@ ground plane and measure signed wrist extension toward the palm normal
 in a 75–100° range. The 40° grip limit still applies to implement grips
 and the existing support-hand checks.
 
+For elevated palms, set `palm_support: "bench"` and give the flat bench
+enough `width` to fit both hands. Contact is measured against the pad's
+top, within its edges. For moving hands, key `plant_left` and
+`plant_right` as world-space wrist positions, and use `during: [start, end]`
+on each side's floor-plant checkpoints. Intervals include the start and
+exclude the end, and all phases use the normalized loop time. The wrist
+can travel off the support between those intervals.
+
 ### Bar turnover
 
 A straight-bar spec may key `grip_pitch` to control hand rotation around the

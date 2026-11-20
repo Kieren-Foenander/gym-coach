@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "incline-push-up",
+    views: ["front"],
+    cues: [
+      "Plant your palms on a sturdy elevated surface.",
+      "Keep a straight line from shoulders to heels as your chest lowers.",
+      "Press through both palms to return.",
+    ],
+  },
+  {
+    slug: "decline-push-up",
+    views: ["front"],
+    cues: [
+      "Set your toes on a bench and your palms on the floor.",
+      "Brace and lower your chest without letting your hips sag.",
+      "Press the floor away until your elbows straighten.",
+    ],
+  },
+  {
     slug: "push-up",
     views: ["front"],
     cues: [
