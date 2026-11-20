@@ -1,0 +1,47 @@
+{
+  "equipment": [
+    {
+      "type": "elliptical",
+      "grip": [
+        0.26,
+        -0.462,
+        1.29
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.29,
+    "toe_out": 0
+  },
+  "camera": {
+    "angle": 104
+  },
+  "frames": 102,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.005,
+        1.053
+      ],
+      "lean": 8
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        8,
+        112
+      ]
+    },
+    {
+      "at": 0,
+      "side": "Left",
+      "knee": [
+        12,
+        125
+      ]
+    }
+  ]
+}

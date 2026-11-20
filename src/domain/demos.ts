@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "elliptical",
+    views: ["front"],
+    cues: [
+      "Keep your feet flat on the pedals.",
+      "Push and pull the handles as you stride.",
+      "Stay tall and move at a steady pace.",
+    ],
+  },
+  {
     slug: "ski-erg",
     views: ["front"],
     cues: [

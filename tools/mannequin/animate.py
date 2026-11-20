@@ -1970,6 +1970,50 @@ class StandingCardio:
                                  for part, _ in self.parts for v in part.bound_box]))
 
 
+class Elliptical(StandingCardio):
+    """A front crank guides the foot platforms and reciprocating grips."""
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.pivot = Vector((0, -.60, .69))
+        tower = box("elliptical mast", (.105, .14, .69), (0, -.60, .345), self.finish)
+        flywheel = cylinder("elliptical flywheel cover", .205, .16, 0, self.finish, None)
+        flywheel.location = (0, -.60, .27)
+        base = box("elliptical frame beam", (.13, 1.30, .09), (0, -.15, .05), self.finish)
+        self.parts.extend((part, False) for part in (tower, flywheel, base))
+        for y in (-.69, .41):
+            foot = box("elliptical stabilizer", (.61, .11, .077), (0, y, .0385), self.finish)
+            self.parts.append((foot, False))
+        self.platforms, self.rockers, self.drives, self.spindles = {}, {}, {}, {}
+        for side, sign in SIDES.items():
+            pedal = box("elliptical platform", (.137, .31, .036), (0, 0, 0), self.tread)
+            self.platforms[side] = pedal
+            self.rockers[side] = self.member("elliptical handle rocker", .021)
+            self.drives[side] = self.member("elliptical pedal linkage", .025)
+            self.spindles[side] = self.member("elliptical pedal spindle", .024)
+            axle = self.member("elliptical rocker axle", .022)
+            set_segment(axle, self.pivot, self.pivot + Vector((sign * (self.grip.x + .08), 0, 0)), 1)
+
+    def pose(self, spec, keys, phase, key, torso, frame, gaps):
+        for side, (ankle, _) in ankles(spec, key).items():
+            sign = SIDES[side]
+            angle = math.tau * (phase + (0 if sign > 0 else .5))
+            pedal = Vector((sign * .155, -.024 - .239 * math.cos(angle), .211 + .074 * math.sin(angle)))
+            self.platforms[side].location = pedal - Vector((0, 0, .018))
+            self.platforms[side].keyframe_insert("location", frame=frame)
+            self.contacts[side] = pedal, .137, .31
+            key["foot_" + side.lower()] = [pedal.y + .061 - ankle.y, pedal.z, 0, pedal.x - ankle.x]
+            pivot = self.pivot + Vector((sign * (self.grip.x + .08), 0, 0))
+            handle = Vector((sign * self.grip.x, self.grip.y, self.grip.z))
+            swing = Matrix.Rotation(-.15 * math.cos(angle), 3, "X")
+            target = pivot + swing @ (handle - pivot)
+            outer = target + Vector((sign * .08, 0, 0))
+            set_segment(self.rockers[side], pivot, outer, frame)
+            set_segment(self.drives[side], Vector((pedal.x, -.60, .088)), pedal - Vector((0, 0, .068)), frame)
+            set_segment(self.spindles[side], pedal - Vector((0, 0, .073)), pedal - Vector((0, 0, .032)), frame)
+            self.grip_pose(side, target, torso, frame, gaps)
+
+
 class StairClimber(StandingCardio):
     """Treads descend in lockstep, with feet alternating support and swing."""
 
@@ -3424,7 +3468,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "stair-climber", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "elliptical", "stair-climber", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3451,7 +3495,7 @@ def bake(spec, keys):
     rotary = next((RotaryTorsoStation(e) for e in spec.get("equipment", []) if e["type"] == "rotary-torso"), None)
     hip_thrust = next((HipThrustStation(e) for e in spec.get("equipment", []) if e["type"] == "thrust-station"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
-    standing_cardio_types = {"stair-climber": StairClimber}
+    standing_cardio_types = {"elliptical": Elliptical, "stair-climber": StairClimber}
     standing_cardio = next((standing_cardio_types[e["type"]](e) for e in spec.get("equipment", [])
                             if e["type"] in standing_cardio_types), None)
     rower = next((RowingErg(e) for e in spec.get("equipment", []) if e["type"] == "rowing-erg"), None)
