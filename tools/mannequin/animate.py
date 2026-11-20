@@ -1453,6 +1453,52 @@ def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems
                 break
 
 
+class PushSled:
+    """A low prowler chassis with vertical grips and a loaded centre post."""
+
+    def __init__(self, config):
+        self.handles = {}
+        self.grip = Vector(config["grip"])
+        frame = material("sled frame", IRON, .55, .5)
+        grip_finish = material("sled grip", STEEL, .55, .42)
+        y = self.grip.y
+        self.parts = [box("sled crossbar", (.64, .09, .06), (0, y - .22, .064), frame)]
+        for side, sign in SIDES.items():
+            x = self.grip.x * sign
+            self.parts.append(box("sled runner", (.105, .59, .035), (x, y - .195, .021), frame))
+            self.parts.append(box("sled upright", (.043, .043, self.grip.z - .11),
+                                  (x, y, self.grip.z / 2 - .025), frame))
+            handle = CableStation.part("sled handle", Barbell.SHAFT, grip_finish)
+            centre = Vector((x, y, self.grip.z))
+            set_segment(handle, centre - Vector((0, 0, .085)), centre + Vector((0, 0, .085)), 1)
+            self.handles[side] = handle
+        for z in (.08, .117, .154):
+            plate = cylinder("sled weight plate", .158, .035, 0, frame, None)
+            plate.rotation_euler = (0, 0, 0)
+            plate.location = (0, y - .24, z)
+            self.parts.append(plate)
+        pin = cylinder("sled loading pin", .018, .24, 0, grip_finish, None)
+        pin.rotation_euler = (0, 0, 0)
+        pin.location = (0, y - .24, .182)
+        self.parts.append(pin)
+
+    def pose(self, torso, gaps):
+        for side, sign in SIDES.items():
+            target = self.grip.copy()
+            target.x *= sign
+            pole = torso.direction([.21, -.1, -1], sign)
+            gap = pose_arm(side, target, pole, "thumb-forward", torso, Vector((0, 0, 1)))
+            gaps.append((side + " sled grip", gap))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        parts = [(part, False) for part in self.parts]
+        parts.extend((handle, True) for handle in self.handles.values())
+        check_hardware_clearance(parts, points, faces, hands, grips, frame, problems)
+        samples.append(np.array([part.matrix_world @ Vector(vertex)
+                                 for part, _ in parts for vertex in part.bound_box]))
+
+
 class SmithRails:
     """The bar's sleeves travel on two fixed vertical guides."""
 
@@ -2206,7 +2252,7 @@ def swim_surface(height):
         yield np.array([line.matrix_world @ Vector(corner) for corner in line.bound_box])
 
 
-def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0):
+def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0, hands_supported=False):
     pitch = math.radians(incline)
     for side, sign in SIDES.items():
         stride = PoseSpan(keys, phase + (0 if side == "Left" else .5))
@@ -2218,6 +2264,8 @@ def pose_gait(keys, phase, key, torso, gaps, contacts, height=0, incline=0):
         # The toe pivots on the inclined belt as the heel rises.
         key["foot_" + side.lower()] = [y, ankle_height, heel - incline]
         key.setdefault("sled_toe_pitch", {})[side] = -incline
+        if hands_supported:
+            continue
         upper = stride.sample("arm_swing")
         curl = stride.sample("arm_bend")
         _, hand = held_point(side, {"upper_arm":upper,"curl":curl,"flex_toward":[0,1,0]}, torso)
@@ -4548,7 +4596,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4572,6 +4620,7 @@ def bake(spec, keys):
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
+    push_sled = next((PushSled(e) for e in spec.get("equipment", []) if e["type"] == "push-sled"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
     tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand, "ankle-cable": AnkleCable}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
@@ -4619,7 +4668,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
     handled_station = next((item for item in (
-        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral, ab_wheel,
+        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral, ab_wheel, push_sled,
         pullup, dip_bars, captains_chair, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
@@ -4732,7 +4781,8 @@ def bake(spec, keys):
         if waterline is not None:
             pose_swim_stroke(keys, phase, torso, activity_gaps)
         if ground_gait is not None:
-            pose_gait(keys, gait_phase, key, torso, activity_gaps, gait_contacts)
+            pose_gait(keys, gait_phase, key, torso, activity_gaps, gait_contacts,
+                      hands_supported=push_sled is not None)
         if standing_cardio:
             standing_cardio.pose(spec, keys, phase, key, torso, frame, activity_gaps)
         if treadmill:
@@ -4916,6 +4966,8 @@ def bake(spec, keys):
                 gaps.append((side+" hand", gap))
         if machine:
             machine.pose(span, torso, grips, frame, gaps, problems)
+        if push_sled:
+            push_sled.pose(torso, gaps)
         if ab_wheel:
             ab_wheel.pose(span, torso, frame, gaps)
         if cables:
@@ -5208,9 +5260,11 @@ def bake(spec, keys):
             thigh_band.pose(everything, contact, frame, problems, samples)
         if plyo_box:
             plyo_box.check(everything, contact, phase, frame, problems, samples)
+        if push_sled:
+            push_sled.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if ab_wheel:
             ab_wheel.check(everything, contact, hands, grips, frame, problems, samples)
-        if ground_gait is not None or treadmill:
+        if (ground_gait is not None and push_sled is None) or treadmill:
             check_gait(spec, gait_phase, everything, contact, frame, problems, treadmill)
         if ground_gait is not None:
             for side, planted in gait_contacts.items():
