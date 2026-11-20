@@ -103,7 +103,10 @@ const config: ExpoConfig = {
     appVariant: APP_VARIANT,
     // Where the app looks for your account unless you type another address when signing in.
     defaultServerUrl: process.env.EXPO_PUBLIC_GYM_SERVER_URL ?? "https://gym.kfoenander98.workers.dev",
+    // The EAS project builds and cloud simulator sessions run under.
+    eas: { projectId: "40998394-874e-41ed-82c0-7977979091e5" },
   },
+  owner: "kierenfoenander",
 }
 
 export default config

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import { View } from "react-native"
+import { testIds } from "~/domain/test-ids"
 import { describeError, normalizeServerUrl } from "@/api/client"
 import { fetchSignupStatus, signUp, useSession } from "@/api/session"
 import { Button, ErrorNote, Field, Text, TextInput } from "@/components/ui"
@@ -56,7 +57,7 @@ export function SignUpScreen({ navigation }: AuthScreenProps<"SignUp">) {
                 : "You need an invite code to join."}
       </Text>
       <View className="gap-4">
-        <ServerField value={serverUrl} onChange={setServerUrl} />
+        <ServerField value={serverUrl} onChange={setServerUrl} testID={testIds.signup.server} />
         {open ? (
           <>
             <Field label="Name">

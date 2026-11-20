@@ -1,0 +1,189 @@
+name: iOS tour
+
+# Builds the iPhone app for the iOS Simulator on a GitHub macOS runner, signs in to a local server loaded with
+# seed/training-history.json, taps through the main screens (apps/mobile/e2e/tour.yaml) and keeps a screen
+# recording and a screenshot of each screen as the "ios-tour" artifact.
+#
+# macOS runners cost nothing on a public repository. The build is signed ad hoc, so no Apple account is needed.
+# The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
+#
+# Building takes about half an hour, so the built app is cached, keyed on everything that goes into it: the native
+# app's files, src/domain, the lockfiles, apps/mobile/e2e/build-simulator.sh and the Xcode version. A change to the
+# tour, the server or this file reuses it. Pull requests can read the cache that runs on master make.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: &paths
+      - apps/mobile/**
+      - src/domain/**
+      - src/server/**
+      - migrations/**
+      - .github/workflows/ios-tour.yml
+  pull_request:
+    paths: *paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-tour-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_VARIANT: preview
+  APP_ID: com.kierenfoenander.gym.preview
+  # The build's default server address. The simulator shares the runner's network, so this is the server below.
+  # An IP address rather than localhost, which the simulator tries over IPv6 first.
+  EXPO_PUBLIC_GYM_SERVER_URL: http://127.0.0.1:1337
+  TOUR_EMAIL: tour@example.com
+  TOUR_PASSWORD: tour-password-not-secret
+  OUT: ${{ github.workspace }}/tour-output
+  MAESTRO_CLI_NO_ANALYTICS: "1"
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+
+jobs:
+  tour:
+    name: Build and tour the iPhone app
+    # The local server is `alchemy dev`, which keeps its state in the Cloudflare account, so it needs the secrets
+    # that pull requests from forks don't get.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Read the Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
+
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: apps/mobile
+
+      - name: Restore the built app
+        id: built
+        uses: actions/cache/restore@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: >-
+            ios-sim-app-${{ steps.xcode.outputs.version }}-${{ env.APP_VARIANT }}-${{ env.EXPO_PUBLIC_GYM_SERVER_URL }}-${{
+              hashFiles('apps/mobile/**', '!apps/mobile/node_modules/**', '!apps/mobile/e2e/tour.yaml', '!apps/mobile/test/**',
+                        'src/domain/**', 'bun.lock') }}
+
+      - name: Build for the simulator
+        if: steps.built.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        run: e2e/build-simulator.sh
+
+      - name: Keep the built app for later runs
+        if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: ${{ steps.built.outputs.cache-primary-key }}
+
+      - name: Find the built app
+        working-directory: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+        run: |
+          mkdir -p "$OUT"
+          APP=$(ls -d *.app | head -1)
+          echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
+          tar -czf "$OUT/gym-preview-simulator.tar.gz" "$APP"
+          echo "Built app: $APP (from the cache: ${{ steps.built.outputs.cache-hit == 'true' }})"
+
+      - name: Boot an iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Start the server
+        run: |
+          mkdir -p "$OUT"
+          nohup bun run dev --no-input --stage ci-ios-tour > "$OUT/server.log" 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" > /dev/null && exit 0
+            sleep 2
+          done
+          cat "$OUT/server.log"
+          exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Make the tour account and load the seed history
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-up" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
+          bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
+
+      # The app gives up on a request after 15 seconds. Sign in once here, so the server has served the route
+      # before the app asks, and the log shows how long it took.
+      - name: Check the server answers a sign-in
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-in" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$TOUR_PASSWORD\"}" \
+            -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Tour the app
+        working-directory: tour-output
+        run: |
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force tour.mp4 &
+          echo $! > recorder.pid
+          sleep 2
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" -o /dev/null -w 'server answered in %{time_total}s\n'
+          maestro --device "$UDID" test ../apps/mobile/e2e/tour.yaml \
+            --test-output-dir maestro \
+            --format junit --output maestro/report.xml \
+            -e APP_ID="$APP_ID" -e EMAIL="$TOUR_EMAIL" -e PASSWORD="$TOUR_PASSWORD" -e SERVER="$EXPO_PUBLIC_GYM_SERVER_URL"
+
+      - name: Stop the recording
+        if: always()
+        working-directory: tour-output
+        run: |
+          if [ -f recorder.pid ]; then
+            kill -INT "$(cat recorder.pid)" || true
+            # The recorder writes the end of the file after it is told to stop.
+            for i in $(seq 1 20); do kill -0 "$(cat recorder.pid)" 2> /dev/null || break; sleep 1; done
+            rm recorder.pid
+          fi
+          find . -name '*.png' -path '*takeScreenshot*' -exec cp {} . \;
+          ls -la
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### iOS tour"
+            echo
+            echo "Download the **ios-tour** artifact below for \`tour.mp4\`, a screenshot of each screen and the simulator build."
+            echo
+            ls "$OUT"/*.png 2> /dev/null | xargs -n1 basename | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-tour
+          path: tour-output
+          retention-days: 14

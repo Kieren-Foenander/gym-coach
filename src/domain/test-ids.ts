@@ -51,6 +51,8 @@ export const testIds = {
   login: {
     email: "login.email",
     password: "login.password",
+    /** The native app's server address field. */
+    server: "login.server",
     submit: "login.submit",
   },
   signup: {
@@ -58,6 +60,8 @@ export const testIds = {
     email: "signup.email",
     password: "signup.password",
     inviteCode: "signup.invite-code",
+    /** The native app's server address field. */
+    server: "signup.server",
     submit: "signup.submit",
   },
   today: {
@@ -75,6 +79,14 @@ export const testIds = {
   },
   plan: {
     template: keyed<string>("plan.template"),
+  },
+  exercises: {
+    /** A muscle group in the library, keyed by the muscle. */
+    muscle: (muscle: string) => `exercises.muscle:${slugFor(muscle)}`,
+  },
+  muscleGroup: {
+    /** Back to every muscle from one muscle's exercises. */
+    back: "muscle-group.back",
   },
   workout: {
     finish: "workout.finish",
