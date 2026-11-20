@@ -3579,7 +3579,7 @@ def bake(spec, keys):
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
-        if (side == support_side or floor_hands) and shape != "support":
+        if (side == support_side or floor_hands) and shape not in ("support", "diamond"):
             raise ValueError("Bench contact needs the open support hand")
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
@@ -3905,6 +3905,13 @@ def bake(spec, keys):
                     problems.add(frame, side + " open palm loses floor contact", abs(gap))
                 if not planted:
                     surface.check_wrist(frame, problems)
+        if floor_hands and all(spec.get("hands", {}).get(side) == "diamond" for side in SIDES):
+            for digit in ("thumb", "index"):
+                tips = [surface.transform @ Vector(surface.skin["diamond_" + digit + "." + side])
+                        for side, surface in grips.items()]
+                gap = (tips[0] - tips[1]).xy.length
+                if gap > .008:
+                    problems.add(frame, "diamond " + digit + " tips lose contact", gap)
         if dumbbells:
             for side in dumbbells.roots:
                 sign = SIDES[side]

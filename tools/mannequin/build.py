@@ -280,25 +280,27 @@ def make_fists(hand_shapes):
         palm = -frame.col[2] * sign  # found by eye: this way the fingers close over the palm
         shape = hand_shapes[side]
         if shape != "fist":
-            if shape not in {"support", "pinch", "cup"}:
+            if shape not in {"support", "diamond", "pinch", "cup"}:
                 raise ValueError(f"Unknown hand shape {shape}")
             # Keep the MakeHuman phalanx lengths. The long fingers share a
             # contact plane on a plate, or turn up around a dumbbell head.
-            bends = {"support": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70)}[shape]
+            bends = {"support": (0, 0, 0), "diamond": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70)}[shape]
             for finger in (2, 3, 4, 5):
                 for joint, degrees in enumerate(bends, 1):
                     angle = math.radians(degrees)
-                    spread = (3.5 - finger)*(.055 if shape == "support" else .028)
+                    spread = (3.5 - finger)*(.055 if shape in ("support", "diamond") else .028)
                     direction = Vector((spread, math.cos(angle), -sign*math.sin(angle)))
                     swing(f"finger{finger}-{joint}.{tag}", frame @ direction)
-            if shape in ("support", "pinch", "cup"):
+            if shape in ("support", "diamond", "pinch", "cup"):
                 targets = ((.053,.063,-.038),(.047,.089,-.055),(.031,.113,-.052)) if shape == "pinch" else (
                     (.058,.056,-.022),(.067,.080,-.039),(.060,.102,-.055))
                 if shape == "support":
                     targets = ((.068,.052,-.008),(.079,.074,-.010),(.087,.092,-.012))
                 for joint, (x,y,z) in enumerate(targets, 1):
                     name = f"finger1-{joint}.{tag}"
-                    swing(name, head("wrist") + frame @ Vector((x,y,sign*z)) - pose[name].head)
+                    direction = frame @ Vector((.75, .66, 0)) if shape == "diamond" else (
+                        head("wrist") + frame @ Vector((x, y, sign * z)) - pose[name].head)
+                    swing(name, direction)
             origin = head("wrist") + frame @ Vector((0,.09,-sign*.018))
             fists[side] = {"shape":shape, "frame":frame, "wrist":head("wrist"),
                            "length":(head("finger3-1")-head("wrist")).length, "tunnel":origin}
@@ -367,6 +369,15 @@ def make_fists(hand_shapes):
         points = [(to_hand @ (posed.vertices[i].co - fist["wrist"])) / fist["length"] for i in keep]
         faces = [[order[v] for v in polygon.vertices] for polygon in human.data.polygons if set(polygon.vertices) <= kept]
         fist["points"], fist["faces"] = points, faces
+        if fist.get("shape") == "diamond":
+            for digit, number in (("thumb", 1), ("index", 2)):
+                distal = pose[f"finger{number}-3.{tag}"]
+                edges = [posed.vertices[i].co for i in keep
+                         if (posed.vertices[i].co - distal.tail).length < .018]
+                tip = max(edges, key=lambda point: (point - distal.head).dot(distal.vector.normalized()),
+                          default=distal.tail)
+                fist[digit] = (to_hand @ (tip - fist["wrist"])) / fist["length"]
+
         fist["tunnel"] = (to_hand @ (fist["tunnel"] - fist["wrist"])) / fist["length"]
     human.evaluated_get(depsgraph).to_mesh_clear()
     for thing in [human, skeleton]:
@@ -430,7 +441,7 @@ def attach_fists(rig, body, fists, joints, material):
         bpy.ops.object.modifier_apply(modifier=smooth.name)
         centre = fit_point(fist["tunnel"])
         if fist.get("shape", "fist") != "fist":
-            if fist["shape"] == "support":
+            if fist["shape"] in ("support", "diamond"):
                 # A loaded palm flattens at the thenar pad and fingertips.
                 sign = 1 if side == "Left" else -1
                 for v in thing.data.vertices:
@@ -438,6 +449,9 @@ def attach_fists(rig, body, fists, joints, material):
                     q.z -= sign * .010 * max(0,min(1,(q.y-.10)/.06))
                     q.z = sign * max(-.020, sign*q.z)
                     v.co = wrist + frame @ q
+            if fist.get("shape") == "diamond":
+                for digit in ("thumb", "index"):
+                    thing["diamond_" + digit] = wrist + frame @ fit_point(fist[digit])
             thing["grip_axis"] = frame.col[0]
             thing["grip_origin"] = wrist + frame @ centre
             thing["grip_sections"] = [0.0]
@@ -529,6 +543,9 @@ def continuous_skin(body, joints, rest_surface):
         source = bpy.data.objects["fist." + side]
         for key in ("grip_axis", "grip_origin", "grip_sections"):
             skin[key + "." + side] = source[key]
+        for key in ("diamond_thumb", "diamond_index"):
+            if key in source:
+                skin[key + "." + side] = source[key]
         # Cut through the solid wrist just beyond the voxel-remesh cap.
         fist = bmesh.new()
         fist.from_mesh(source.data)
