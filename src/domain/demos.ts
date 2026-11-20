@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "box-jump",
+    views: ["front"],
+    cues: [
+      "Bend your hips and knees and swing your arms back.",
+      "Jump onto the box and land softly on both feet.",
+      "Stand tall, then step down one foot at a time.",
+    ],
+  },
+  {
     slug: "band-pull-apart",
     views: ["back"],
     cues: [

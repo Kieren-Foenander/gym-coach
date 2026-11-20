@@ -1239,6 +1239,41 @@ class HandBand(BandStation):
         self.pose_line(self.strip, *ends, frame, problems)
 
 
+class PlyoBox:
+    """A fixed box for a two-foot landing and controlled step down."""
+
+    def __init__(self, config):
+        x, y, top = config["at"]
+        self.centre = Vector((x, y, top / 2))
+        self.size = Vector((.61, .60, top))
+        finish = material("plyo box", (.12, .14, .155), .05, .64)
+        self.box = box("plyo box", self.size, self.centre, finish)
+        tread = material("plyo box tread", (.19, .22, .24), .12, .60)
+        box("plyo box top", (.606, .596, .008), (x, y, top - .004), tread)
+        self.contacts = config["contacts"]
+
+    def check(self, points, contact, phase, frame, problems, samples):
+        local = points - np.array(self.centre)
+        half = np.array(self.size) / 2
+        inside = np.all(np.abs(local) < half - .006, axis=1)
+        if inside.any():
+            depth = (half - np.abs(local[inside])).min(axis=1).max()
+            problems.add(frame, "the body crosses the jump box", depth)
+        for side, regions in self.contacts.items():
+            for start, end, level in regions:
+                if not start <= phase <= end:
+                    continue
+                foot = local[contact.foot_vertices[side]]
+                if level == "box":
+                    over = np.all(np.abs(foot[:, :2]) < half[:2], axis=1)
+                    gap = foot[over, 2].min(initial=1) - half[2]
+                else:
+                    gap = foot[:, 2].min() + half[2]
+                if not -.006 <= gap <= .012:
+                    problems.add(frame, side + " foot loses " + level + " contact", abs(gap))
+        samples.append(np.array([self.box.matrix_world @ Vector(v) for v in self.box.bound_box]))
+
+
 def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems):
     """Check fixed and moving mesh parts against posed skin, including actual fists."""
     skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
@@ -4357,7 +4392,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4380,6 +4415,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
+    plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
     tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
                    if e["type"] in tension_stations), None)
@@ -5015,6 +5051,8 @@ def bake(spec, keys):
             cables.check(everything, contact.faces, frame, problems, samples)
         if thigh_band:
             thigh_band.pose(everything, contact, frame, problems, samples)
+        if plyo_box:
+            plyo_box.check(everything, contact, phase, frame, problems, samples)
         if ground_gait is not None or treadmill:
             check_gait(spec, gait_phase, everything, contact, frame, problems, treadmill)
         if ground_gait is not None:
