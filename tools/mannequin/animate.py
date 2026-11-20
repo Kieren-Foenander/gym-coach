@@ -279,6 +279,17 @@ def pose_side_support(spec, pelvis, torso, gaps):
     gaps.append(("upper hand", gap))
 
 
+def pose_extended_legs(pelvis, abduction):
+    down = pelvis @ Vector((0, 0, -1))
+    forward = pelvis @ Vector((0, -1, 0))
+    for side in SIDES:
+        lift = Matrix.Rotation(-math.radians(abduction if side == "Right" else 0), 3, forward)
+        for bone in ("UpLeg", "Leg"):
+            swing(side + bone, lift @ down)
+        for bone in ("Foot", "ToeBase"):
+            place(side + bone, lift @ pelvis @ REST[side + bone])
+
+
 def pose_legs(spec, key, pelvis, except_side=None, support=None):
     gaps = []
     # Knees point where the toes do: forward along the floor, whatever the hips are doing.
@@ -4114,7 +4125,9 @@ def bake(spec, keys):
     roman_chair = next((RomanChair(e) for e in spec.get("equipment", []) if e["type"] == "roman-chair"), None)
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
-    wall = SupportPad("wall back contact", wall_config, material("wall", (.12, .13, .145), .04, .72), None) if wall_config else None
+    wall_feet = wall_config and wall_config.get("contact") == "feet"
+    wall = SupportPad("wall toe contact" if wall_feet else "wall back contact", wall_config,
+                      material("wall", (.12, .13, .145), .04, .72), None) if wall_config else None
     pullup = next((PullupBar(e) for e in spec.get("equipment", []) if e["type"] == "pullup-bar"), None)
     dip_bars = next((ParallelBars(e) for e in spec.get("equipment", []) if e["type"] == "parallel-bars"), None)
     standing_cardio_types = {"elliptical": Elliptical, "stair-climber": StairClimber}
@@ -4268,6 +4281,9 @@ def bake(spec, keys):
         elif roman_chair:
             gaps = []
             roman_chair.pose_legs(gaps)
+        elif spec.get("extended_legs"):
+            gaps = []
+            pose_extended_legs(pelvis, span.sample("abduction", 0))
         elif side_support:
             gaps = []
             pose_side_support(side_support, pelvis, torso, gaps)
@@ -4680,6 +4696,9 @@ def bake(spec, keys):
             treadmill.check(everything, contact.faces, hands, frame, problems, samples)
         if wall:
             wall.check(everything, frame, problems)
+            if wall_feet:
+                for vertices in contact.foot_vertices.values():
+                    wall.check(everything[vertices], frame, problems)
             samples.append(np.array([wall.face + Vector((sign * wall.width / 2, 0, z))
                                      for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
         if pullup:

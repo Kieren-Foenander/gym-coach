@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "handstand-push-up",
+    views: ["front"],
+    cues: [
+      "Set your palms shoulder-width apart and keep your toes on the wall.",
+      "Lower your head between and just ahead of your hands.",
+      "Press to straight arms while keeping your legs long.",
+    ],
+  },
+  {
     slug: "nordic-curl",
     views: ["front"],
     cues: [
