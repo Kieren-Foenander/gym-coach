@@ -1,0 +1,65 @@
+{
+  "equipment": [
+    {
+      "type": "pullup-bar",
+      "at": [
+        0,
+        -0.06,
+        2.11
+      ],
+      "grip_width": 0.295
+    }
+  ],
+  "stance": {
+    "width": 0.22,
+    "toe_out": 6,
+    "y": 0.067
+  },
+  "camera": {
+    "angle": 47
+  },
+  "frames": 78,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.016,
+        1.17
+      ],
+      "lean": 0,
+      "shoulder_y": 0.015,
+      "foot_left": [
+        0,
+        0.259,
+        0
+      ],
+      "foot_right": [
+        0,
+        0.259,
+        0
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "elbow": [
+        1,
+        13
+      ],
+      "knee": [
+        0,
+        22
+      ]
+    },
+    {
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.26,
+          0.41
+        ]
+      }
+    }
+  ]
+}

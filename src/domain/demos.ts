@@ -28,6 +28,15 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "dead-hang",
+    views: ["front"],
+    cues: [
+      "Reach overhead and take a secure overhand grip.",
+      "Lift your feet clear and let your arms straighten.",
+      "Keep your body still as you breathe.",
+    ],
+  },
+  {
     slug: "burpee",
     views: ["front"],
     cues: [

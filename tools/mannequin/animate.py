@@ -223,12 +223,12 @@ def vertical_arm_reach(lateral, forward, slack=.0003):
     return math.sqrt(reach ** 2 + palm ** 2 - forward ** 2)
 
 
-def suspend_from_bar(centre, width, shoulder_y, pelvis_rotation):
+def suspend_from_bar(centre, width, shoulder_y, pelvis_rotation, overhead=False):
     """Set trunk height from the bar and the length of a hanging, nearly straight arm."""
     shoulder = (head("LeftArm") + head("RightArm")) / 2
     lateral = width - (head("LeftArm").x - shoulder.x)
     height = vertical_arm_reach(lateral, shoulder_y - centre[1])
-    target = Vector((centre[0], shoulder_y, centre[2] + height))
+    target = Vector((centre[0], shoulder_y, centre[2] - height if overhead else centre[2] + height))
     place("Hips", pelvis_rotation @ REST["Hips"], head("Hips") + target - shoulder)
 
 
@@ -1965,6 +1965,39 @@ class CycleStation:
         samples.append(np.array(self.bounds))
 
 
+class PullupBar:
+    """A stationary grip between uprights. The trunk hangs from the grip height."""
+
+    def __init__(self, config):
+        self.centre = Vector(config["at"])
+        self.grip_width = config["grip_width"]
+        finish = material("pull-up frame", (.08, .09, .105), .55, .43)
+        shaft = CableStation.part("pull-up bar", Barbell.SHAFT, finish)
+        spread = Vector((.69, 0, 0))
+        set_segment(shaft, self.centre - spread, self.centre + spread, 1)
+        self.handles = dict.fromkeys(SIDES, shaft)
+        self.parts = [(shaft, True)]
+        for sign in (-1, 1):
+            x = self.centre.x + sign * .69
+            y, z = self.centre.y, self.centre.z
+            post = box("pull-up upright", (.076, .078, z + .055), (x, y, (z + .055) / 2), finish)
+            foot = box("pull-up base", (.116, .67, .05), (x, y + .08, .025), finish)
+            self.parts.extend(((post, False), (foot, False)))
+
+    def pose(self, torso, gaps):
+        axis = Vector((1, 0, 0))
+        for side, sign in SIDES.items():
+            target = self.centre + axis * (sign * self.grip_width)
+            pole = torso.direction([.42, .47, -.14], sign)
+            gaps.append((side + " pull-up grip", pose_arm(side, target, pole, "pronated", torso, axis)))
+
+    def check(self, points, faces, hands, grips, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        check_hardware_clearance(self.parts, points, faces, hands, grips, frame, problems)
+        samples.append(np.array([part.matrix_world @ Vector(v)
+                                 for part, _ in self.parts for v in part.bound_box]))
+
+
 class StandingCardio:
     """Shared grip and foot contact checks for standing cardio machines."""
 
@@ -3516,7 +3549,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -3545,6 +3578,7 @@ def bake(spec, keys):
     treadmill = next((Treadmill(e) for e in spec.get("equipment", []) if e["type"] == "treadmill"), None)
     wall_config = next((e for e in spec.get("equipment", []) if e["type"] == "wall-support"), None)
     wall = SupportPad("wall back contact", wall_config, material("wall", (.12, .13, .145), .04, .72), None) if wall_config else None
+    pullup = next((PullupBar(e) for e in spec.get("equipment", []) if e["type"] == "pullup-bar"), None)
     standing_cardio_types = {"elliptical": Elliptical, "stair-climber": StairClimber}
     standing_cardio = next((standing_cardio_types[e["type"]](e) for e in spec.get("equipment", [])
                             if e["type"] in standing_cardio_types), None)
@@ -3575,7 +3609,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     handled_station = next((item for item in (
         cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral,
-        standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
+        pullup, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
@@ -3631,7 +3665,9 @@ def bake(spec, keys):
         if guided_squat:
             guided_squat.trunk(span, key, frame, problems)
         pelvis = pose_trunk(key)
-        if "shoulder_y" in a:
+        if pullup and "shoulder_y" in a:
+            suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis, overhead=True)
+        elif "shoulder_y" in a:
             suspend_from_bar(span.sample("bar"), span.sample("grip_width", 0.25),
                              span.sample("shoulder_y"), pelvis)
         elif "pelvis" not in key:
@@ -3679,6 +3715,8 @@ def bake(spec, keys):
         else:
             gaps = pose_legs(spec, {**a, **key}, pelvis)
         gaps.extend(activity_gaps)
+        if pullup:
+            pullup.pose(torso, gaps)
         if rower:
             rower.pose(span, torso, frame, gaps)
         if belt_squat:
@@ -4027,6 +4065,8 @@ def bake(spec, keys):
             wall.check(everything, frame, problems)
             samples.append(np.array([wall.face + Vector((sign * wall.width / 2, 0, z))
                                      for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
+        if pullup:
+            pullup.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if standing_cardio:
             standing_cardio.check(everything, contact.faces, hands, grips, frame, problems, samples)
         if rower:
