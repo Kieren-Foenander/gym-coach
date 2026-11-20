@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "overhead-cable-triceps-extension",
+    views: ["back"],
+    cues: [
+      "Stand facing away from the pulley with the rope behind your head.",
+      "Keep your elbows steady as you extend your arms.",
+      "Let your forearms fold back slowly.",
+    ],
+  },
+  {
     slug: "wide-grip-seated-cable-row",
     views: ["back"],
     cues: [
