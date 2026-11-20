@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-woodchopper",
+    views: ["front"],
+    cues: [
+      "Start with your hands high beside the pulley.",
+      "Turn through your torso and hips as you pull diagonally down.",
+      "Return along the same path under control.",
+    ],
+  },
+  {
     slug: "cable-hip-adduction",
     views: ["front"],
     cues: [

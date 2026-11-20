@@ -848,6 +848,7 @@ class CableStation:
         self.half = config.get("grip_half", self.GRIP_HALF[self.attachment])
         self.resistance_direction = config.get("resistance_direction")
         self.resistance_lengths = {}
+        self.follow_forearm = config.get("follow_forearm", False)
         self.stirrup_direction = config.get("stirrup_direction")
         dual = self.attachment == "d-handle"
         self.stations = {}
@@ -950,7 +951,7 @@ class CableStation:
             grip = span.keys[1].get("grip", "neutral")
             if "cable_target" in span.keys[1]:
                 target = Vector(span.sample("cable_target"))
-                target.x *= sign
+                target.x = target.x * sign + span.sample("cable_centre_x", 0)
                 pole = torso.direction(span.sample("elbows", [.25, -.1, -1]), sign)
                 axis = torso.direction(span.sample("handle_direction", [1, 0, 0]), sign)
                 if straight:
@@ -967,6 +968,13 @@ class CableStation:
                 along, palm = hand_on_bar(lower, palm_facing(grip, lower, pole, torso, sign, axis), axis)
                 target = elbow + lower * fore + along * GRIP[side][0] + palm * GRIP[side][1]
                 hand_frame = (along, palm)
+            if self.follow_forearm:
+                desired = axis
+                direction = (target - head(side + "Arm")).normalized()
+                for _ in range(4):
+                    axis = (desired - direction * direction.dot(desired)).normalized()
+                    pose_arm(side, target, pole, grip, torso, axis)
+                    direction = (head(side + "Hand") - head(side + "ForeArm")).normalized()
             targets[side], axes[side] = target, axis.normalized()
             gap = pose_arm(side, target, pole, grip, torso, axis, hand_frame)
             gaps.append((side + " cable grip", gap))

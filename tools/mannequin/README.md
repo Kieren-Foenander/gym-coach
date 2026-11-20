@@ -66,6 +66,9 @@ so far.
 
 Use `cable_target` for a left grip position in world metres, mirrored for the right
 hand, and `handle_direction` for the grip shaft direction in torso coordinates.
+Use `cable_centre_x` to shift both grip targets sideways. For independently
+rotating rope ends, `follow_forearm` lets each shaft tilt toward perpendicular
+to its forearm as the hand moves.
 For an elbow-driven arc, use `upper_arm`, `curl`, and `flex_toward`. The geometry
 follows the hand targets in either mode.
 
