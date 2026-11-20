@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "diamond-push-up",
+    views: ["front"],
+    cues: [
+      "Place your hands close together under your chest.",
+      "Brace and bend your elbows back as you lower.",
+      "Press through both palms and lift your body as one unit.",
+    ],
+  },
+  {
     slug: "pike-push-up",
     views: ["front"],
     cues: [
