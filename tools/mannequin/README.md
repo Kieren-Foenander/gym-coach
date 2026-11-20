@@ -95,7 +95,17 @@ moving spring handle, checking both handle contacts and spring clearance.
 A `push-sled` sets the left palm position with `grip` and mirrors the right grip.
 Its gait keeps the arms on those handles while alternating legs. The
 `stability-ball` rolls along `ball_y`, with per-frame foot contact and
-body clearance.
+body clearance. A sled with `tow_y` uses a fixed tow attachment and a
+backward gait.
+
+The `safety-bar` follows torso pitch and checks each shoulder pad and grip.
+Set `ghd: true` on a Nordic bench to add a curved thigh pad and a braced
+footplate. The `road` cycle option uses a bicycle frame with rotating wheels
+and keeps the saddle, pedal and grip checks.
+
+A `jump-rope` uses an authored grip position and `reach` in metres. Its
+constant-length cord has per-frame floor and body clearance checks, and
+the feet must be airborne while the rope passes beneath them.
 
 ### Choosing a colour
 

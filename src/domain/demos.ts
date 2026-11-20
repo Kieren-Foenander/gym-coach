@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "jump-rope",
+    views: ["front"],
+    cues: [
+      "Keep your elbows close and turn the rope from your wrists.",
+      "Take a low hop as the rope passes under your feet.",
+      "Land softly and keep the rhythm.",
+    ],
+  },
+  {
     slug: "glute-ham-raise",
     views: ["front"],
     cues: [

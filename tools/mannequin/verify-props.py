@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 here = Path(__file__).parent
 api = runpy.run_path(str(here / "animate.py"))
@@ -86,3 +87,39 @@ heels[0, 2] += .035
 ball.check(heels, contact, 1, problems, [])
 assert "Left heel loses stability ball contact" in problems.found, list(problems.lines())
 print("EXERCISE PROP REGRESSIONS PASSED")
+
+spec = initial_pose("safety-bar-squat")
+bake(spec)
+spec["keys"][0]["bar"]["offset"][2] += .045
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left safety bar pad lifts off the shoulder" in problems.found, list(problems.lines())
+
+spec = initial_pose("glute-ham-raise")
+bake(spec)
+spec["equipment"][0]["roller"][2] += .055
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left ankle loses Nordic roller contact" in problems.found, list(problems.lines())
+
+spec = initial_pose("outdoor-cycling")
+bake(spec)
+cycle = api["CycleStation"](spec["equipment"][0])
+key = spec["keys"][0]
+cycle.pose(spec, api["PoseSpan"](api["load_keys"](spec), 0), 0, key, api["Torso"](), 1, [])
+cycle.pedal_faces["Left"].z += .045
+api["update"]()
+points, faces, hands = skin()
+grips = {side: api["GripSurface"](side) for side in api["SIDES"]}
+problems = api["Problems"]()
+cycle.check(points, faces, hands, grips, 1, problems, [])
+assert "Left foot loses cycle pedal contact" in problems.found, list(problems.lines())
+
+spec = initial_pose("jump-rope")
+bake(spec)
+rope = api["JumpRope"](spec["equipment"][0])
+rope.rope.points = [Vector((0, -.5, 1.15)), Vector((0, .5, 1.15))]
+points, faces, _ = skin()
+problems = api["Problems"]()
+rope.rope.check_clearance(BVHTree.FromPolygons(points, faces, all_triangles=True),
+                          1, problems, "jump rope", rope.radius)
+assert "jump rope crosses the body" in problems.found, list(problems.lines())
+print("ROAD BIKE, GHD, SAFETY BAR AND JUMP ROPE REGRESSIONS PASSED")
