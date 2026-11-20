@@ -1,38 +1,37 @@
 import type { Device } from "@e2e-dev/mobile"
+import { expect } from "e2e"
 
 /**
- * Dialogs that the operating system shows over the app. They are not the app's, so they have no test ids,
- * and this file is the one place a test finds an element by its words. test/test-ids.test.ts leaves it out.
+ * Dialogs that the operating system shows over the app, such as iOS's offer to save the password after a
+ * sign-in. They are not the app's, so they have no test ids and the app's screen tree doesn't hold them:
+ * `device.alert` reaches them, and agent-device taps the button that says no ("Not Now", "Cancel",
+ * "Don't Allow").
  */
 
-const notNow = (device: Device) => device.locator('role=button label="Not Now"')
+/** Dismisses a system dialog over the app if there is one. Answers whether there was. */
+export const dismissSystemDialog = async (device: Device): Promise<boolean> => {
+  if (device.unstable_raw.platform !== "ios") return false
 
-// The sheet can take a long time to come on a CI runner's simulator (E2E_SLOW_DEVICE, see e2e.config.ts).
+  try {
+    await device.alert("dismiss")
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+// The save-password sheet can take a long time to come on a CI runner's simulator (E2E_SLOW_DEVICE, see
+// e2e.config.ts).
 const SAVE_PASSWORD_WAIT = process.env.E2E_SLOW_DEVICE ? 120_000 : 15_000
 
-/**
- * iOS offers to save the password after a sign-in, as a sheet over the app. Waits for it and taps
- * "Not Now". Android never offers, so there it does nothing.
- */
+/** Waits for iOS's offer to save the password after a sign-in, and dismisses it. Android never offers. */
 export const dismissSavePassword = async (device: Device, within = SAVE_PASSWORD_WAIT) => {
   if (device.unstable_raw.platform !== "ios") return
 
   try {
-    await notNow(device).waitFor({ timeout: within })
+    await expect.poll(() => dismissSystemDialog(device), { timeout: within }).toBe(true)
   } catch {
-    return
+    // It never came.
   }
-
-  await notNow(device).tap()
-}
-
-/** Taps "Not Now" if the save-password sheet is over the app right now. Answers whether it was. */
-export const dismissSavePasswordIfShown = async (device: Device): Promise<boolean> => {
-  if (device.unstable_raw.platform !== "ios") return false
-
-  if (!(await notNow(device).isVisible())) return false
-
-  await notNow(device).tap()
-
-  return true
 }
