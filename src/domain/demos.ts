@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "band-pull-apart",
+    views: ["back"],
+    cues: [
+      "Hold the band at chest height with your arms long.",
+      "Pull your hands apart without bending your elbows or shrugging.",
+      "Return slowly and keep the band taut.",
+    ],
+  },
+  {
     slug: "clamshell",
     views: ["front"],
     cues: [

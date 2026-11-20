@@ -1209,6 +1209,36 @@ def pose_clamshell(pelvis, opening):
             place(side + bone, pelvis @ REST[side + bone])
 
 
+class HandBand(BandStation):
+    """Two grips pull an elastic strip apart without a fixed anchor."""
+
+    def __init__(self, config):
+        self.rest_length = config["rest_length"]
+        if not math.isfinite(self.rest_length) or self.rest_length <= 0:
+            raise ValueError("Band rest length must be positive")
+        self.elastic = material("amber resistance band", (.60, .205, .035), .03, .47)
+        self.strip = self.make_line()
+        finish = material("band grips", (.07, .08, .09), .12, .56)
+        self.handles = {side: self.part(side + " band grip", Barbell.SHAFT, finish) for side in SIDES}
+        self.lines, self.straps, self.bounds, self.parts = [], [], [], []
+        self.footplate = None
+
+    def pose(self, span, torso, grips, frame, gaps, problems):
+        ends = []
+        axis = Vector((0, 0, 1))
+        for side, sign in SIDES.items():
+            target = Vector(span.sample("band_grip"))
+            target.x *= sign
+            pole = torso.direction(span.sample("elbows"), sign)
+            gap = pose_arm(side, target, pole, "thumb-forward", torso, axis)
+            gaps.append((side + " band grip", gap))
+            end = target + axis * .079
+            set_segment(self.handles[side], target - axis * .079, end, frame)
+            ends.append(end)
+        self.lines[:] = [tuple(ends)]
+        self.pose_line(self.strip, *ends, frame, problems)
+
+
 def check_hardware_clearance(parts, points, faces, hands, grips, frame, problems):
     """Check fixed and moving mesh parts against posed skin, including actual fists."""
     skin = BVHTree.FromPolygons(points, faces, all_triangles=True)
@@ -4327,7 +4357,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band"}
+    unknown = set(equipment) - {"barbell", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -4350,7 +4380,7 @@ def bake(spec, keys):
     contact_load = next((ContactLoad(e) for e in spec.get("equipment", []) if e["type"] in ("plate","vertical-dumbbell")),None)
     landmine = next((Landmine(e) for e in spec.get("equipment", []) if e["type"] == "landmine"), None)
     thigh_band = next((ThighBand(e) for e in spec.get("equipment", []) if e["type"] == "thigh-band"), None)
-    tension_stations = {"cable": CableStation, "resistance-band": BandStation}
+    tension_stations = {"cable": CableStation, "resistance-band": BandStation, "hand-band": HandBand}
     cables = next((tension_stations[e["type"]](e) for e in spec.get("equipment", [])
                    if e["type"] in tension_stations), None)
     belt_squat = next((BeltSquatStation(e) for e in spec.get("equipment", []) if e["type"] == "belt-squat"), None)
