@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "band-curl",
+    views: ["front"],
+    cues: [
+      "Anchor the band low and hold the bar with palms up.",
+      "Curl the bar while keeping your elbows by your ribs.",
+      "Straighten your arms slowly and keep the band taut.",
+    ],
+  },
+  {
     slug: "band-pushdown",
     views: ["back"],
     cues: [
