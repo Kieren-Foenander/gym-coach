@@ -130,3 +130,13 @@ spec["keys"][0]["gait"][1] = -.06
 problems, _, _ = api["bake"](spec, api["load_keys"](spec))
 assert "Left foot goes through treadmill belt" in problems.found, list(problems.lines())
 print("TREADMILL AND CYCLE REGRESSIONS PASSED")
+
+spec = initial_pose("machine-glute-kickback")
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert not problems.found, list(problems.lines())
+
+spec = initial_pose("machine-glute-kickback")
+spec["equipment"][0]["forearm_support"]["face"][2] -= .045
+problems, _, _ = api["bake"](spec, api["load_keys"](spec))
+assert "Left kickback forearm support loses skin contact" in problems.found, list(problems.lines())
+print("KICKBACK SUPPORT REGRESSIONS PASSED")

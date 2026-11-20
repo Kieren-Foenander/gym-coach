@@ -2163,6 +2163,7 @@ class LegRollerMachine:
         self.side = config.get("side")
         self.hip_drive = config.get("hip_drive", False)
         self.grip = Vector(config["support_grip"]) if "support_grip" in config else None
+        self.forearm_support = config.get("forearm_support")
         self.handles = {}
         sides = (self.side,) if self.side else SIDES
         self.offset = Vector(config["roller_offset"])
@@ -2182,6 +2183,16 @@ class LegRollerMachine:
         self.parts = [(part, False) for parts in (self.levers, self.returns, self.bearings, self.columns)
                       for part in parts.values()]
         self.parts.extend((mount, False) for pad in self.pads for mount in pad.mounts)
+        if self.forearm_support:
+            self.frame_finish = material("kickback frame", (.10, .115, .13), .52, .39)
+            self.axle_finish = material("kickback axle cap", (.26, .28, .32), .66, .34)
+            self.axle_caps = {}
+            for side in sides:
+                self.columns[side].data.materials[0] = self.frame_finish
+                self.levers[side].data.materials[0] = self.frame_finish
+                cap = cylinder("kickback fixed pivot", .062, .115, 0, self.axle_finish, None)
+                self.axle_caps[side] = cap
+                self.parts.append((cap, False))
         if self.grip:
             for side, sign in SIDES.items():
                 target = Vector((sign * self.grip.x, self.grip.y, self.grip.z))
@@ -2190,6 +2201,17 @@ class LegRollerMachine:
                 set_segment(handle, target - Vector((sign * .077, 0, 0)), outer, 1)
                 post = box("standing roller grip post", (.057,.062,outer.z),
                            (outer.x, outer.y, outer.z / 2), metal)
+                if self.forearm_support:
+                    post.data.materials[0] = self.frame_finish
+                    support = self.forearm_support
+                    face = (sign * support["face"][0], *support["face"][1:])
+                    self.pads.append(SupportPad(side + " kickback forearm support",
+                                                {**support, "face": face}, pad, self.frame_finish))
+                    cradle = CableStation.part("kickback forearm support bracket", .022, self.frame_finish)
+                    start = Vector((outer.x, outer.y, face[2] - .066))
+                    end = Vector((face[0], face[1], face[2] - .053))
+                    set_segment(cradle, start, end, 1)
+                    self.parts.append((cradle, False))
                 self.handles[side] = handle
                 self.parts.extend(((handle, True), (post, False)))
 
@@ -2225,6 +2247,13 @@ class LegRollerMachine:
                 column = self.columns[side]
                 column.location = (outside.x, outside.y, outside.z / 2)
                 column.scale.z = outside.z
+                if self.forearm_support:
+                    self.axle_caps[side].location = outside + Vector((sign * .035, 0, 0))
+                    front_y = self.grip.y - .045
+                    back_y = outside.y + .16
+                    foot = box("kickback base rail", (.115, back_y - front_y, .052),
+                               (sign * .423, (front_y + back_y) / 2, .026), self.frame_finish)
+                    self.parts.append((foot, False))
             if (outside - self.axes[side]).length > .002:
                 problems.add(frame, "knee leaves the fixed roller axle", (outside - self.axes[side]).length)
 
@@ -2258,8 +2287,9 @@ class LegRollerMachine:
                 problems.add(frame, side + " roller penetrates skin", depth)
         for pad in self.pads:
             pad.check(points, frame, problems)
+        visible = (*self.rollers.values(), *(part for part, _ in self.parts)) if self.forearm_support else self.rollers.values()
         samples.append(np.array([part.matrix_world @ Vector(corner)
-                                 for part in self.rollers.values() for corner in part.bound_box]))
+                                 for part in visible for corner in part.bound_box]))
 
 
 class SelectorMachine:
