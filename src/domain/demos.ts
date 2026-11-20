@@ -64,6 +64,24 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "sit-up",
+    views: ["front"],
+    cues: [
+      "Lie with your knees bent and your feet flat.",
+      "Curl up toward your thighs as your hands reach forward.",
+      "Lower slowly until your shoulders and head return to the floor.",
+    ],
+  },
+  {
+    slug: "v-up",
+    views: ["front"],
+    cues: [
+      "Start on your back with your arms overhead and legs extended.",
+      "Lift your torso and legs together and reach for your feet.",
+      "Lower both under control.",
+    ],
+  },
+  {
     slug: "bicycle-crunch",
     views: ["front"],
     cues: [
