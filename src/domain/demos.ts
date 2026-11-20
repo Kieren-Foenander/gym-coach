@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-upright-row",
+    views: ["front"],
+    cues: [
+      "Start with the bar close to your thighs.",
+      "Lead with your elbows as you raise the bar.",
+      "Lower under control with your shoulders relaxed.",
+    ],
+  },
+  {
     slug: "bayesian-curl",
     views: ["front"],
     cues: [
