@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "pike-push-up",
+    views: ["front"],
+    cues: [
+      "Plant your hands and lift your hips high.",
+      "Bend your elbows and lower the top of your head toward the floor.",
+      "Press through your palms while keeping your hips high.",
+    ],
+  },
+  {
     slug: "bear-crawl",
     views: ["front"],
     cues: [
