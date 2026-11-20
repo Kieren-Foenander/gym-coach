@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-pull-through",
+    views: ["back"],
+    cues: [
+      "Straddle the cable facing away from the low pulley.",
+      "Push your hips back as the rope travels between your legs.",
+      "Drive through your feet and stand tall.",
+    ],
+  },
+  {
     slug: "cable-kickback",
     views: ["back"],
     cues: [
