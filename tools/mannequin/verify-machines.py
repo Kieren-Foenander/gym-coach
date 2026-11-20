@@ -42,7 +42,11 @@ def initial_pose(slug):
     api = runpy.run_path(str(here / "animate.py"))
     spec = json.loads((here / f"exercises/{slug}.json").read_text())
     spec.update(frames=1, keys=spec["keys"][:1],
-                checkpoints=[check for check in spec["checkpoints"] if check.get("at", 0) == 0])
+                checkpoints=[check for check in spec.get("checkpoints", []) if check.get("at", 0) == 0])
+    if slug == "treadmill-run":
+        # Belt clearance is independent of the runner's finger pose.
+        # The machine fixtures use the shared fist scene.
+        spec.pop("hands", None)
     return spec
 
 
