@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
-import { expect, test as base, type Page } from "@playwright/test"
-import { testIds } from "../src/domain/test-ids"
-import { seedStatements, type History } from "../tools/seed/history"
-import { E2E_DATABASE_FILE, E2E_INVITE_CODE } from "../tools/e2e/constants"
+import { test as base } from "@e2e-dev/web"
+import { expect, type App, type Screen } from "e2e"
+import { testIds } from "../../src/domain/test-ids"
+import { seedStatements, type History } from "../../tools/seed/history"
+import { E2E_DATABASE_FILE, E2E_INVITE_CODE } from "../../tools/e2e/constants"
 
 /**
- * What the browser tests share. Elements are found by test id only (`page.getByTestId` with an id from
+ * What the browser tests share. Elements are found by test id only (`screen.getByTestId` with an id from
  * src/domain/test-ids.ts), and values are read from `data-state` and `data-value`, never from the words
  * on screen. test/test-ids.test.ts fails the build if a test does otherwise.
  */
@@ -23,10 +24,10 @@ const PASSWORD = "a long enough password"
 let people = 0
 
 /** A new account on the server under test, made through the JSON API. */
-const makePerson = async (baseURL: string): Promise<Person> => {
+const makePerson = async (baseUrl: string): Promise<Person> => {
   const email = `e2e-${Date.now()}-${++people}@example.com`
 
-  const response = await fetch(new URL("/api/v1/account/sign-up", baseURL), {
+  const response = await fetch(new URL("/api/v1/account/sign-up", baseUrl), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password: PASSWORD, displayName: "Tester", inviteCode: process.env.E2E_INVITE_CODE ?? E2E_INVITE_CODE }),
@@ -38,14 +39,14 @@ const makePerson = async (baseURL: string): Promise<Person> => {
 }
 
 /** Signs in through the sign-in screen, and waits for Today. */
-export const signIn = async (page: Page, person: Person) => {
-  await page.goto("/login")
+export const signIn = async ({ app, screen }: { readonly app: App; readonly screen: Screen }, person: Person) => {
+  await app.open("/login")
   // The button turns on once the page is live; anything typed before that is lost when React takes over.
-  await expect(page.getByTestId(testIds.login.submit)).toBeEnabled()
-  await page.getByTestId(testIds.login.email).fill(person.email)
-  await page.getByTestId(testIds.login.password).fill(person.password)
-  await page.getByTestId(testIds.login.submit).click()
-  await expect(page.getByTestId(testIds.today.weekCard)).toBeVisible()
+  await expect(screen.getByTestId(testIds.login.submit)).toBeEnabled()
+  await screen.getByTestId(testIds.login.email).fill(person.email)
+  await screen.getByTestId(testIds.login.password).fill(person.password)
+  await screen.getByTestId(testIds.login.submit).tap()
+  await expect(screen.getByTestId(testIds.today.weekCard)).toBeVisible()
 }
 
 export const seedHistory: History = JSON.parse(readFileSync("seed/training-history.json", "utf8"))
@@ -65,24 +66,30 @@ const seed = (person: Person) => {
 export const signedOutTest = base
 
 const withPerson = base.extend<{ readonly person: Person }>({
-  person: async ({ baseURL }, use) => {
-    await use(await makePerson(baseURL ?? ""))
+  person: async ({ app }, use) => {
+    await use(await makePerson(app.baseUrl))
   },
 })
 
 /** Tests that start signed in to a new, empty account, on Today. `person` is that account. */
-export const test = withPerson.extend({
-  page: async ({ page, person }, use) => {
-    await signIn(page, person)
-    await use(page)
-  },
+export const test = withPerson.extend<{ readonly signedIn: void }>({
+  signedIn: [
+    async ({ app, screen, person }, use) => {
+      await signIn({ app, screen }, person)
+      await use()
+    },
+    { auto: true },
+  ],
 })
 
 /** Tests that start signed in to a new account holding the seed training history, on Today. */
-export const seededTest = withPerson.extend({
-  page: async ({ page, person }, use) => {
-    seed(person)
-    await signIn(page, person)
-    await use(page)
-  },
+export const seededTest = withPerson.extend<{ readonly signedIn: void }>({
+  signedIn: [
+    async ({ app, screen, person }, use) => {
+      seed(person)
+      await signIn({ app, screen }, person)
+      await use()
+    },
+    { auto: true },
+  ],
 })

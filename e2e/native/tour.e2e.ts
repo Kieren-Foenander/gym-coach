@@ -8,7 +8,7 @@ import { dismissSavePasswordIfShown, serverUrl, test, testIds } from "./support"
  * .github/workflows/ios-tour.yml runs it on an iOS Simulator, signed in to a server with the seed history.
  */
 
-describe("a tour of the main screens", { serial: true }, () => {
+describe("a tour of the main screens", { serial: true, requires: ["device"] }, () => {
   // In case iOS still offers to save the password, over a later screen. Before the first test opens the app
   // there is no screen to read, so it starts checking after that.
   let opened = false
