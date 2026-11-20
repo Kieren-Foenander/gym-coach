@@ -364,6 +364,15 @@ on both sides. Set `floor_hands` to the left wrist's world coordinates.
 The right wrist mirrors across X. The palms are checked against the floor
 on every frame.
 
+For weight-bearing palms, add a checkpoint with
+`"hand_mode": "floor-plant"`. Omit `at` to check the whole rep, or use
+`at` and `side` to check a selected hand at contact. The open `support`
+mesh already extends and spreads the fingers and flattens the palm.
+Floor-plant checks require both the palm and finger pads to approach the
+ground plane and measure signed wrist extension toward the palm normal
+in a 75–100° range. The 40° grip limit still applies to implement grips
+and the existing support-hand checks.
+
 ### Bar turnover
 
 A straight-bar spec may key `grip_pitch` to control hand rotation around the

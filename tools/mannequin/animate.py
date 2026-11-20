@@ -3350,8 +3350,8 @@ def movement_checkpoints(spec, frames):
         phase = check.get("at")
         if phase is not None and not 0 <= phase < 1:
             raise ValueError("Checkpoint phase must be in [0, 1)")
-        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical"}
-        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical"}:
+        unknown = set(check) - {"at", "side", "elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical", "hand_mode"}
+        if unknown or not set(check) & {"elbow", "position", "handle_axis", "palm", "upper_arm_to_torso", "fixed_elbow_m", "head_pitch", "surface_gap", "hand_pitch", "wrist_bend", "knee", "shin_vertical", "hand_mode"}:
             raise ValueError(f"Invalid movement checkpoint: {check}")
         if check.get("side", "Left") not in SIDES:
             raise ValueError(f"Unknown checkpoint side: {check['side']}")
@@ -3391,6 +3391,15 @@ def check_movement(checks, frame, barbell, dumbbells, problems, initial=None, co
                 local = tool.matrix_world.inverted() @ landmark
                 gap = contact_load.distance(np.array([local]), expected.get("upper_head", False))[0]
                 bounds("load to " + expected["landmark"], max(0, gap), [0, expected["max_m"]], "m")
+            if "hand_mode" in check:
+                if check["hand_mode"] != "floor-plant":
+                    raise ValueError(f"Unknown hand mode: {check['hand_mode']}")
+                forearm = world_rotation(side + "ForeArm").col[1]
+                rotation = world_rotation(side + "Hand")
+                along = rotation.col[1]
+                normal = rotation @ palm_axis(side)
+                extension = math.degrees(math.atan2(forearm.dot(normal), forearm.dot(along)))
+                bounds("floor-plant wrist extension", extension, [75, 100], "degrees")
             if "wrist_bend" in check:
                 forearm = joint("Hand") - joint("ForeArm")
                 along = world_rotation(side + "Hand").col[1]
@@ -3544,6 +3553,8 @@ def bake(spec, keys):
         if rig.get("hand_shape." + side, "fist") != shape:
             raise ValueError("Scene hand shape does not match the spec")
     problems = Problems()
+    if any(check.get("hand_mode") == "floor-plant" for checks in checkpoints.values() for check in checks) and not floor_hands:
+        raise ValueError("Floor-plant checkpoints need floor_hands")
     has_grips = barbell or dumbbells or contact_load or landmine or floor_hands or handled_station
     grips = {side: GripSurface(side) for side in SIDES} if has_grips else {}
     wrists = wrist_collision_points()
@@ -3804,7 +3815,9 @@ def bake(spec, keys):
                 radius, y, z = floor_hands
                 wrist = Vector((sign * radius, y, z))
                 target = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
-                pole = Vector((sign * .58, .14, -.45))
+                planted = any(check.get("hand_mode") == "floor-plant" and check.get("side", side) == side
+                              for check in checkpoints.get(frame, ()))
+                pole = Vector((sign * .65, .008, .28)) if planted else Vector((sign * .58, .14, -.45))
                 gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm))
                 gaps.append((side + " floor wrist", gap))
                 surface = grips[side]
@@ -3812,9 +3825,18 @@ def bake(spec, keys):
                 heights = surface.points @ np.array(transform.to_3x3().row[2]) + transform.translation.z
                 gap = heights.min(initial=1)
                 surface.record_contact(gap)
-                if gap < -.002 or np.count_nonzero(np.abs(heights) < .004) < 20:
+                near = np.abs(heights) < .004
+                if planted:
+                    direction = transform.to_3x3().transposed() @ along
+                    forward = surface.points @ np.array(direction) + (transform.translation - wrist).dot(along)
+                    palm_supported = (np.count_nonzero(near & (forward > .017) & (forward < .085)) >= 20
+                               and np.count_nonzero(near & (forward > .10)) >= 20)
+                else:
+                    palm_supported = np.count_nonzero(near) >= 20
+                if gap < -.002 or not palm_supported:
                     problems.add(frame, side + " open palm loses floor contact", abs(gap))
-                surface.check_wrist(frame, problems)
+                if not planted:
+                    surface.check_wrist(frame, problems)
         if dumbbells:
             for side in dumbbells.roots:
                 sign = SIDES[side]

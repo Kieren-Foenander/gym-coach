@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "push-up",
+    views: ["front"],
+    cues: [
+      "Plant your palms just outside your shoulders and spread your fingers.",
+      "Brace and lower your chest with your elbows angled back.",
+      "Press the floor away and lift your hips and chest together.",
+    ],
+  },
+  {
     slug: "cossack-squat",
     views: ["front"],
     cues: [
