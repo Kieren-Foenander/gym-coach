@@ -2077,6 +2077,7 @@ class PullupBar:
         self.centre = Vector(config["at"])
         self.grip_width = config["grip_width"]
         self.grip = config.get("grip", "pronated")
+        self.feet_supported = config.get("feet_supported", False)
         finish = material("pull-up frame", (.08, .09, .105), .55, .43)
         shaft = CableStation.part("pull-up bar", Barbell.SHAFT, finish)
         spread = Vector((.69, 0, 0))
@@ -2120,7 +2121,10 @@ class PullupBar:
         check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
         for side, vertices in contact.foot_vertices.items():
             height = points[vertices, 2].min()
-            if height < .10:
+            if self.feet_supported:
+                if not -.006 <= height <= .012:
+                    problems.add(frame, side + " loses floor support below the low bar", abs(height))
+            elif height < .10:
                 problems.add(frame, side + " foot below hanging clearance", .10 - height)
         samples.append(np.array([part.matrix_world @ Vector(v)
                                  for part, _ in self.parts for v in part.bound_box]))
@@ -4308,7 +4312,7 @@ def bake(spec, keys):
                 turn_back = Matrix.Rotation(sign * retract, 3, torso.up)
                 turn_up = Matrix.Rotation(sign * elevate, 3, torso.forward)
                 swing(name, turn_back @ turn_up @ direction)
-        if pullup:
+        if pullup and not pullup.feet_supported:
             suspend_from_bar(pullup.centre, pullup.grip_width, span.sample("shoulder_y"), pelvis,
                              overhead=True, lift=span.sample("hang_lift", 0))
             torso = Torso()

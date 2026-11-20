@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "inverted-row",
+    views: ["front"],
+    cues: [
+      "Grip the bar and plant your heels.",
+      "Keep your body straight as you pull your chest toward the bar.",
+      "Lower until your arms are long.",
+    ],
+  },
+  {
     slug: "side-lying-leg-raise",
     views: ["front"],
     cues: [
