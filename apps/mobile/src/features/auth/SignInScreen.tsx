@@ -5,7 +5,12 @@ import { describeError } from "@/api/client"
 import { signIn, useSession } from "@/api/session"
 import { Button, ErrorNote, Field, Text, TextInput } from "@/components/ui"
 import type { AuthScreenProps } from "@/navigation"
+import { END_TO_END_BUILD } from "@/lib/build"
 import { AuthLayout, ServerField } from "./AuthLayout"
+
+// iOS offers to save the password of fields marked as a sign-in, in a sheet over the app that a test can't
+// reliably clear, so a build for the end-to-end tests leaves them unmarked. Every other build fills them in.
+const AUTOFILL = !END_TO_END_BUILD
 
 export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
   const session = useSession()
@@ -38,9 +43,9 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
             onChangeText={setEmail}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="email"
+            autoComplete={AUTOFILL ? "email" : "off"}
             keyboardType="email-address"
-            textContentType="username"
+            textContentType={AUTOFILL ? "username" : "none"}
             returnKeyType="next"
           />
         </Field>
@@ -50,8 +55,8 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            autoComplete="current-password"
-            textContentType="password"
+            autoComplete={AUTOFILL ? "current-password" : "off"}
+            textContentType={AUTOFILL ? "password" : "none"}
             returnKeyType="go"
             onSubmitEditing={submit}
           />

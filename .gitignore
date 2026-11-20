@@ -7,3 +7,6 @@ dist
 *.local
 playwright-report
 test-results
+
+# e2e run output: reports, traces, screenshots and its replay cache
+.e2e/
