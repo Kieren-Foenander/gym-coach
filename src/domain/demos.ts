@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cossack-squat",
+    views: ["front"],
+    cues: [
+      "Take a wide stance and shift toward one foot.",
+      "Keep that heel down and extend the other leg.",
+      "Drive back to center and repeat on the other side.",
+    ],
+  },
+  {
     slug: "jump-squat",
     views: ["front"],
     cues: [
