@@ -845,7 +845,8 @@ class CableStation:
 
     def __init__(self, config):
         self.attachment = config["attachment"]
-        self.half = self.GRIP_HALF[self.attachment]
+        self.half = config.get("grip_half", self.GRIP_HALF[self.attachment])
+        self.stirrup_direction = config.get("stirrup_direction")
         dual = self.attachment == "d-handle"
         self.stations = {}
         self.handles = {}
@@ -856,6 +857,8 @@ class CableStation:
         self.steel = material("cable hardware", STEEL, .8, .33)
         self.rubber = material("cable and rope", (.072, .078, .085), .24, .62)
         frame_finish = material("cable frame", (.085, .095, .11), .65, .43)
+        self.restraints = [SupportPad(name, pad, self.rubber, frame_finish)
+                           for name, pad in config.get("restraints", {}).items()]
         self.footplate = config.get("footplate")
         if self.footplate:
             y, top = self.footplate
@@ -934,8 +937,12 @@ class CableStation:
         straight = self.attachment == "straight-bar"
         for side, sign in SIDES.items():
             if side not in self.handles:
-                pole = torso.direction(span.sample("free_arm", [.27, .02, -1]), sign)
-                gap = pose_arm(side, head(side + "Arm") + pole * .51, pole, "neutral", torso)
+                upper = span.sample("free_arm", [.27, .02, -1])
+                if "free_arm" in span.keys[1]:
+                    gap = pose_unloaded_arm(side, torso, upper, 12, -torso.left * sign)
+                else:
+                    pole = torso.direction(upper, sign)
+                    gap = pose_arm(side, head(side + "Arm") + pole * .51, pole, "neutral", torso)
                 gaps.append((side + " hand", gap))
                 continue
             grip = span.keys[1].get("grip", "neutral")
@@ -1008,6 +1015,9 @@ class CableStation:
                 width = self.half
                 if "upper_arm" in span.keys[1]:
                     outward = world_rotation(key + "Hand").col[1].normalized()
+                    if self.stirrup_direction is not None:
+                        desired = torso.direction(self.stirrup_direction, SIDES[key])
+                        outward = (desired - axis * desired.dot(axis)).normalized()
                     eye = middle + outward * .155
                     width = .095
                     set_segment(self.handles[key], middle - axis * width, middle + axis * width, frame)
@@ -1033,6 +1043,10 @@ class CableStation:
                 problems.add(frame, side + " stirrup strap crosses the fist", .008)
 
     def check(self, points, faces, frame, problems, samples):
+        for restraint in self.restraints:
+            restraint.check(points, frame, problems)
+            check_hardware_clearance([(part, False) for part in restraint.mounts],
+                                     points, faces, np.zeros(len(points), dtype=bool), {}, frame, problems)
         if self.footplate:
             y, top = self.footplate
             for side, sign in SIDES.items():
@@ -1222,6 +1236,7 @@ class HandBand(BandStation):
         self.handles = {side: self.part(side + " band grip", Barbell.SHAFT, finish) for side in SIDES}
         self.lines, self.straps, self.bounds, self.parts = [], [], [], []
         self.footplate = None
+        self.restraints = []
 
     def pose(self, span, torso, grips, frame, gaps, problems):
         ends = []
@@ -3792,6 +3807,16 @@ def held_point(side, key, torso):
     return axis, elbow + (down * math.cos(curl) + ahead * math.sin(curl)) * (fore + GRIP[side][0])
 
 
+def pose_unloaded_arm(side, torso, upper, curl, inward):
+    _, target = held_point(side, {"upper_arm": upper, "curl": curl}, torso)
+    pole = torso.direction(upper, SIDES[side])
+    elbow = head(side + "Arm") + pole * segment(side + "Arm", side + "ForeArm", side + "Hand")[0]
+    along = (target - elbow).normalized()
+    palm = (inward - along * along.dot(inward)).normalized()
+    return pose_arm(side, target + palm * GRIP[side][1], pole, "neutral",
+                    torso, contact_frame=(along, palm))
+
+
 def supported_wrist(spec, span, side):
     """Flex a hand around a stationary wrist with the shaft transverse to the forearm."""
     wrist = Vector(spec["wrist_rest"])
@@ -4887,15 +4912,8 @@ def bake(spec, keys):
             curl = span.sample("unloaded_curl", 10)
             for side, sign in SIDES.items():
                 upper = span.sample("unloaded_arm_" + side.lower(), span.sample("unloaded_arm"))
-                arm = {"upper_arm": upper, "curl": curl}
-                _, target = held_point(side, arm, torso)
-                pole = torso.direction(upper, sign)
-                elbow = head(side + "Arm") + pole * segment(side + "Arm", side + "ForeArm", side + "Hand")[0]
-                along = (target - elbow).normalized()
                 inward = torso.direction(spec["unloaded_palm"], sign) if "unloaded_palm" in spec else -torso.left * sign
-                palm = (inward - along * along.dot(inward)).normalized()
-                gap = pose_arm(side, target + palm * GRIP[side][1], pole, "neutral",
-                               torso, contact_frame=(along, palm))
+                gap = pose_unloaded_arm(side, torso, upper, curl, inward)
                 gaps.append((side + " unloaded arm", gap))
         if floor_hands:
             palm = Vector((0, 0, -1))

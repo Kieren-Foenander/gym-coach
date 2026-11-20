@@ -19,6 +19,33 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "reverse-grip-lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Take a shoulder-width underhand grip.",
+      "Pull down toward your upper chest with your elbows close to your sides.",
+      "Reach overhead under control.",
+    ],
+  },
+  {
+    slug: "close-grip-lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Take a narrow overhand grip and sit tall under the pulley.",
+      "Pull the bar to your upper chest with elbows close.",
+      "Allow a controlled overhead reach.",
+    ],
+  },
+  {
+    slug: "lat-pulldown",
+    views: ["back"],
+    cues: [
+      "Grip the wide bar overhand and brace your thighs under the pad.",
+      "Pull your elbows down and bring the bar toward your upper chest.",
+      "Let your arms straighten slowly without lifting off the seat.",
+    ],
+  },
+  {
     slug: "high-cable-curl",
     views: ["front"],
     cues: [

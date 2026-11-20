@@ -1,0 +1,138 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "straight-bar",
+      "columns": {
+        "Both": {
+          "at": [
+            0,
+            -0.83
+          ],
+          "height": "high"
+        }
+      },
+      "restraints": {
+        "pulldown thigh pad": {
+          "face": [
+            0,
+            -0.148,
+            0.615
+          ],
+          "size": [
+            0.39,
+            0.16
+          ],
+          "pitch": 180,
+          "split": true,
+          "mount": "hold-down"
+        }
+      },
+      "grip_half": 0.32
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.09,
+        0.425
+      ],
+      "length": 0.46
+    }
+  ],
+  "stance": {
+    "width": 0.39,
+    "y": -0.24,
+    "toe_out": 15
+  },
+  "camera": {
+    "angle": 39,
+    "elevation": 9
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.575
+      ],
+      "lean": -5,
+      "grip": "pronated",
+      "free_arm": [
+        0.3,
+        0.13,
+        -1
+      ],
+      "cable_target": [
+        0.19,
+        -0.167,
+        1.436
+      ],
+      "handle_direction": [
+        0,
+        0,
+        1
+      ],
+      "elbows": [
+        0.76,
+        0.04,
+        -0.75
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.48,
+      "cable_target": [
+        0.19,
+        -0.158,
+        0.971
+      ],
+      "elbows": [
+        0.47,
+        -0.35,
+        -1
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        3,
+        42
+      ],
+      "position": {
+        "point": "handle",
+        "z": [
+          1.3960000000000001,
+          1.446
+        ]
+      }
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        72,
+        149
+      ],
+      "position": {
+        "point": "handle",
+        "z": [
+          0.959,
+          0.983
+        ],
+        "y": [
+          -0.17,
+          -0.146
+        ]
+      }
+    }
+  ]
+}
