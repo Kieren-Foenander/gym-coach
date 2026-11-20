@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "cable-triceps-kickback",
+    views: ["back"],
+    cues: [
+      "Hinge forward with your elbow beside your ribs.",
+      "Straighten your arm behind you without swinging your upper arm.",
+      "Return slowly to a bent elbow.",
+    ],
+  },
+  {
     slug: "overhead-cable-triceps-extension",
     views: ["back"],
     cues: [
