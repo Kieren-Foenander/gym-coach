@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "battle-ropes",
+    views: ["front"],
+    cues: [
+      "Set your feet wide and bend your knees slightly.",
+      "Alternate your hands to send waves toward the anchor.",
+      "Keep your hips steady and your shoulders relaxed.",
+    ],
+  },
+  {
     slug: "jump-rope",
     views: ["front"],
     cues: [

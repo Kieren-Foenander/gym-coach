@@ -1789,6 +1789,51 @@ class JumpRope:
         samples.append(np.array(self.rope.points))
 
 
+class BattleRopes:
+    """Alternating waves travel away from the hands to a shared floor anchor."""
+
+    COUNT = 45
+    RADIUS = .019
+
+    def __init__(self, config):
+        self.anchor = Vector((0, config["anchor_y"], .105))
+        self.target = Vector(config["grip"])
+        finish = material("battle rope braid", (.22, .095, .039), .15, .65)
+        grip = material("battle rope grip", IRON, .22, .6)
+        self.base = box("battle rope anchor", (.39, .23, .073), self.anchor - Vector((0, 0, .0685)), grip)
+        self.ring = CableStation.part("battle rope anchor eye", .034, grip)
+        set_segment(self.ring, self.anchor - Vector((.09, 0, 0)), self.anchor + Vector((.09, 0, 0)), 1)
+        self.handles = {side: CableStation.part("battle rope handle", Barbell.SHAFT, grip) for side in SIDES}
+        self.lines = {side: FlexibleLine("battle rope", self.COUNT, self.RADIUS, finish) for side in SIDES}
+
+    def pose(self, span, torso, phase, frame, gaps):
+        axis = Vector((1, 0, 0))
+        for side, sign in SIDES.items():
+            angle = math.tau * phase * 2 + (0 if side == "Left" else math.pi)
+            grip = Vector((sign*self.target.x, self.target.y, self.target.z + .115 * math.sin(angle)))
+            pole = torso.direction([.32, .07, -1], sign)
+            gaps.append((side + " battle rope grip", pose_arm(side, grip, pole, "pronated", torso, axis)))
+            eye = grip + axis * (.081 * sign)
+            set_segment(self.handles[side], grip - axis * (.081 * sign), eye, frame)
+            anchor = self.anchor + Vector((sign*.068, 0, 0))
+            points = []
+            for i in range(self.COUNT):
+                t = i / (self.COUNT - 1)
+                baseline = eye.lerp(anchor, t)
+                baseline.z = anchor.z + (eye.z - anchor.z) * (1 - t) ** 2.15
+                baseline.z += .21 * math.sin(math.pi*t) * math.sin(angle - math.tau*1.45*t)
+                baseline.z = max(self.RADIUS, baseline.z)
+                points.append(baseline)
+            self.lines[side].move(points, frame)
+
+    def check(self, points, contact, grips, phase, frame, problems, samples):
+        check_rendered_grips(self.handles, grips, frame, problems)
+        skin = BVHTree.FromPolygons(points, contact.faces, all_triangles=True)
+        for side, line in self.lines.items():
+            line.check_clearance(skin, frame, problems, side + " battle rope", self.RADIUS)
+            samples.append(np.array(line.points))
+
+
 class PushSled:
     """A loaded prowler with uprights for pushing or a tow rope for pulling."""
 
@@ -5042,7 +5087,7 @@ def bake(spec, keys):
     FOREARM.clear()
     detail(False)
     equipment = [e["type"] for e in spec.get("equipment", [])]
-    unknown = set(equipment) - {"barbell", "wrist-roller", "safety-bar", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball", "jump-rope"}
+    unknown = set(equipment) - {"barbell", "wrist-roller", "safety-bar", "trap-bar", "ez-bar", "kettlebells", "dumbbells", "plate", "vertical-dumbbell", "landmine", "bench", "rack-pins", "platform", "cable", "ankle-cable", "selector-machine", "leg-roller", "leg-sled", "smith-rails", "calf-station", "hip-machine", "guided-squat", "assist-station", "trunk-station", "lateral-station", "treadmill", "cycle-station", "rowing-erg", "pullup-bar", "core-bench", "parallel-bars", "elliptical", "stair-climber", "wall-support", "rotary-torso", "thrust-station", "belt-squat", "resistance-band", "roman-chair", "nordic-bench", "captains-chair", "thigh-band", "hand-band", "plyo-box", "ab-wheel", "push-sled", "hand-gripper", "stability-ball", "jump-rope", "battle-ropes"}
     if unknown or len(equipment) != len(set(equipment)) or len(set(equipment) - {"bench","platform","rack-pins","smith-rails"}) > 1:
         raise ValueError(f"Unsupported equipment combination: {equipment}")
     barbell = None
@@ -5072,6 +5117,7 @@ def bake(spec, keys):
     plyo_box = next((PlyoBox(e) for e in spec.get("equipment", []) if e["type"] == "plyo-box"), None)
     stability_ball = StabilityBall() if "stability-ball" in equipment else None
     gripper = next((HandGripper(e) for e in spec.get("equipment", []) if e["type"] == "hand-gripper"), None)
+    battle_ropes = next((BattleRopes(e) for e in spec.get("equipment", []) if e["type"] == "battle-ropes"), None)
     jump_rope = next((JumpRope(e) for e in spec.get("equipment", []) if e["type"] == "jump-rope"), None)
     push_sled = next((PushSled(e) for e in spec.get("equipment", []) if e["type"] == "push-sled"), None)
     ab_wheel = next((AbWheel(e) for e in spec.get("equipment", []) if e["type"] == "ab-wheel"), None)
@@ -5121,7 +5167,7 @@ def bake(spec, keys):
         raise ValueError("Open rack contact requires a straight barbell")
     core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
     handled_station = next((item for item in (
-        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral, ab_wheel, push_sled, jump_rope,
+        cables, machine, hip_machine, guided_squat, assist, trunk_station, lateral, ab_wheel, push_sled, jump_rope, battle_ropes,
         pullup, dip_bars, captains_chair, core_bench, standing_cardio, rower, cycle, belt_squat, rotary, hip_thrust, calf, roller,
     ) if item is not None and item.handles), None)
     for side in SIDES:
@@ -5429,6 +5475,8 @@ def bake(spec, keys):
             stability_ball.pose(span, frame)
         if gripper:
             gripper.pose(span, torso, frame, gaps)
+        if battle_ropes:
+            battle_ropes.pose(span, torso, phase, frame, gaps)
         if jump_rope:
             jump_rope.pose(span, torso, phase, frame, gaps)
         if push_sled:
@@ -5733,6 +5781,8 @@ def bake(spec, keys):
             stability_ball.check(everything, contact, frame, problems, samples)
         if gripper:
             gripper.check(everything, contact.faces, hands, frame, problems)
+        if battle_ropes:
+            battle_ropes.check(everything, contact, grips, phase, frame, problems, samples)
         if jump_rope:
             jump_rope.check(everything, contact, grips, phase, frame, problems, samples)
         if push_sled:

@@ -1,0 +1,13 @@
+{
+  "equipment": [{"type": "battle-ropes", "grip": [0.235, -0.323, 0.952], "anchor_y": -2.16}],
+  "stance": {"width": 0.44, "toe_out": 11},
+  "camera": {"angle": 63, "elevation": 15},
+  "frames": 84,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.086, 0.823], "lean": 17}
+  ],
+  "checkpoints": [
+    {"elbow": [45, 126]},
+    {"knee": [16, 57]}
+  ]
+}
