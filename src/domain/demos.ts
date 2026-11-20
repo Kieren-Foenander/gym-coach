@@ -19,6 +19,15 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "back-extension",
+    views: ["front"],
+    cues: [
+      "Lie face down with your fingertips beside your head.",
+      "Lift your chest gently while keeping your hips and legs down.",
+      "Lower slowly with your neck in line.",
+    ],
+  },
+  {
     slug: "donkey-kick",
     views: ["front"],
     cues: [
