@@ -6,16 +6,19 @@ import { useEffect } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { Muscle } from "~/domain/catalog"
+import { TABS, testIds } from "~/domain/test-ids"
 import { rememberUser, useSession } from "@/api/session"
 import { TabIcon, type TabName } from "@/components/icons"
 import { Text } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import { SignInScreen } from "@/features/auth/SignInScreen"
 import { SignUpScreen } from "@/features/auth/SignUpScreen"
+import { CalendarScreen } from "@/features/calendar/CalendarScreen"
 import { AddToPlanSheet } from "@/features/exercises/AddToPlanSheet"
 import { LibraryExerciseScreen, OwnExerciseScreen } from "@/features/exercises/ExerciseDetailScreen"
 import { ExercisesScreen } from "@/features/exercises/ExercisesScreen"
 import { MuscleGroupScreen } from "@/features/exercises/MuscleGroupScreen"
+import { NutritionScreen } from "@/features/nutrition/NutritionScreen"
 import { HistoryScreen } from "@/features/history/HistoryScreen"
 import { AddPlanDaySheet, AddPlanExerciseSheet, EditPlanExerciseSheet, TemplatesSheet } from "@/features/plan/PlanSheets"
 import { PlanScreen } from "@/features/plan/PlanScreen"
@@ -38,6 +41,8 @@ export type TabParams = { readonly [K in TabName]: undefined }
 export type AppStackParams = {
   readonly Tabs: NavigatorScreenParams<TabParams> | undefined
   readonly Workout: { readonly workoutId: number }
+  readonly Calendar: undefined
+  readonly Nutrition: undefined
   readonly MuscleGroup: { readonly muscle: Muscle }
   readonly LibraryExercise: { readonly slug: string }
   readonly OwnExercise: { readonly exerciseId: number }
@@ -95,6 +100,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
             return (
               <Pressable
                 key={route.key}
+                testID={testIds.nav.tab(TABS[index] ?? "today")}
                 accessibilityRole="tab"
                 accessibilityLabel={tab}
                 accessibilityState={{ selected: focused }}
@@ -162,6 +168,8 @@ export function Navigation() {
             <AppStack.Screen name="Tabs" component={TabScreens} />
             {/* A workout is left with its own buttons, so a stray swipe cannot drop you out of it mid-set. */}
             <AppStack.Screen name="Workout" component={WorkoutScreen} options={{ gestureEnabled: false }} />
+            <AppStack.Screen name="Calendar" component={CalendarScreen} />
+            <AppStack.Screen name="Nutrition" component={NutritionScreen} />
             <AppStack.Screen name="MuscleGroup" component={MuscleGroupScreen} />
             <AppStack.Screen name="LibraryExercise" component={LibraryExerciseScreen} />
             <AppStack.Screen name="OwnExercise" component={OwnExerciseScreen} />

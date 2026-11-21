@@ -112,3 +112,18 @@ export const evaluateProgression = (
 /** Epley estimate of a one-rep max. */
 export const estimateOneRepMax = (weight: number, reps: number): number =>
   reps <= 1 ? weight : Math.round(weight * (1 + reps / 30) * 10) / 10
+
+interface TopSet {
+  readonly topWeight: number
+  readonly topReps: number
+}
+
+/** The heaviest top set across sessions; more reps wins a tie on weight. */
+export const heaviestSet = <T extends TopSet>(sessions: ReadonlyArray<T>): T | undefined =>
+  sessions.reduce<T | undefined>(
+    (best, session) =>
+      !best || session.topWeight > best.topWeight || (session.topWeight === best.topWeight && session.topReps > best.topReps)
+        ? session
+        : best,
+    undefined,
+  )

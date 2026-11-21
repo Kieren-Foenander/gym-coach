@@ -1,10 +1,16 @@
 import { useState } from "react"
 import { View } from "react-native"
+import { testIds } from "~/domain/test-ids"
 import { describeError } from "@/api/client"
 import { signIn, useSession } from "@/api/session"
 import { Button, ErrorNote, Field, Text, TextInput } from "@/components/ui"
 import type { AuthScreenProps } from "@/navigation"
+import { END_TO_END_BUILD } from "@/lib/build"
 import { AuthLayout, ServerField } from "./AuthLayout"
+
+// iOS offers to save the password of fields marked as a sign-in, in a sheet over the app that a test can't
+// reliably clear, so a build for the end-to-end tests leaves them unmarked. Every other build fills them in.
+const AUTOFILL = !END_TO_END_BUILD
 
 export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
   const session = useSession()
@@ -32,30 +38,37 @@ export function SignInScreen({ navigation }: AuthScreenProps<"SignIn">) {
       <View className="gap-4">
         <Field label="Email">
           <TextInput
+            testID={testIds.login.email}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="email"
+            autoComplete={AUTOFILL ? "email" : "off"}
             keyboardType="email-address"
-            textContentType="username"
+            textContentType={AUTOFILL ? "username" : "none"}
             returnKeyType="next"
           />
         </Field>
         <Field label="Password">
           <TextInput
+            testID={testIds.login.password}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            autoComplete="current-password"
-            textContentType="password"
+            autoComplete={AUTOFILL ? "current-password" : "off"}
+            textContentType={AUTOFILL ? "password" : "none"}
             returnKeyType="go"
             onSubmitEditing={submit}
           />
         </Field>
-        <ServerField value={serverUrl} onChange={setServerUrl} />
+        <ServerField value={serverUrl} onChange={setServerUrl} testID={testIds.login.server} />
         <ErrorNote message={error} />
-        <Button variant="primary" disabled={pending || email === "" || password === "" || serverUrl === ""} onPress={submit}>
+        <Button
+          testID={testIds.login.submit}
+          variant="primary"
+          disabled={pending || email === "" || password === "" || serverUrl === ""}
+          onPress={submit}
+        >
           {pending ? "Signing in…" : "Sign in"}
         </Button>
       </View>

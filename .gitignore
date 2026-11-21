@@ -8,3 +8,6 @@ dist
 
 # Rendered exercise videos and posters. They are uploaded to R2, never committed.
 tools/mannequin/renders/
+
+# e2e run output: reports, traces, screenshots and its replay cache
+.e2e/

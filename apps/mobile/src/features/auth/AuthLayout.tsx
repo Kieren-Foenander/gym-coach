@@ -44,13 +44,15 @@ export function AuthLayout({ title, children }: AuthLayoutProps) {
 interface ServerFieldProps {
   readonly value: string
   readonly onChange: (value: string) => void
+  readonly testID: string
 }
 
 /** The address of the server the account is on. It is the same address the web app is opened at. */
-export function ServerField({ value, onChange }: ServerFieldProps) {
+export function ServerField({ value, onChange, testID }: ServerFieldProps) {
   return (
     <Field label="Server address">
       <TextInput
+        testID={testID}
         value={value}
         onChangeText={onChange}
         placeholder="https://gym.example.workers.dev"

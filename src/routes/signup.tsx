@@ -5,6 +5,7 @@ import { BarbellIcon } from "~/components/icons"
 import { Button, ErrorNote, Field, TextInput, useHydrated } from "~/components/ui"
 import { getSession, getSignupStatus, signUp } from "~/functions/api"
 import { safeRedirect } from "./login"
+import { testIds } from "~/domain/test-ids"
 
 const Search = Schema.Struct({ redirect: Schema.optional(Schema.String) })
 
@@ -59,6 +60,7 @@ function SignupPage() {
           <form onSubmit={submit} className="space-y-4">
             <Field label="Name">
               <TextInput
+                data-testid={testIds.signup.name}
                 autoComplete="given-name"
                 required
                 maxLength={80}
@@ -68,6 +70,7 @@ function SignupPage() {
             </Field>
             <Field label="Email">
               <TextInput
+                data-testid={testIds.signup.email}
                 type="email"
                 autoComplete="username"
                 autoCapitalize="none"
@@ -78,6 +81,7 @@ function SignupPage() {
             </Field>
             <Field label="Password (10 characters or more)">
               <TextInput
+                data-testid={testIds.signup.password}
                 type="password"
                 autoComplete="new-password"
                 required
@@ -89,6 +93,7 @@ function SignupPage() {
             {status.firstUser ? null : (
               <Field label="Invite code">
                 <TextInput
+                  data-testid={testIds.signup.inviteCode}
                   autoCapitalize="none"
                   autoComplete="off"
                   required
@@ -98,7 +103,13 @@ function SignupPage() {
               </Field>
             )}
             <ErrorNote message={error} />
-            <Button type="submit" variant="primary" className="w-full" disabled={pending || !hydrated}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              data-testid={testIds.signup.submit}
+              disabled={pending || !hydrated}
+            >
               {pending ? "Creating…" : "Create account"}
             </Button>
           </form>

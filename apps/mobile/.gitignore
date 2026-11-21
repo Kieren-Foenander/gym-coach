@@ -25,3 +25,6 @@ expo-env.d.ts
 .env*.local
 *.tsbuildinfo
 .DS_Store
+
+# Expo cloud simulator session config (holds a token)
+.env.eas-simulator

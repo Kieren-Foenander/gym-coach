@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { Schema } from "effect"
+import { useEffect, useRef, useState } from "react"
 import { ExerciseLine, MUSCLE_COUNTS, SearchField } from "~/components/exercise"
 import { Card, PageTitle, SectionTitle } from "~/components/ui"
 import { CATALOG, EQUIPMENT, MUSCLES, mergeLibrary, searchLibrary, type LibraryItem } from "~/domain/catalog"
+import { createUrlEcho } from "~/components/urlEcho"
 import { getExercises } from "~/functions/api"
 
 const Search = Schema.Struct({
@@ -21,15 +23,27 @@ const SEARCH_LIMIT = 60
 
 function ExercisesPage() {
   const known = Route.useLoaderData()
-  const { q = "", group, equipment } = Route.useSearch()
+  const { q: urlQuery = "", group, equipment } = Route.useSearch()
   const navigate = Route.useNavigate()
   const items = mergeLibrary(known)
   const own = items.filter((item) => item.entry === null)
-  const searching = q.trim() !== ""
+
+  // The field keeps its own text and mirrors it into the address, so a refresh or Back keeps the search.
+  // Reading it back from the address instead would drop letters typed faster than the router commits.
+  const [q, setQ] = useState(urlQuery)
+  const echo = useRef(createUrlEcho())
+  useEffect(() => {
+    if (echo.current.isOutside(urlQuery)) setQ(urlQuery)
+  }, [urlQuery])
 
   // Typing replaces the address instead of adding to the history, so Back leaves the screen in one step.
-  const setQuery = (text: string) =>
+  const setQuery = (text: string) => {
+    setQ(text)
+    echo.current.wrote(text)
     void navigate({ search: (previous) => ({ ...previous, q: text === "" ? undefined : text }), replace: true })
+  }
+
+  const searching = q.trim() !== ""
 
   const inGroup = group ? items.filter((item) => item.entry?.primary.includes(group)) : []
   const offered = EQUIPMENT.filter((option) => inGroup.some((item) => item.entry?.equipment === option))

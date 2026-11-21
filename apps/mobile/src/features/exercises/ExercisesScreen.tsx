@@ -2,6 +2,7 @@ import { useNavigation } from "@react-navigation/native"
 import { useState } from "react"
 import { Pressable, View } from "react-native"
 import { CATALOG, catalogForMuscle, MUSCLES, mergeLibrary, searchLibrary } from "~/domain/catalog"
+import { testIds } from "~/domain/test-ids"
 import { Display, Empty, PageTitle, Screen, SearchField, SectionTitle, Text } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import { ExerciseRows } from "./ExerciseRows"
@@ -46,6 +47,7 @@ export function ExercisesScreen() {
             {MUSCLE_COUNTS.map(({ muscle, count }) => (
               <Pressable
                 key={muscle}
+                testID={testIds.exercises.muscle(muscle)}
                 accessibilityRole="button"
                 accessibilityLabel={`${muscle}, ${count} exercises`}
                 onPress={() => navigation.navigate("MuscleGroup", { muscle })}

@@ -1,0 +1,216 @@
+name: iOS tour
+
+# Builds the iPhone app for the iOS Simulator on a GitHub macOS runner, signs in to a local server loaded with
+# seed/training-history.json, taps through the main screens with e2e (e2e/native/tour.e2e.ts, e2e.config.ts) and
+# keeps a screen recording and a screenshot of each screen as the "ios-tour" artifact.
+#
+# macOS runners cost nothing on a public repository. The build is signed ad hoc, so no Apple account is needed.
+# The built app is kept too (gym-preview-simulator.tar.gz), in the form Expo's cloud simulator installs.
+#
+# Building takes about half an hour, so the built app is cached, keyed on everything that goes into it: the native
+# app's files, src/domain, the lockfiles, apps/mobile/e2e/build-simulator.sh and the Xcode version. A change to the
+# tests, the server or this file reuses it. Pull requests can read the cache that runs on master make.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: &paths
+      - apps/mobile/**
+      - src/domain/**
+      - src/server/**
+      - migrations/**
+      - e2e/native/**
+      - e2e.config.ts
+      - .github/workflows/ios-tour.yml
+  pull_request:
+    paths: *paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-tour-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_VARIANT: preview
+  # The build's default server address. The simulator shares the runner's network, so this is the server below.
+  # An IP address rather than localhost, which the simulator tries over IPv6 first.
+  EXPO_PUBLIC_GYM_SERVER_URL: http://127.0.0.1:1337
+  # e2e.config.ts reads these: the server the build signs in to, and the tour account on it.
+  E2E_SERVER_URL: http://127.0.0.1:1337
+  TOUR_EMAIL: tour@example.com
+  E2E_USER_TOUR_PASSWORD: tour-password-not-secret
+  OUT: ${{ github.workspace }}/tour-output
+  # e2e sends anonymous usage data unless told not to.
+  E2E_TELEMETRY_DISABLED: "1"
+  # The runner's simulator is slow, so e2e.config.ts gives each action and test longer.
+  E2E_SLOW_DEVICE: "1"
+
+jobs:
+  tour:
+    name: Build and tour the iPhone app
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Read the Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
+
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: apps/mobile
+
+      - name: Restore the built app
+        id: built
+        uses: actions/cache/restore@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: >-
+            ios-sim-app-${{ steps.xcode.outputs.version }}-${{ env.APP_VARIANT }}-${{ env.EXPO_PUBLIC_GYM_SERVER_URL }}-${{
+              hashFiles('apps/mobile/**', '!apps/mobile/node_modules/**', '!apps/mobile/test/**',
+                        'src/domain/**', 'bun.lock') }}
+
+      - name: Build for the simulator
+        if: steps.built.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        run: e2e/build-simulator.sh
+
+      - name: Keep the built app for later runs
+        if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          key: ${{ steps.built.outputs.cache-primary-key }}
+
+      - name: Find the built app
+        working-directory: apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+        run: |
+          mkdir -p "$OUT"
+          APP=$(ls -d *.app | head -1)
+          echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
+          tar -czf "$OUT/gym-preview-simulator.tar.gz" "$APP"
+          echo "Built app: $APP (from the cache: ${{ steps.built.outputs.cache-hit == 'true' }})"
+
+      - name: Boot an iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          # Installed here rather than by the tests: copying the build takes longer than one e2e action may.
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl list devices | grep "$UDID"
+
+      # `alchemy dev` with its state kept on the runner, as tools/e2e/serve.ts runs it for the browser tests, so
+      # it needs no Cloudflare secrets and runs for pull requests from forks too.
+      - name: Start the server
+        run: |
+          mkdir -p "$OUT"
+          nohup bunx alchemy dev --stage ci-ios-tour --no-input --env-file tools/e2e/e2e.env > "$OUT/server.log" 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/signup-status" > /dev/null && exit 0
+            sleep 2
+          done
+          cat "$OUT/server.log"
+          exit 1
+        env:
+          ALCHEMY_LOCAL_STATE: "1"
+
+      - name: Make the tour account and load the seed history
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-up" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\",\"displayName\":\"Tour\"}" > /dev/null
+          bun tools/seed/load.ts --local --email "$TOUR_EMAIL"
+
+      # The app gives up on a request after 15 seconds. Sign in once here, so the server has served the route
+      # before the app asks, and the log shows how long it took.
+      - name: Check the server answers a sign-in
+        run: |
+          curl -sf -X POST "$EXPO_PUBLIC_GYM_SERVER_URL/api/v1/account/sign-in" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$TOUR_EMAIL\",\"password\":\"$E2E_USER_TOUR_PASSWORD\"}" \
+            -o /dev/null -w 'sign-in answered %{http_code} in %{time_total}s\n' --max-time 120
+
+      # e2e drives the simulator through agent-device's XCTest runner, whose first start can take minutes on a
+      # runner and overran e2e's launch budget. Build, start and health-check it here, with its own budget and a
+      # few tries, then stop this daemon so e2e's run starts its own on the ready runner.
+      - name: Start the iOS automation runner
+        run: |
+          for attempt in 1 2 3; do
+            if bunx agent-device prepare ios-runner --platform ios --udid "$UDID" --timeout 900000; then
+              bunx agent-device daemon stop || true
+              exit 0
+            fi
+            echo "Attempt $attempt did not get the runner ready."
+            bunx agent-device daemon stop || true
+          done
+          exit 1
+
+      # Reports on agent-device, Xcode and the simulator before the tour, for the log. Its own checks get 30 s,
+      # which the runner's simulator can miss, and `e2e run` checks the device again anyway, so it never fails
+      # the job.
+      - name: Check the e2e setup
+        continue-on-error: true
+        run: bunx e2e doctor --target ios
+        env:
+          E2E_DEVICE: ${{ env.UDID }}
+
+      # One recording of the whole tour, from the simulator itself. e2e's own video is off: the simulator
+      # records one screen at a time, and e2e gives its recorder 15 s to start, which a CI runner can miss.
+      - name: Tour the app
+        run: |
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/tour.mp4" &
+          echo $! > "$OUT/recorder.pid"
+          sleep 2
+          # In CI e2e retries a failed test once, from the start of the group: the runner's simulator now and then
+          # times out on a step that passes the next time.
+          bunx e2e run --target ios --video off
+        env:
+          E2E_DEVICE: ${{ env.UDID }}
+
+      - name: Collect the recording and screenshots
+        if: always()
+        working-directory: tour-output
+        run: |
+          if [ -f recorder.pid ]; then
+            kill -INT "$(cat recorder.pid)" || true
+            # The recorder writes the end of the file after it is told to stop.
+            for i in $(seq 1 20); do kill -0 "$(cat recorder.pid)" 2> /dev/null || break; sleep 1; done
+            rm recorder.pid
+          fi
+          # Each app.screenshot() by its label, and everything e2e kept: the JUnit report, and a trace page
+          # for any test that failed.
+          find ../.e2e/results -name '*.png' -path '*/screenshots/*' -exec cp {} . \; 2> /dev/null || true
+          cp -R ../.e2e e2e-results 2> /dev/null || true
+          ls -la
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### iOS tour"
+            echo
+            echo "Download the **ios-tour** artifact below for \`tour.mp4\`, a screenshot of each screen and the simulator build."
+            echo
+            ls "$OUT"/*.png 2> /dev/null | xargs -n1 basename | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-tour
+          path: tour-output
+          retention-days: 14

@@ -8,3 +8,6 @@ export const DbLive = D1Client.layer({ db: env.DB, transformResultNames: Str.sna
 export const runtime = ManagedRuntime.make(DbLive)
 
 export const signupCode = (): string | undefined => env.SIGNUP_CODE || undefined
+
+/** The Alchemy stage this Worker was deployed as, such as prod, pr-21 or dev_<user>. */
+export const stage = (): string => env.STAGE

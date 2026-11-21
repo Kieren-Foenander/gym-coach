@@ -38,6 +38,7 @@ import {
   soundEnabled,
 } from "~/restAlert"
 import type { Adjustment, WorkoutDetail, WorkoutExercise } from "~/server/repo"
+import { testIds } from "~/domain/test-ids"
 
 export const Route = createFileRoute("/_app/workout/$workoutId")({
   loader: ({ params }) => getWorkout({ data: { workoutId: Number(params.workoutId) } }),
@@ -162,7 +163,12 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
               {prescribed > 0 ? ` · ${completed} of ${prescribed} sets` : ""}
             </p>
           </div>
-          <Button variant={loggedAnything ? "primary" : "secondary"} disabled={pending} onClick={finish}>
+          <Button
+            variant={loggedAnything ? "primary" : "secondary"}
+            disabled={pending}
+            data-testid={testIds.workout.finish}
+            onClick={finish}
+          >
             {loggedAnything ? "Finish" : "Cancel"}
           </Button>
         </div>
@@ -203,7 +209,12 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
             Nothing here yet. Add the first exercise you are going to do.
           </p>
         ) : null}
-        <Button className="w-full" variant={detail.exercises.length === 0 ? "primary" : "secondary"} onClick={() => setAdding(true)}>
+        <Button
+          className="w-full"
+          variant={detail.exercises.length === 0 ? "primary" : "secondary"}
+          data-testid={testIds.workout.addExercise}
+          onClick={() => setAdding(true)}
+        >
           Add exercise
         </Button>
       </div>
@@ -215,7 +226,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
       ) : null}
 
       {loggedAnything ? (
-        <Button variant="danger" className="w-full" disabled={pending} onClick={discard}>
+        <Button variant="danger" className="w-full" disabled={pending} data-testid={testIds.workout.discard} onClick={discard}>
           Discard workout
         </Button>
       ) : null}
@@ -350,6 +361,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onL
       className={`rounded-3xl border bg-surface p-4 transition-colors ${
         current ? "border-accent/40 shadow-[0_0_40px_-18px_rgb(215_255_62/0.5)]" : "border-white/5"
       }`}
+      data-testid={testIds.workout.exercise(exercise.exerciseName)}
     >
       <div className="flex items-start gap-3">
         <span
@@ -399,6 +411,7 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onL
             <li
               key={set.id}
               className="flex animate-pop items-center justify-between gap-3 rounded-2xl bg-raised/70 pl-3"
+              data-testid={testIds.workout.set(index + 1)}
             >
               <span className="tabular flex items-center gap-3">
                 <span className="display w-4 text-lg text-faint">{index + 1}</span>
@@ -437,13 +450,27 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onL
         <div className="mt-4 space-y-3">
           {cardio ? (
             <div className="grid grid-cols-2 gap-2">
-              <Stepper label="Minutes" value={minutes} step={1} decimal onChange={setMinutes} />
-              <Stepper label={distanceUnit(unit)} value={distance} step={0.5} decimal onChange={setDistance} />
+              <Stepper testId={testIds.workout.minutes} label="Minutes" value={minutes} step={1} decimal onChange={setMinutes} />
+              <Stepper
+                testId={testIds.workout.distance}
+                label={distanceUnit(unit)}
+                value={distance}
+                step={0.5}
+                decimal
+                onChange={setDistance}
+              />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              <Stepper label={unit} value={weight} step={target?.increment || 2.5} decimal onChange={setWeight} />
-              <Stepper label="Reps" value={reps} step={1} onChange={setReps} />
+              <Stepper
+                testId={testIds.workout.weight}
+                label={unit}
+                value={weight}
+                step={target?.increment || 2.5}
+                decimal
+                onChange={setWeight}
+              />
+              <Stepper testId={testIds.workout.reps} label="Reps" value={reps} step={1} onChange={setReps} />
             </div>
           )}
           <div role="group" aria-label="Effort, optional">
@@ -468,7 +495,13 @@ function ExerciseCard({ exercise, position, current, unit, workoutId, taken, onL
               ))}
             </div>
           </div>
-          <Button variant={current || done ? "primary" : "secondary"} className="w-full" disabled={pending} onClick={log}>
+          <Button
+            variant={current || done ? "primary" : "secondary"}
+            className="w-full"
+            disabled={pending}
+            data-testid={testIds.workout.logSet}
+            onClick={log}
+          >
             Log {noun} {sets.length + 1}
             {prescribed > 0 && !done ? ` of ${prescribed}` : ""}
           </Button>
@@ -685,14 +718,14 @@ function FinishedWorkout({ detail, unit }: WorkoutViewProps) {
 
   return (
     <>
-      <header className="pb-5 pt-2">
+      <header className="pb-5 pt-2" data-testid={testIds.workout.summary}>
         <p className="eyebrow pb-1 text-accent">Workout complete · {formatDay(workout.startedAt)}</p>
         <h1 className="display text-5xl">{workout.name}</h1>
       </header>
 
       <div className="grid grid-cols-3 gap-2">
         <Stat label="Minutes" value={minutes > 0 ? minutes : "–"} />
-        <Stat label="Sets" value={allSets.length} />
+        <Stat label="Sets" value={allSets.length} testId={testIds.workout.summarySets} />
         <Stat label="Lifted" value={formatCompact(volume)} unit={unit} />
       </div>
 
@@ -752,7 +785,7 @@ function FinishedWorkout({ detail, unit }: WorkoutViewProps) {
         ))}
       </div>
 
-      <Link to="/" className={buttonClass("primary", "mt-6 w-full")}>
+      <Link to="/" className={buttonClass("primary", "mt-6 w-full")} data-testid={testIds.workout.done}>
         Done
       </Link>
     </>

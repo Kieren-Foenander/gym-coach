@@ -43,11 +43,13 @@ const signupCode = Config.Redacted("SIGNUP_CODE").pipe(Config.withDefault(Redact
 // so no stage can delete it, and previews show the same videos as prod.
 const exerciseMedia = Cloudflare.R2.Bucket.lookup({ name: MEDIA_BUCKET })
 
-const bindings = (names: Names) => ({
+const bindings = (names: Names, stage: string) => ({
   DB: database(names),
   OAUTH_KV: grants(names),
   EXERCISE_MEDIA: exerciseMedia,
   SIGNUP_CODE: signupCode,
+  // Which copy this is, so a test copy's MCP server and connector name say so (src/domain/coach-apps.ts).
+  STAGE: stage,
 })
 
 /** The bindings the Worker is given. src/env.d.ts makes them the type of `env`. */
@@ -59,7 +61,9 @@ export default Alchemy.Stack(
     providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers()),
     // State is kept in the Cloudflare account, so a laptop and CI see the same thing. It has a store of
     // its own, so upgrading Alchemy here never touches the store other projects on the account share.
-    state: Cloudflare.state({ workerName: STATE_STORE }),
+    // The browser tests serve the app with `alchemy dev` on a machine with no Cloudflare account (see
+    // tools/e2e/serve.ts), so they keep state in .alchemy instead.
+    state: process.env.ALCHEMY_LOCAL_STATE === "1" ? Alchemy.localState() : Cloudflare.state({ workerName: STATE_STORE }),
   },
   Effect.gen(function* () {
     const stage = yield* Alchemy.Stage
@@ -70,7 +74,9 @@ export default Alchemy.Stack(
       // src/server.ts wraps the TanStack Start handler with the OAuth provider and the MCP server.
       main: "src/server.ts",
       compatibility: { date: "2026-11-01", flags: ["nodejs_compat", "global_fetch_strictly_public"] },
-      env: bindings(names),
+      env: bindings(names, stage),
+      // The browser tests serve their own copy on another port, beside a `bun run dev` already running.
+      dev: process.env.GYM_DEV_PORT ? { port: Number(process.env.GYM_DEV_PORT), strictPort: true } : undefined,
     })
 
     const github = yield* GitHub.GitHubEnv

@@ -53,6 +53,21 @@ const dayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "n
 
 export const formatDay = (timestamp: number) => dayFormat.format(timestamp)
 
+const longDayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" })
+
+/** A day in full, such as "Monday, November 9". */
+export const formatLongDay = (timestamp: number) => longDayFormat.format(timestamp)
+
+/** A calendar day and how many workouts it had, as a screen reader should say it. */
+export const describeTrainingDay = (day: number, workouts: number, walks = 0) => {
+  const parts = [
+    workouts > 0 ? `${workouts} ${workouts === 1 ? "workout" : "workouts"}` : null,
+    walks > 0 ? `${walks} ${walks === 1 ? "walk" : "walks"}` : null,
+  ].filter((part) => part !== null)
+
+  return parts.length === 0 ? formatLongDay(day) : `${formatLongDay(day)}, ${parts.join(" and ")}`
+}
+
 export const formatVolume = (volume: number, unit: string) =>
   `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(volume)} ${unit}`
 
