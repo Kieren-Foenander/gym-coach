@@ -832,7 +832,10 @@ class Dumbbells:
     INNER = 0.065  # half the handle's length between the heads
     HEAD, DEPTH = 0.062, 0.06
 
-    def __init__(self, sides=SIDES):
+    def __init__(self, sides=SIDES, head_radius=HEAD):
+        if head_radius <= self.HANDLE:
+            raise ValueError("Dumbbell heads must extend beyond the handle")
+        self.HEAD = head_radius
         steel = material("steel", STEEL, 0.9, 0.3)
         iron = material("iron", IRON, 0.3, 0.55)
         self.roots, self.centres, self.axes = {}, {}, {}
@@ -919,6 +922,14 @@ class Kettlebells(Dumbbells):
             rotation = Matrix.Rotation(math.radians(roll), 3, axis).to_quaternion()
             root.rotation_quaternion = rotation @ root.rotation_quaternion
             root.keyframe_insert("rotation_quaternion", frame=frame)
+
+    def check_forearm_contact(self, points, contact, frame, problems):
+        for side, root in self.roots.items():
+            centre = self.centres[side] + root.rotation_quaternion @ Vector((0, 0, -self.DROP))
+            arm = points[np.unique(contact.vertices[contact.part == side + " forearm"])]
+            gap = np.linalg.norm(arm - np.array(centre), axis=1).min() - self.RADIUS
+            if gap > .003:
+                problems.add(frame, side + " kettlebell loses forearm contact", gap)
 
     def intrusions(self, points):
         inside, closest = 0, math.inf
@@ -5236,7 +5247,8 @@ def bake(spec, keys):
                 raise ValueError("Plate radius must clear the sleeve and fit a standard barbell")
             barbell = Barbell(radius) if kind == "barbell" else BentBar(kind, radius)
     db_spec = next((e for e in spec.get("equipment", []) if e["type"] == "dumbbells"), None)
-    dumbbells = Dumbbells([db_spec["side"]] if "side" in db_spec else SIDES) if db_spec else None
+    dumbbells = Dumbbells([db_spec["side"]] if "side" in db_spec else SIDES,
+                          db_spec.get("head_radius", Dumbbells.HEAD)) if db_spec else None
     bell_spec = next((e for e in spec.get("equipment", []) if e["type"] == "kettlebells"), None)
     if bell_spec:
         dumbbells = Kettlebells([bell_spec["side"]] if "side" in bell_spec else SIDES, bell_spec.get("shared", False))
@@ -5685,7 +5697,7 @@ def bake(spec, keys):
         if "unloaded_arm" in a:
             curl = span.sample("unloaded_curl", 10)
             for side, sign in SIDES.items():
-                if gripper and side == "Left":
+                if (gripper and side == "Left") or (dumbbells and side in dumbbells.roots):
                     continue
                 upper = span.sample("unloaded_arm_" + side.lower(), span.sample("unloaded_arm"))
                 inward = torso.direction(spec["unloaded_palm"], sign) if "unloaded_palm" in spec else -torso.left * sign
@@ -5753,12 +5765,19 @@ def bake(spec, keys):
         if dumbbells:
             for side in dumbbells.roots:
                 sign = SIDES[side]
-                phase = spec.get("arm_phase", {}).get(side, 0)
-                arm_span = PoseSpan(keys, (frame - 1) / frames + phase) if phase else span
+                offset = spec.get("arm_phase", {}).get(side, 0)
+                arm_span = PoseSpan(keys, phase + offset) if offset else span
                 arm_key = arm_span.keys[1]
                 elbows = arm_span.sample("elbows", [0.1, -0.3, -1])
                 hand_frame = None
-                if "wrist_rest" in arm_key:
+                pole = torso.direction(elbows, sign)
+                if "arm_arc" in arm_key:
+                    elbow_x, pitch = arm_span.sample("arm_arc")
+                    hand_frame = planar_grip(arm_span.sample("grip_pitch"))
+                    grip_point, pole = arm_arc_target(side, sign * elbow_x, pitch,
+                                                     sign * arm_span.sample("grip_x"), hand_frame)
+                    forward_axis = Vector((1, 0, 0))
+                elif "wrist_rest" in arm_key:
                     grip_point, hand_frame = supported_wrist(arm_key, arm_span, side)
                     forward_axis = torso.forward
                 elif "bar" in arm_key:
@@ -5770,12 +5789,11 @@ def bake(spec, keys):
                     if "flex_toward" in arm_key:
                         arms["flex_toward"] = arm_span.sample("flex_toward")
                     forward_axis, grip_point = held_point(side, arms, torso)
-                axis = forward_axis if arm_key.get("grip") == "neutral" else torso.left
+                axis = forward_axis if "arm_arc" in arm_key or arm_key.get("grip") == "neutral" else torso.left
                 if "handle_direction" in arm_key:
                     axis = torso.direction(arm_span.sample("handle_direction"), sign)
                 grip = arm_key.get("grip", "supinated")
                 orientation = "thumb-forward" if grip == "neutral" else grip
-                pole = torso.direction(elbows, sign)
                 if arm_key.get("fixed_upper_arm"):
                     # Construct the grip from the authored elbow and wrist, including the
                     # palm offset. The IK solution then recovers the same stationary elbow.
@@ -6002,6 +6020,8 @@ def bake(spec, keys):
             if isinstance(barbell, SafetyBar):
                 barbell.check(everything, frame, problems)
         if dumbbells:
+            if bell_spec and any(start <= phase < end for start, end in bell_spec.get("forearm_contact", [])):
+                dumbbells.check_forearm_contact(everything, contact, frame, problems)
             corners = np.array(dumbbells.corners())
             samples.append(corners)
             if not bell_spec:

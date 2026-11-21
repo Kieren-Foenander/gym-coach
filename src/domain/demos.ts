@@ -19,6 +19,24 @@ export interface ExerciseDemo {
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
+    slug: "kettlebell-snatch",
+    views: ["front"],
+    cues: [
+      "Hike the bell back between your legs.",
+      "Drive your hips and keep the bell close.",
+      "Punch through the handle so the bell settles against your forearm.",
+    ],
+  },
+  {
+    slug: "dumbbell-snatch",
+    views: ["front"],
+    cues: [
+      "Start with the dumbbell between your feet.",
+      "Drive through your legs and keep the weight close.",
+      "Punch up and stand tall with your arm locked.",
+    ],
+  },
+  {
     slug: "chest-supported-t-bar-row",
     views: ["front"],
     cues: [

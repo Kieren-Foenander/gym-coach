@@ -314,6 +314,10 @@ EZ bars and trap bars use the equipment types `ez-bar` and `trap-bar`.
 Their modeled straight grip sections determine the hand positions and shaft axes.
 The `kettlebells` type uses level handles. Set `side` on the equipment
 for a single bell and use `bell_roll` in the keys to rotate the bell around its handle.
+During optional `forearm_contact` intervals the bell must stay within 3 mm of the forearm.
+Both handheld loads support the world-space `arm_arc` and `grip_pitch` described below.
+Key `grip_x` in metres to place the grip laterally. A dumbbell's optional `head_radius`
+sets its modeled radius and floor clearance.
 For dumbbell arcs, `fixed_upper_arm` preserves the authored elbow position and
 `flex_toward` chooses the torso-relative direction of elbow flexion.
 Continuous checkpoints can limit `upper_arm_to_torso` in degrees and
