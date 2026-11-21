@@ -2,7 +2,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { CallName } from "~/domain/calls"
 import { CallInputs } from "~/domain/calls"
-import { RENDERED_SLUGS } from "~/domain/demos"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import type { CallInput, CallOutput } from "~/server/calls"
 import { makeServer, type Account, type TestServer } from "./harness"
@@ -68,7 +67,7 @@ const STEPS = {
 
     return record("getExerciseProgress", { exerciseId: squat.id })
   },
-  getLibraryExercise: () => record("getLibraryExercise", { slug: RENDERED_SLUGS[0] ?? "squat" }),
+  getLibraryExercise: () => record("getLibraryExercise", { slug: "squat" }),
   getDemos: () => record("getDemos", {}),
 
   applyTemplate: () => record("applyTemplate", { templateId: PLAN_TEMPLATES[0]!.id }),
