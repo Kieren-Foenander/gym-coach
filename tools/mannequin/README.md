@@ -13,7 +13,13 @@ tools/mannequin/render.sh squat
 tools/mannequin/render.sh squat --view back
 tools/mannequin/render.sh --library             # render every shipped slug and view, including posters
 tools/mannequin/render.sh --verify-rig          # shoulder, elbow, grip and deadlift regressions
+tools/mannequin/publish.sh squat                # upload squat's reviewed videos and posters to R2
 ```
+
+Videos and posters are written to `tools/mannequin/renders/`, which git ignores. They are
+never committed and never go under `public/`. The app streams them from the R2 bucket
+`gym-exercise-media` (see `src/server/media.ts`), and `publish.sh` uploads them there once
+they have been reviewed. Previews and prod read the same bucket.
 
 Run on Linux with Blender 5.2, the MPFB extension (MakeHuman, for the body and the fists),
 ffmpeg with libx264, libwebp and drawtext, bun and flock. Nothing needs downloading: MPFB
@@ -36,21 +42,75 @@ MPFB assets, remove the corresponding directory under `gym-trainer/scenes` to re
 5. Render the loop and poster, inspect the motion through its restart, and register the slug,
    shipped views and three cues in `src/domain/demos.ts`. That registry also drives
    `render.sh --library`. Set `OUT` on the library command to stage a complete media refresh.
+6. After review, run `publish.sh <slug>` to upload the files to R2. The app shows a demo once
+   its entry in `demos.ts` is deployed and its files are in the bucket.
 
 ### Extending equipment
 
-The supported equipment types are `barbell`, `dumbbells` and `bench`. Unsupported types fail
+The supported equipment includes `barbell`, `dumbbells`, `bench`, `ez-bar`, `trap-bar`, `kettlebells` and `cable`. Unsupported types fail
 before rendering. Keep exercise JSON focused on the setup and movement. Put geometry, handle
 axes, travel limits and contact checks in the shared equipment implementation. Existing bar
 and dumbbell classes provide examples of grip targets and collision measurements.
 
-For the first cable exercise, model the pulley exit and moving handle as explicit anchors.
-Both the visible cable segment and the tension direction should use those anchors. For a
-machine, define its hinge or slide, limits, pads and handle in the apparatus's local coordinates.
-Drive the handle from the mechanism and solve the body to that handle. Add a known-good motion
-and a deliberately bad travel or contact case when introducing each apparatus. A subsequent
-exercise using the same apparatus should only need a spec. The current closed fists require
-a straight 28 mm grip; ropes, open hands and other handle diameters need their own grip geometry.
+A `cable` uses `columns` keyed by hand (`Left` or `Right`) with a `d-handle`, or
+by `Both` with a `rope`, `straight-bar` or `v-bar`. Each column takes `at: [x, y]`,
+`height: "high" | "mid" | "low"`, and an optional horizontal exit direction
+`exit: [x, y]` (default `[0, 1]`). The cable runs straight from that exit to
+the attachment eye. The bake checks travel, cable clearance against the posed skin,
+and contact and wrist alignment at each 28 mm grip. The rope has molded end grips.
+Use `anchor_height` in metres for an exact exit height. A cable or anchored
+band can set `resistance_direction: {"during": [start, end], "min_gain": metres}`
+to check that its loaded span lengthens throughout the working phase. The
+check permits up to 4 mm of backward travel from the longest span measured
+so far.
+
+Use `cable_target` for a left grip position in world metres, mirrored for the right
+hand, and `handle_direction` for the grip shaft direction in torso coordinates.
+Use `cable_centre_x` to shift both grip targets sideways. For independently
+rotating rope ends, `follow_forearm` lets each shaft tilt toward perpendicular
+to its forearm as the hand moves.
+For an elbow-driven arc, use `upper_arm`, `curl`, and `flex_toward`. The geometry
+follows the hand targets in either mode.
+
+For a machine, define its hinge or slide, limits, pads and handle in the apparatus's
+local coordinates. Drive the handle from the mechanism and solve the body to that
+handle. Add a known-good motion and a deliberately bad travel or contact case when
+introducing each apparatus.
+
+Use `pullup-bar` for unsupported hangs. Its `at` position is the centre
+of the grip line, and `grip_width` is the distance from that centre to
+each hand. The frame checks grip contact, hardware clearance, and whether
+the lowest skin vertex on each foot stays at least 10 cm above the floor
+on every frame.
+
+Use `parallel-bars` for a dip. Set `grip` to the left palm's target in
+world metres. The right rail mirrors that position. The bake checks
+neutral-grip contact and clearance from the rails, posts and bases.
+
+The wrist roller uses the ordinary shaft grip and a wrist-pitch arc. Its cord
+pays out from the spool, and the weight must stay clear of the figure and the
+floor. The hand gripper uses `spring_opening` to link the finger shape to the
+moving spring handle, checking both handle contacts and spring clearance.
+
+A `push-sled` sets the left palm position with `grip` and mirrors the right grip.
+Its gait keeps the arms on those handles while alternating legs. The
+`stability-ball` rolls along `ball_y`, with per-frame foot contact and
+body clearance. A sled with `tow_y` uses a fixed tow attachment and a
+backward gait.
+
+The `safety-bar` follows torso pitch and checks each shoulder pad and grip.
+Set `ghd: true` on a Nordic bench to add a curved thigh pad and a braced
+footplate. The `road` cycle option uses a bicycle frame with rotating wheels
+and keeps the saddle, pedal and grip checks.
+
+A `jump-rope` uses an authored grip position and `reach` in metres. Its
+constant-length cord has per-frame floor and body clearance checks, and
+the feet must be airborne while the rope passes beneath them.
+
+Battle ropes reuse the round, keyed line geometry, with alternating waves
+and one fixed anchor. A `medicine-ball` separates the ball position from the
+hand target so a release and catch can be checked at the fingertips. It
+checks ball clearance against the body, floor and optional wall.
 
 ### Choosing a colour
 
@@ -97,10 +157,11 @@ key spacing. Landmark positions are resolved in the current torso frame before b
 | --- | --- |
 | `pelvis` | `[x, y, z]` of the pelvis |
 | `shoulder_y` | alternative to `pelvis` for a square, suspended barbell pull. Set the world Y coordinate between the shoulders and give `bar` in world coordinates. The rig derives pelvis height from bar height, grip width and arm length, keeping the arms long |
+| `hang_lift` | on a `pullup-bar`, metres to raise the shoulders from the passive hang height derived from `shoulder_y` and the grip geometry |
 | `clavicle` | optional pair of angles in degrees, retraction and elevation, applied on each side before hand IK |
 | `lean` | degrees the body pitches forward from the hips. -90 lies on the back with the head towards +Y |
 | `spine` | extra forward bend of the spine, degrees (negative arches) |
-| `head` | nod, degrees (negative looks up) |
+| `head` | nod, degrees (negative looks up). The neck and head share it evenly unless `neck_pitch` assigns the neck’s share explicitly |
 | `yaw` | turns the whole body about the vertical |
 | `bar` | where the bar's middle is: `[x, y, z]`, or `{ "at": landmark, "offset": [side, forward, up] }` measured on the torso |
 | `grip_width` | from the bar's middle to each hand |
@@ -111,7 +172,7 @@ key spacing. Landmark positions are resolved in the current torso frame before b
 
 With a barbell, each key places the bar (`bar`, `grip_width`) and the arms reach for it. With
 `dumbbells`, each key sets the arms (`upper_arm`, `curl`) and a dumbbell goes in each fist, its
-handle running across the body. `exercises/deadlift.json` holds a bar on the floor with `bar` given
+handle running across the body for overhand or underhand grips. A neutral dumbbell starts with its handle pointing forward and turns with the elbow flexion plane during a curl. `exercises/deadlift.json` holds a bar on the floor with `bar` given
 as `[x, y, z]`; `exercises/dumbbell-curl.json` shows the dumbbell fields.
 
 Landmarks move with the torso, so a bar `{ "at": "chest" }` stays on the chest when the body
@@ -124,7 +185,7 @@ These run on every frame before anything renders:
 
 - a hand or ankle can't reach its target
 - posed skin triangles cross on non-adjacent faces. The check ignores face pairs already crossing at rest and reports the smaller of the two inward plane depths in centimetres. The allowance is 1 cm between regions separated by at least 15 cm at rest and 2 cm for local folds
-- the body goes through the floor
+- the body or a moving weight goes through the floor
 - the bar's shaft or a plate passes through the body (hands are allowed round the shaft)
 - a hand misses the bar: the bar must run through the middle of the fist
 - any **finished fist triangle**, including its edges and interior, penetrates the shaft by
@@ -167,7 +228,8 @@ micrometre; changes in attachment or orientation invalidate it. The wrist angle 
 measured afresh.
 
 `render.sh --verify-rig` exercises moving grip widths with all three grips and checks that
-displaced fists fail. The elbow test reintroduces linear skinning and wrist roll at peak curl
+displaced grips fail. It also compares every rigid grip vertex with the evaluated render
+mesh at a bent wrist and checks the actual handle and palm orientations of a hammer curl. The elbow test reintroduces linear skinning and wrist roll at peak curl
 flexion. The shoulder test bakes the original narrow-grip squat, then puts full humeral twist
 back onto the deltoid at standing and depth. It requires the pec check to fail on both sides.
 The deadlift regression measures the baked bar speed through knee height on both passes, floor and lockout holds, bar drift, clearance to the leg surface, elbow angle and the
@@ -197,16 +259,18 @@ Muscle regions were first drawn on a figure with different proportions; each poi
 is mapped onto that figure between the knees, hip joints, neck and crown before they are
 applied.
 
-The hands are **closed fists that never change shape**, so a grip can never deform badly.
-Each comes from the same MakeHuman man: individual phalanx targets close all four fingers
-around a shared virtual shaft, and the thumb opposes at its base, then bends across the index
-and middle fingers. The build subdivides and freezes the surface, seats contact patches on a
-28 mm cylinder, closes the wrist cut, and remeshes at 0.8 mm to remove folded skin overlaps. It
-then relaxes the surface and cuts the final cylindrical cavity with 0.15 mm nominal clearance,
-using Blender's manifold boolean solver (the exact solver runs out of memory on this mesh).
-The build rejects open or inverted surfaces. Each finished fist is rigidly parented to its hand
-bone and uses the body's silver material. A dark fabric wrap, sized from the forearm and the
-fist's cut end, covers each wrist and bends between the hand and forearm.
+Each closed fist comes from the same MakeHuman man. Individual phalanx targets close
+the fingers around a 28 mm shaft. The build freezes and remeshes this surface at 0.8 mm,
+relaxes the skin and cuts a cylindrical cavity with 0.15 mm nominal clearance.
+It opens a loop proximal to the palm and stitches it into the subdivided forearm,
+sampling each transition loop from the original wrist surface. The transition
+retains the proximal forearm, forearm roll and hand weights and blends to the rigid palm. The fingers and palm
+are fully weighted to the hand bone. The result is one continuous rendering mesh.
+The grip checker extracts its marked triangles and verifies their rigid weights.
+Floor, bench and equipment clearance checks include the skinned wrist transition.
+The rest of the render surface follows the posed, subdivided collision cage by vertex index.
+As the humerus rises, a local corrective smoothing modifier distributes shoulder
+strain across the surrounding skin before the deformation checks and subdivision.
 
 The solver aligns the elbow hinge to the flexion plane and limits upper-arm twist to 35
 degrees relative to swing, with the same excess-twist correction around the proximal forearm.
@@ -218,3 +282,353 @@ orientation follow the handle and wrist axes.
 frame, runs the checks, and renders with Eevee.
 
 MakeHuman's assets are CC0, so the renders need no credit.
+
+### Movement checkpoints
+
+A spec can declare independent expectations for the baked joints and rendered equipment.
+For example, a standing press can check the rack, lockout and horizontal shaft:
+
+```json
+"checkpoints": [
+  {"at": 0, "elbow": [140, 165]},
+  {"at": 0.48, "elbow": [0, 6], "position": {"point": "handle", "relative_to": "Arm", "z": [0.53, 0.65]}},
+  {"handle_axis": {"direction": [1, 0, 0], "degrees": 5}}
+]
+```
+
+Omit `at` to measure every frame. Otherwise it is a loop fraction from 0 up to 1,
+measured on the nearest frame. Each check applies to both sides unless `side` is
+`Left` or `Right`. Elbow flexion is zero when straight. A position can bound any
+combination of world x, y and z in metres, using the root of the apparatus (`handle`)
+or a joint name (`Hand`, `ForeArm`, `Hips`, etc.). The optional reference joint
+is subtracted before measuring. A handle axis is undirected. A `palm` direction
+uses the same format, is directed, and mirrors its x component for the right hand.
+
+For matched dumbbell presses and suspended pulls, `bar` and `grip_width` give
+the midpoint and spacing of the two separate grips. A barbell can also use
+`upper_arm` and `curl` for an elbow-driven or shoulder-driven arc with a fixed
+grip width. For alternating dumbbell work, `arm_phase` maps a side to a fraction
+of a cycle to add when sampling that arm's movement.
+
+EZ bars and trap bars use the equipment types `ez-bar` and `trap-bar`.
+Their modeled straight grip sections determine the hand positions and shaft axes.
+The `kettlebells` type uses level handles. Set `side` on the equipment
+for a single bell and use `bell_roll` in the keys to rotate the bell around its handle.
+For dumbbell arcs, `fixed_upper_arm` preserves the authored elbow position and
+`flex_toward` chooses the torso-relative direction of elbow flexion.
+Continuous checkpoints can limit `upper_arm_to_torso` in degrees and
+`fixed_elbow_m` in metres. For stepping movements, each key can specify
+`foot_left` or `foot_right` as forward/back displacement in world Y,
+vertical clearance in metres and heel lift in degrees about the toe joint. A fourth
+value optionally gives the lateral displacement in world X.
+
+For an adjustable bench, set `angle` in degrees and place `at` at the hinge
+between the seat and backrest. Zero is flat, positive angles incline the back,
+and negative angles decline it. Use `support: "chest"` for a prone setup with
+the backrest rising toward the front of the figure. The checks measure depth
+normal to each pad, equipment intersections and chest contact on prone setups.
+For a rear foot raised on a bench, the stance can also specify a world-space
+`knee_direction` for either side to select the downward-bending knee solution.
+
+### Face grips and the support hand
+
+Set `hands.Left` and `hands.Right` independently to `pinch`, `cup`, `support`
+or `fist` (the default). The scene cache includes both shapes. All four poses
+use the mannequin's own skin and the same wrist blend.
+
+For a `plate` or `vertical-dumbbell`, each key supplies a load centre in
+metres and an optional pitch in degrees around world X. A shared `contact`
+specifies the left wrist offset and the hand's longitudinal and palmar
+directions in load coordinates. The right socket mirrors across X. Paired
+plates also use a lateral `spacing` per side. The checks measure the rigid
+skin against the weight every frame, including both faces for a pinch. A
+`follow.bone` carries the load with that joint and checks skin contact there.
+
+For a bench-supported row, set the dumbbell's `side` and give the opposite
+side a `support.wrist` in world coordinates. At least 20 open-hand vertices
+must stay within 4 mm of the flat pad and none may sink deeper than 2 mm.
+
+For a pull with high elbows, `shoulder_smoothing.elevation_range` sets the
+start and end of the shoulder correction ramp. Values measure the upper arm
+against the torso's upward axis, from −1 hanging down to +1 overhead.
+`radius` limits the correction around the shoulder in metres. The overhead
+extension uses a smaller radius to preserve the flexing elbow's cross section.
+Both the elbow-section and shoulder-stretch checks still run on every frame.
+
+### Anchors and supports
+
+A `landmine` takes a fixed world-space `pivot` and a grip attachment.
+`cross` supplies a press handle, `parallel` supplies the T-bar row handles,
+and `end` exposes one end grip. Keys animate pitch and yaw with
+`landmine_angles` and can roll the bar about its shaft with `landmine_roll`.
+The grip checks use each rendered handle's transform. The shaft, plate,
+handles and anchor have separate collision tests.
+
+A bench can carry an `arm_pad` with a centre and an angle. The two cushions
+support the upper arms during preacher curls. Each frame checks skin contact
+on both cushions, pad penetration and collisions between the weight and pads.
+`rack-pins` and `platform` use a height in metres. The rack pull starts with
+the shaft resting on both pins. For a deficit pull, each foot must stay on top
+of the platform.
+
+A `surface_gap` checkpoint measures from a torso landmark to the weight
+surface. A vertical dumbbell supports `upper_head: true` for a goblet hold.
+With `directed: true`, a handle-axis check also detects a reversed face normal.
+
+For a seated wrist curl, `wrist_rest` fixes the left wrist centre and mirrors
+it on the right. `hand_pitch` raises or lowers the knuckles around the shaft.
+`forearm_support: "thighs"` checks both forearms against the posed thigh
+surfaces. An overhead squat can specify `overhead_y` and `grip_width` to
+maintain lockout as shoulder height changes. Both forms use independent angle
+checkpoints on the baked pose.
+
+A straight barbell rack can use `rack_contact` with an open hand shape on both
+sides. It takes the same `wrist`, `along` and `palm` fields as a face grip, in
+torso coordinates relative to the shaft centre. The closest point on the hand
+surface must stay within 2.5 mm of the shaft. The triangles may penetrate by
+at most 0.2 mm. Wrist and
+collar clearance checks still apply.
+
+A dumbbell spec can key `handle_direction` in torso coordinates. With
+`grip: "neutral"` this is the directed shaft toward the thumb end, mirrored
+for the opposite hand. Use an intermediate direction for a half-turn so
+the interpolated shaft never goes through a zero vector.
+
+
+### Elbow cradles and floor contact
+
+Use `elbow_cradle` on a straight barbell when the load rests in the elbow
+creases. Its `wrist` offset is measured from the shaft in torso coordinates.
+Use `along` and `palm` to orient the hands. The solver mirrors the left
+socket to the right and checks contact at each elbow and shaft clearance
+against the full skin surface.
+
+For bodyweight moves with both palms flat, use the `support` hand shape
+on both sides. Set `floor_hands` to the left wrist's world coordinates.
+The right wrist mirrors across X. The palms are checked against the floor
+on every frame.
+
+For weight-bearing palms, add a checkpoint with
+`"hand_mode": "floor-plant"`. Omit `at` to check the whole rep, or use
+`at` and `side` to check a selected hand at contact. The open `support`
+mesh already extends and spreads the fingers and flattens the palm.
+Floor-plant checks require both the palm and finger pads to approach the
+ground plane and measure signed wrist extension toward the palm normal
+in a 75–100° range. The 40° grip limit still applies to implement grips
+and the existing support-hand checks.
+
+For elevated palms, set `palm_support: "bench"` and give the flat bench
+enough `width` to fit both hands. Contact is measured against the pad's
+top, within its edges. For moving hands, key `plant_left` and
+`plant_right` as world-space wrist positions, and use `during: [start, end]`
+on each side's floor-plant checkpoints. Intervals include the start and
+exclude the end, and all phases use the normalized loop time. Between those intervals the fingers relax toward a slight curl and the
+wrist is checked against the standard 40° limit. The planted hand retains
+the ground-contact and wrist-extension checks.
+
+### Bar turnover
+
+A straight-bar spec may key `grip_pitch` to control hand rotation around the
+shaft. Zero points the hand forward, −90° points it down, and 90° points it up.
+With `arm_arc: [elbow_x, upper_pitch]`, the solver derives the bar position
+from the mirrored elbow targets and the limb lengths. The upper-arm pitch
+uses the same world-space convention as the grip pitch. The regular grip,
+wrist, skin and equipment checks still run on every frame.
+
+### Selectorized press stations
+
+Combine `selector-machine` with a flat `bench` for the seat. Set the
+left bearing's world `pivot` and the `grip_offset` from the bearing to
+the left grip at zero rotation. The right bearing and grip mirror across X.
+Key `lever_angle` in degrees around the axle and give the permitted
+`travel` as two angles. A `back_pad` specifies the front face's bottom
+edge as `[y, z, incline]`. The lever carries its grips through the arc,
+and the arms solve against those moving grips. Levers stay in the plane
+of each outer bearing and turn inward at the grip. The bake checks lever
+travel, overlaps between the rendered moving hardware and the posed skin,
+grip enclosure, and contact with the back pad.
+
+### Leg machines and Smith guides
+
+- A `leg-roller` keeps the thigh at `thigh_pitch` and rotates the lower leg
+  and roller together around the knee-height axle. The `roller_offset` is
+  measured from the knee at zero `lever_angle`. Both rollers are checked
+  on every frame against the lower calf for contact and against the skin for
+  penetration. Optional `pads` give a contact face, width and length, and pitch
+  around X. Use `split` to require contact on both thighs.
+- A `leg-sled` uses an inclined foot plate on fixed guides. Set its plate
+  `origin`, optional `pitch`, and travel limits in metres. The `sled` key
+  sets displacement along the guide. Set `side` for single-leg work. The
+  plate must stay against the working soles. The rendered carriage, fixed
+  rails, and supports must clear skin.
+- Setting `motion: "fly"` on a selectorized station uses overhead vertical
+  bearings and a suspended grip on each arm.
+- Add `smith-rails` to a straight bar with fixed world `y` and vertical
+  `travel`. A landmark-based bar target translates the torso to the guide
+  while leaving bar height driven by the pose. The guides constrain the bar
+  throughout the loop and the carriages are checked against skin.
+
+A `calf-station` uses a fixed forefoot step and paired pads with a common
+vertical travel limit. Set `footplate` to the step centre Y and top Z, and
+`pad_at` to the left pad's positive X, centre Y and unloaded contact Z.
+The `calf_lift` key moves the contact faces and yokes together. With
+`seated: true`, the shorter frame loads the thighs. Each frame checks
+the padded faces, the forefoot support, and clearance of the frame and yokes.
+For donkey calf raises, set `fixed_grip` to place the handles on the frame
+while the pads load the back of the hips.
+
+A `hip-machine` rotates both thigh supports about fixed vertical axles.
+Set `contact` to `outer` for abduction or `inner` for adduction, give
+the skin-facing pad distance as `pad_offset`, and key `hip_angle` in
+degrees within `travel`. The thigh pad and forefoot support turn together.
+The bake measures their skin contact, checks the backrest, and checks the
+rendered frame and linkages for clearance.
+
+A `guided-squat` holds the back and shoulder pads and hand grips on the
+same carriage. Set `at` and `lean` to its standing reference pose.
+With rails, `carriage` measures distance in metres along the incline.
+With a world `pivot`, `carriage` measures degrees around the axle.
+The fixed `footplate` gives its centre Y and top Z. Each frame checks
+pad contact, foot support, grip enclosure, and clearance of the fixed
+frame and moving linkages.
+
+Selectorized stations can use `pad_size: [width, length]` to size the
+chest or back pad, or omit `back_pad` when a separate preacher pad carries
+the upper arms. Optional `restraints` use the same contact-face geometry as
+the leg-machine pads. The pulldown uses a split thigh restraint.
+
+- An `assist-station` has fixed hand grips and a vertically guided knee pad.
+  The `assist_height` channel joins the torso movement and the knee support.
+- A `trunk-station` rotates a padded yoke on a fixed pelvis-height axle.
+  Its `support` selects the front or back of the torso and the `lean`
+  channel drives the lever. The pad contact check samples the torso skin.
+- A `lateral-station` rotates a padded support against each elbow and
+  carries its grip through the same arc. The `lever_angle` key is measured
+  in degrees upward from the hanging upper arm.
+- A roller with `side` moves just the working leg. A roller with
+  `hip_drive` rotates both legs together from fixed hip-height pivots.
+- A selectorized `grip_axis` is specified in the lever's local coordinates.
+  The shaft rotates with the lever and its actual transform drives the grip
+  check.
+
+- A `belt-squat` has split platforms and a cable from the waist belt
+  to a fixed `anchor`. Set `footplate` to the centre Y and top Z,
+  `belt_radii` to the strap's lateral and front-to-back radii, and `grip`
+  to the left handle centre. The belt follows the torso and is checked
+  against the waist and thighs through the full squat.
+- A `rotary-torso` station carries its chest pad and grips around the
+  seat's vertical axis. `torso_twist` turns the spine and frame together.
+  Set `pivot`, `pad_y` for the pad face in the rotating frame, and angular
+  `travel`. The bake checks pad contact and full frame clearance.
+- A `leg-roller` with `hip_drive: true` pivots at the working hip for
+  standing kickbacks. The roller stays against the lower leg.
+- A `thrust-station` carries a hip pad and two grips on one fixed axle.
+  Specify its world-space `pivot`, resting `pad_offset` and angular
+  `travel`. Animate it with `thrust_lever` while the upper back rests
+  on a separate bench.
+- A `treadmill` uses `gait: [y, lift, heel]` for one leg. The second leg
+  and both arm swings sample the same cycle half a turn apart. The
+  `incline` is in degrees. The bake checks belt support through stance
+  and checks the deck rails and console for collisions.
+- A `cycle-station` places the pedals on opposite sides of a shared
+  crank. Set the world `crank`, `radius`, `saddle`, and mirrored `grip`
+  positions. A recumbent cycle adds a `backrest` contact pad, and `air`
+  makes the handles move with the crank. The bake checks the saddle,
+  pedals, grips, and frame.
+
+For a supine exercise that keeps the pelvis and lower back down, set
+`"supine_support": {}`. The bake checks both skin regions against the
+floor on every frame, allowing for the natural curve of the lower back.
+Set `"supine_support": {"feet": true}` when both feet must stay planted.
+Supine poses also limit head and neck extension relative to the upper
+back. Use `head_contact` inside `supine_support` to give the phase ranges
+where the back of the head must touch the floor. The optional
+`neck_retraction` key sets the cervical offset in metres along the
+pelvis's backward direction.
+
+Use the `relaxed` hand shape for an unloaded open hand. With
+`thigh_reach`, the palm follows the thigh surface. Key the contact
+position as a fraction of the distance from the hip to the knee.
+
+For a supine leg that lifts off the floor, key `supine_leg_left` or
+`supine_leg_right` as `[thigh pitch, knee bend]` in degrees. Thigh
+pitch starts at zero along the floor and rises to 90 over the hip.
+The bake derives the shin pitch and foot orientation from that pose.
+Use `unloaded_arm_left` and `unloaded_arm_right` to override the shared
+`unloaded_arm` direction for an alternating reach.
+
+`pelvis_contact` and `lumbar_contact` take phase ranges when a curl
+intentionally lifts those regions. Both default to the whole loop.
+`axial_twist` turns the upper spine around the torso's long axis.
+`upper_back_contact` pins the upper back during a reverse curl.
+`temple_hands` keeps relaxed fingertips beside the head as the trunk turns.
+
+`roll` turns the pelvis around the body's long axis before the lean is
+applied. A left forearm side plank uses `roll: 90` and
+`side_support: {"wrist": [x, y, z]}`. Use a support hand below and a
+relaxed hand above. The bake checks four sections along the ulna, the palm and lower foot
+against the floor, and checks the contact between the two feet.
+
+A `core-bench` has a single pad at `pad: [centre_y, length]` relative
+to its `at` origin. For a decline curl, set its `angle` and an ankle
+`roller` in bench coordinates. The footplate and roller support both
+feet while the bake checks hardware clearance. `head_contact` and
+`pelvis_contact` set the phases where those skin surfaces must reach
+the pad.
+
+For a dragon flag, use a flat core bench with a fixed `grip` instead
+of the ankle roller. The upper back anchors near the end of the pad.
+Use `upper_back_contact` to check the support throughout the rep.
+
+A Copenhagen hold reuses the forearm support with `bench_foot: true`
+and a flat bench supporting the upper foot. For a kneeling exercise,
+`kneeling_support` maps each side to the phase ranges where that knee
+must touch the floor.
+
+`unsupported_feet` maps each free foot to its minimum floor clearance
+in metres. `grounded_heels` lists the heels that must stay on the floor.
+A `free_leg_left` or `free_leg_right` key takes the same thigh pitch and
+knee bend as a supine leg, measured from forward-horizontal.
+
+`kneeling_support` keeps the hip over each supporting knee. If the
+exercise uses floor-plant checkpoints, it also keeps the loaded shoulder
+over the wrist. Set `relaxed_reach` to bring the fingers closer
+together as the palm leaves the floor.
+
+Set `prone_support` for a face-down floor exercise that keeps the front
+of the pelvis and abdomen down. It checks both skin patches each frame
+and interprets free-leg pitch from backward-horizontal while the
+figure faces the floor. `unloaded_palm` optionally specifies the
+unloaded hands' palm direction in torso coordinates.
+
+For a kneeling lift with a changing knee direction, key
+`knee_pole_left` or `knee_pole_right` in stance coordinates. The
+floor-contact and alignment checks still apply to the supporting limbs.
+
+Set `ground_gait: {}` to reuse the treadmill gait on the floor without
+equipment. The stance feet are checked against the floor throughout
+their contact phases. A longer loop can set `cycles` and `surge` to
+vary cadence between slower and faster strides. All walking and running
+gaits check that the leading ankle pairs with the trailing wrist when
+the stride is open. Set `running_gait` to also check flight clearance,
+mid-stance knee flexion and elbow bend. The `gait` hand shape cups the
+fingers with the thumb alongside the index finger.
+
+Set `heel_pivot` to centre the ankle rotation on the heel for a toe raise.
+
+A `roman-chair` holds the thigh angle at 45 degrees and fixes the hip
+joint while the trunk hinges. The front pad edge bears against the
+upper thighs. The bake checks that both thighs stay on the pad, both
+ankles stay against the rollers, and the trunk stops in line with the
+legs at lockout.
+
+A `resistance-band` reuses the cable attachment and grip checks with a
+fixed pin on an anchor post. Select `high`, `mid`, `low` or `floor`
+as the anchor height. Set `rest_length` in metres to the unstretched
+length between the fixed pin and the attachment eye. The strip narrows
+as it lengthens. Each frame must keep it clear of the body and between
+1.05 and 2.5 times its rest length.
+
+A `thigh-band` fits a closed strip just above the knees. Each frame uses
+the posed thigh skin to fit the loop around both legs and checks its
+perimeter against `rest_length`.

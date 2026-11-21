@@ -1,0 +1,154 @@
+{
+  "equipment": [
+    {
+      "type": "pullup-bar",
+      "at": [
+        0,
+        -0.057,
+        0.96
+      ],
+      "grip_width": 0.35,
+      "feet_supported": true
+    }
+  ],
+  "stance": {
+    "width": 0.2,
+    "y": -0.87,
+    "toe_out": 3,
+    "knee_direction": {
+      "Left": [
+        0,
+        -0.5,
+        1
+      ],
+      "Right": [
+        0,
+        -0.5,
+        1
+      ]
+    }
+  },
+  "grounded_heels": [
+    "Left",
+    "Right"
+  ],
+  "heel_pivot": true,
+  "camera": {
+    "angle": 126,
+    "elevation": 12
+  },
+  "frames": 120,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        -0.0496,
+        0.3953
+      ],
+      "lean": -69,
+      "head": 2,
+      "foot_left": [
+        0,
+        0,
+        -17
+      ],
+      "foot_right": [
+        0,
+        0,
+        -17
+      ],
+      "elbows": [
+        0.6,
+        0.4,
+        -0.42
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.29,
+      "pelvis": [
+        0,
+        -0.1016,
+        0.5036
+      ],
+      "lean": -61,
+      "elbows": [
+        0.85,
+        -0.24,
+        -0.28
+      ]
+    },
+    {
+      "at": 0.46,
+      "pelvis": [
+        0,
+        -0.1775,
+        0.6154
+      ],
+      "lean": -52,
+      "head": 0,
+      "elbows": [
+        0.94,
+        -0.55,
+        0.1
+      ]
+    },
+    {
+      "at": 0.57
+    },
+    {
+      "at": 0.78,
+      "pelvis": [
+        0,
+        -0.1016,
+        0.5036
+      ],
+      "lean": -61,
+      "elbows": [
+        0.85,
+        -0.24,
+        -0.28
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.04,
+      "elbow": [
+        3,
+        30
+      ]
+    },
+    {
+      "at": 0.5,
+      "elbow": [
+        110,
+        155
+      ]
+    },
+    {
+      "knee": [
+        0,
+        20
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "handle",
+        "relative_to": "Spine2",
+        "y": [
+          -0.015,
+          0.045
+        ],
+        "z": [
+          0.252,
+          0.3
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "equipment": [{"type": "parallel-bars", "grip": [0.24, -0.04, 0.25]}],
+  "camera": {"angle": 63, "elevation": 7},
+  "frames": 78,
+  "unsupported_feet": {"Left": 0.05, "Right": 0.05},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.03, 0.47], "lean": 10, "head": 0, "elbows": [0.14, -0.85, 0], "free_leg_left": [2, 1], "free_leg_right": [2, 1]}
+  ],
+  "checkpoints": [
+    {"elbow": [0, 16], "knee": [0, 6]},
+    {"position": {"point": "Foot", "relative_to": "UpLeg", "z": [-0.012, 0.052]}}
+  ]
+}

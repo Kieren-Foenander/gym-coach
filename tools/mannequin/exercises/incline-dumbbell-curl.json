@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "dumbbells"}, {"type": "bench", "at": [0, 0, 0.45], "angle": 58}],
+  "stance": {"width": 0.37, "y": -0.42, "toe_out": 12},
+  "camera": {"angle": 65, "elevation": 16},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.63], "upper_arm": [0.23, -0.53, -0.848], "curl": 14, "grip": "supinated", "handle_direction": [0.86, -0.43, 0.265], "elbows": [0.13, -0.53, -0.848], "lean": -32, "spine": 0, "head": 0, "fixed_upper_arm": true, "flex_toward": [0.65, 0.848, -0.53]},
+    {"at": 0.44, "curl": 121},
+    {"at": 0.52},
+    {"at": 0.94, "curl": 14}
+  ],
+  "touching": ["bench"],
+  "checkpoints": [
+    {"fixed_elbow_m": 0.005, "position": {"point": "ForeArm", "relative_to": "Arm", "y": [-0.012, 0.012], "z": [-0.243, -0.23]}},
+    {"at": 0, "elbow": [0, 32]},
+    {"at": 0.48, "elbow": [95, 150]}
+  ]
+}

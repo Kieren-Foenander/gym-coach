@@ -5,6 +5,7 @@ import { Effect, Option, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import { SESSION_COOKIE, userById, userFromSession } from "./server/auth"
 import { API_PREFIX, apiHandlerFor } from "./server/http"
+import { isExerciseMedia, serveExerciseMedia } from "./server/media"
 import { handleMcpRequest, MCP_PATH } from "./server/mcp"
 import type { User } from "./server/repo"
 import { runtime, signupCode, stage } from "./server/runtime"
@@ -12,7 +13,8 @@ import { runtime, signupCode, stage } from "./server/runtime"
 const handleApiRequest = apiHandlerFor({ run: (effect) => runtime.runPromise(effect), signupCode, stage })
 
 /**
- * Worker entry. Four things live behind one hostname:
+ * Worker entry. Five things live behind one hostname:
+ *   /exercises/*.mp4  demonstration videos and posters (.webp), streamed from the R2 bucket
  *   /mcp              the MCP server the AI coach connects to (OAuth access token required)
  *   /oauth/*          the OAuth endpoints an MCP client uses to get that token
  *   /api/v1/*         the JSON API the native app uses (session token required)
@@ -212,6 +214,9 @@ const providerFor = (origin: string) => {
 
 export default {
   fetch(request: Request, env: OAuthEnv, ctx: ExecutionContext) {
+    // Public, like the static assets: the native app's video player sends no session token.
+    if (isExerciseMedia(new URL(request.url).pathname)) return serveExerciseMedia(request, env.EXERCISE_MEDIA)
+
     return providerFor(new URL(request.url).origin).fetch(request, env, ctx)
   },
 } satisfies ExportedHandler<OAuthEnv>

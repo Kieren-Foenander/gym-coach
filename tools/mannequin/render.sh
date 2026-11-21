@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Renders one exercise on the mannequin from its spec in exercises/<slug>.json.
 #   tools/mannequin/render.sh squat --sheet          checks the motion and writes a four-frame contact sheet
-#   tools/mannequin/render.sh squat                  checks it and writes public/exercises/squat.mp4 and .webp
+#   tools/mannequin/render.sh squat                  checks it and writes tools/mannequin/renders/squat.mp4 and .webp
 #   tools/mannequin/render.sh squat --view back      the same from behind, as squat-rear
 #   tools/mannequin/render.sh squat --sheet --angle 90   a contact sheet from the side (0 is front, 90 the figure's right)
 #   tools/mannequin/render.sh squat --sheet --focus LeftHand   close-ups that follow one bone
-# OUT=<folder> writes somewhere other than public/exercises.
+# OUT=<folder> writes somewhere other than tools/mannequin/renders. publish.sh uploads renders to R2;
+# they are never committed or put under public/.
 set -euo pipefail
 
 slug="${1:?Usage: render.sh <slug> [--sheet] [--view front|back]}"
@@ -49,7 +50,12 @@ done
 # Isolate different rig builds across worktrees. Publish only a complete .blend.
 cache="${XDG_DATA_HOME:-$HOME/.local/share}/gym-trainer"
 mkdir -p "$cache"
-key="$( { sha256sum < "$here/build.py"; blender --version | head -n 1; } | sha256sum | cut -d' ' -f1)"
+poses=(fist fist)
+if [[ "$slug" != --verify-rig ]]; then
+  pair="$(bun -e 'const s=await Bun.file(process.argv[1]).json(); console.log(["Left","Right"].map(side=>s.hands?.[side] ?? "fist").join(" "))' "$spec")"
+  read -r -a poses <<< "$pair"
+fi
+key="$( { sha256sum < "$here/build.py"; echo "${poses[*]}"; blender --version | head -n 1; } | sha256sum | cut -d' ' -f1)"
 scene_dir="$cache/scenes/$key"
 blend="$scene_dir/mannequin.blend"
 mkdir -p "$scene_dir"
@@ -59,13 +65,13 @@ if [[ ! -f "$blend" ]]; then
     [[ ! -f "$blend" ]] || exit 0
     tmp="$(mktemp -d "$scene_dir/build.XXXXXX")"
     trap 'rm -rf "$tmp"' EXIT
-    blender -b --python-exit-code 1 --python "$here/build.py" -- "$tmp/mannequin.blend" > "$scene_dir/build.log" 2>&1 \
+    blender -b --python-exit-code 1 --python "$here/build.py" -- "$tmp/mannequin.blend" "${poses[@]}" > "$scene_dir/build.log" 2>&1 \
       || { tail -n 30 "$scene_dir/build.log"; exit 1; }
     mv "$tmp/mannequin.blend" "$blend"
   ) 9>"$scene_dir/build.lock"
 fi
 if [[ "$slug" == --verify-rig ]]; then
-  for suite in verify-grips verify-elbows verify-shoulders verify-deadlift; do
+  for suite in verify-grips verify-elbows verify-shoulders verify-deadlift verify-cables verify-machines verify-props; do
     blender -b "$blend" --python-exit-code 1 --python "$here/$suite.py"
   done
   exit 0
@@ -88,7 +94,7 @@ grep -E "CHECKS PASSED|GRIP CHECKS|ELBOW CHECKS|SHOULDER CHECKS" "$work/blender.
 
 [[ -z "$check" ]] || exit 0
 
-out="${OUT:-$root/public/exercises}"
+out="${OUT:-$here/renders}"
 mkdir -p "$out"
 name="$slug$suffix"
 if [[ -n "$palette" ]]; then

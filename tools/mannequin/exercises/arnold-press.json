@@ -1,0 +1,20 @@
+{
+  "equipment": [{"type": "dumbbells"}],
+  "stance": {"width": 0.28, "toe_out": 8},
+  "camera": {"angle": 32},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.928], "bar": [0, -0.245, 1.458], "grip_width": 0.18, "grip": "neutral", "handle_direction": [1, 0, 0], "elbows": [0, 0.6, -1], "clavicle": [0, 4]},
+    {"at": 0.16, "bar": [0, -0.215, 1.51], "grip_width": 0.28, "handle_direction": [0, -1, 0], "elbows": [0.65, 0.6, -1]},
+    {"at": 0.28, "bar": [0, -0.085, 1.64], "grip_width": 0.32, "handle_direction": [-1, 0, 0], "elbows": [1, 0.35, -1], "clavicle": [0, 8]},
+    {"at": 0.46, "bar": [0, -0.012, 1.908], "grip_width": 0.223, "clavicle": [0, 12]},
+    {"at": 0.54},
+    {"at": 0.72, "bar": [0, -0.085, 1.64], "grip_width": 0.32, "handle_direction": [-1, 0, 0], "elbows": [1, 0.35, -1], "clavicle": [0, 8]},
+    {"at": 0.84, "bar": [0, -0.215, 1.51], "grip_width": 0.28, "handle_direction": [0, -1, 0], "elbows": [0.65, 0.6, -1], "clavicle": [0, 4]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [95, 150], "palm": {"direction": [0, 1, 0], "degrees": 30}},
+    {"at": 0, "position": {"point": "ForeArm", "relative_to": "Arm", "y": [-0.25, -0.12]}},
+    {"at": 0.5, "elbow": [0, 10], "palm": {"direction": [0, -1, 0], "degrees": 15}},
+    {"at": 0.5, "position": {"point": "handle", "relative_to": "Arm", "y": [-0.05, 0.05], "z": [0.55, 0.65]}}
+  ]
+}

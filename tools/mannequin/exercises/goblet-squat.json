@@ -1,0 +1,20 @@
+{
+  "equipment": [{"type": "vertical-dumbbell"}],
+  "stance": {"width": 0.42, "toe_out": 23},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.925], "lean": 4, "elbows": [0.28, -0.35, -1], "load": {"at": "chest", "offset": [0, 0.069, 0.015], "world_offset": [0, 0, -0.09]}},
+    {"at": 0.42, "pelvis": [0, 0.15, 0.53], "lean": 38, "head": -20},
+    {"at": 0.52},
+    {"at": 0.9, "pelvis": [0, 0, 0.925], "lean": 4, "head": 0}
+  ],
+  "hands": {"Left": "cup", "Right": "cup"},
+  "contact": {"wrist": [0.11235, 0.06443, 0.04753], "along": [-0.25376, -0.96727, 0], "palm": [-0.7868, 0.20642, 0.58167]},
+  "checkpoints": [
+    {"at": 0, "side": "Left", "position": {"point": "Hips", "z": [0.91, 0.94]}},
+    {"at": 0.42, "side": "Left", "position": {"point": "Hips", "z": [0.515, 0.545]}},
+    {"surface_gap": {"landmark": "sternum", "max_m": 0.03, "upper_head": true}, "handle_axis": {"direction": [0, 0, 1], "degrees": 5, "directed": true}},
+    {"at": 0.48, "side": "Left", "position": {"point": "ForeArm", "relative_to": "Leg", "x": [-0.35, -0.005]}},
+    {"at": 0.48, "side": "Right", "position": {"point": "ForeArm", "relative_to": "Leg", "x": [0.005, 0.35]}}
+  ]
+}

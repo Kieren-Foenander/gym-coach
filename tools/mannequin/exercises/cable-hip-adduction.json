@@ -1,0 +1,110 @@
+{
+  "equipment": [
+    {
+      "type": "ankle-cable",
+      "column": {
+        "at": [
+          0.96,
+          -0.54
+        ],
+        "height": "low",
+        "exit": [
+          0,
+          1
+        ]
+      }
+    }
+  ],
+  "stance": {
+    "width": 0.25,
+    "toe_out": 4
+  },
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "camera": {
+    "angle": 43,
+    "elevation": 12
+  },
+  "frames": 112,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        -0.101,
+        0.02,
+        0.921
+      ],
+      "lean": 2,
+      "foot_left": [
+        0.05,
+        0.142,
+        13,
+        0.345
+      ],
+      "unloaded_arm": [
+        0.28,
+        0.4,
+        -0.9
+      ],
+      "unloaded_curl": 16
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.27,
+      "foot_left": [
+        -0.172,
+        0.057,
+        10,
+        0.132
+      ],
+      "pelvis": [
+        -0.101,
+        0.028,
+        0.928
+      ]
+    },
+    {
+      "at": 0.47,
+      "foot_left": [
+        -0.265,
+        0.047,
+        10,
+        -0.12
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "unsupported_feet": {
+    "Left": 0.035
+  },
+  "checkpoints": [
+    {
+      "side": "Left",
+      "knee": [
+        2,
+        48
+      ]
+    },
+    {
+      "at": 0.52,
+      "side": "Left",
+      "position": {
+        "point": "Foot",
+        "x": [
+          -0.067,
+          0.07
+        ],
+        "y": [
+          -0.31,
+          -0.15
+        ]
+      }
+    }
+  ]
+}

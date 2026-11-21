@@ -1,0 +1,109 @@
+{
+  "equipment": [
+    {
+      "type": "calf-station",
+      "seated": false,
+      "footplate": [
+        -0.16,
+        0.06
+      ],
+      "pad_at": [
+        0.132,
+        0.058,
+        0.986
+      ],
+      "travel": [
+        -0.002,
+        0.1
+      ],
+      "fixed_grip": [
+        0.306,
+        -0.62,
+        0.842
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.29,
+    "y": 0,
+    "toe_out": 8
+  },
+  "camera": {
+    "angle": 111
+  },
+  "frames": 96,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.911
+      ],
+      "lean": 73,
+      "calf_lift": 0,
+      "foot_left": [
+        0,
+        0,
+        0
+      ],
+      "foot_right": [
+        0,
+        0,
+        0
+      ],
+      "head": -46
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.46,
+      "pelvis": [
+        0,
+        0.032,
+        0.993
+      ],
+      "calf_lift": 0.082,
+      "foot_left": [
+        0,
+        0,
+        38
+      ],
+      "foot_right": [
+        0,
+        0,
+        38
+      ]
+    },
+    {
+      "at": 0.54
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.49,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.152,
+          0.242
+        ]
+      }
+    },
+    {
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 2
+      },
+      "elbow": [
+        8,
+        118
+      ]
+    }
+  ]
+}

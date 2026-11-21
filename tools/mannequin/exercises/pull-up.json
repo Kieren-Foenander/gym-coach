@@ -1,0 +1,123 @@
+{
+  "equipment": [
+    {
+      "type": "pullup-bar",
+      "at": [
+        0,
+        -0.06,
+        2.33
+      ],
+      "grip_width": 0.32,
+      "grip": "pronated"
+    }
+  ],
+  "stance": {
+    "width": 0.16,
+    "toe_out": 2,
+    "y": 0.067
+  },
+  "camera": {
+    "angle": 154,
+    "elevation": 5
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.016,
+        1.17
+      ],
+      "lean": 0,
+      "shoulder_y": 0.015,
+      "foot_left": [
+        0.02,
+        0.386,
+        37
+      ],
+      "foot_right": [
+        0.02,
+        0.386,
+        37
+      ],
+      "clavicle": [
+        0,
+        12
+      ],
+      "hang_lift": 0,
+      "elbows": [
+        0.42,
+        0.47,
+        -0.14
+      ]
+    },
+    {
+      "at": 0.08
+    },
+    {
+      "at": 0.45,
+      "hang_lift": 0.41,
+      "clavicle": [
+        0,
+        1
+      ],
+      "shoulder_y": 0.135,
+      "lean": 5,
+      "foot_left": [
+        0.065,
+        0.87,
+        37
+      ],
+      "foot_right": [
+        0.065,
+        0.87,
+        37
+      ],
+      "elbows": [
+        0.68,
+        -0.35,
+        -1
+      ]
+    },
+    {
+      "at": 0.55
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        0,
+        18
+      ]
+    },
+    {
+      "at": 0.5,
+      "elbow": [
+        85,
+        151
+      ]
+    },
+    {
+      "at": 0.5,
+      "position": {
+        "point": "Head",
+        "z": [
+          2.3,
+          2.49
+        ]
+      }
+    },
+    {
+      "at": 0.5,
+      "position": {
+        "point": "Head",
+        "y": [
+          0.06,
+          0.22
+        ]
+      }
+    }
+  ]
+}

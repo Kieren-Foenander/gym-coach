@@ -1,0 +1,114 @@
+{
+  "equipment": [],
+  "supine_support": {},
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "y": -0.53,
+    "toe_out": 5,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 67,
+    "elevation": 17
+  },
+  "frames": 126,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.092
+      ],
+      "lean": -90,
+      "head": 5,
+      "neck_retraction": 0,
+      "supine_leg_left": [
+        87,
+        106
+      ],
+      "supine_leg_right": [
+        20,
+        9
+      ],
+      "spine": 26,
+      "axial_twist": -23
+    },
+    {
+      "at": 0.25,
+      "supine_leg_left": [
+        56,
+        63
+      ],
+      "supine_leg_right": [
+        56,
+        63
+      ],
+      "axial_twist": 0
+    },
+    {
+      "at": 0.5,
+      "supine_leg_left": [
+        20,
+        9
+      ],
+      "supine_leg_right": [
+        87,
+        106
+      ],
+      "axial_twist": 23
+    },
+    {
+      "at": 0.75,
+      "supine_leg_left": [
+        56,
+        63
+      ],
+      "supine_leg_right": [
+        56,
+        63
+      ],
+      "axial_twist": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "position": {
+        "point": "Leg",
+        "z": [
+          0.43,
+          0.5
+        ]
+      },
+      "side": "Left"
+    },
+    {
+      "at": 0.5,
+      "position": {
+        "point": "Leg",
+        "z": [
+          0.43,
+          0.5
+        ]
+      },
+      "side": "Right"
+    }
+  ],
+  "temple_hands": true
+}

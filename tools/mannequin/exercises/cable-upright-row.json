@@ -1,0 +1,114 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "straight-bar",
+      "columns": {
+        "Both": {
+          "at": [
+            0,
+            -0.96
+          ],
+          "height": "low"
+        }
+      },
+      "grip_half": 0.42
+    }
+  ],
+  "stance": {
+    "width": 0.32,
+    "toe_out": 12
+  },
+  "camera": {
+    "angle": 54,
+    "elevation": 10
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 0,
+      "grip": "pronated",
+      "cable_target": [
+        0.312,
+        -0.135,
+        0.755
+      ],
+      "handle_direction": [
+        1,
+        0,
+        0
+      ],
+      "elbows": [
+        0.8,
+        -0.34,
+        0.28
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "cable_target": [
+        0.312,
+        -0.204,
+        1.115
+      ],
+      "elbows": [
+        1,
+        -0.28,
+        0.38
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        5,
+        33
+      ]
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        75,
+        144
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "ForeArm",
+        "relative_to": "Arm",
+        "z": [
+          -0.12,
+          0.06
+        ]
+      }
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "handle",
+        "y": [
+          -0.224,
+          -0.184
+        ],
+        "z": [
+          1.09,
+          1.14
+        ]
+      }
+    }
+  ]
+}

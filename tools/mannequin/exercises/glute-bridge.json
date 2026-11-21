@@ -1,0 +1,18 @@
+{
+  "equipment": [],
+  "stance": {"width": 0.37, "y": -0.51, "toe_out": 13},
+  "camera": {"angle": 119},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.15], "lean": -90, "head": 0},
+    {"at": 0.44, "pelvis": [0, 0.1, 0.43], "lean": -137, "head": 47},
+    {"at": 0.52},
+    {"at": 0.95, "pelvis": [0, 0, 0.15], "lean": -90, "head": 0}
+  ],
+  "checkpoints": [
+    {"at": 0, "position": {"point": "Hips", "z": [0.14, 0.16]}},
+    {"at": 0.48, "position": {"point": "Hips", "z": [0.4, 0.44]}},
+    {"position": {"point": "Arm", "z": [0.13, 0.22]}}
+  ],
+  "floor_hands": [0.28, -0.06, 0.0236],
+  "hands": {"Left": "support", "Right": "support"}
+}

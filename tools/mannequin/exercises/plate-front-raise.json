@@ -1,0 +1,21 @@
+{
+  "equipment": [{"type": "plate", "axis": [0, 1, 0], "radius": 0.14, "thickness": 0.0136}],
+  "stance": {"width": 0.26, "toe_out": 8},
+  "camera": {"angle": 17, "elevation": 10},
+  "keys": [
+    {"pelvis": [0, 0, 0.925], "load": [0, -0.1974, 0.8521], "elbows": [0.3, -0.4, -1], "at": 0},
+    {"at": 0.13, "load": [0, -0.305, 0.9081]},
+    {"at": 0.25, "load": [0, -0.4393, 1.0531]},
+    {"at": 0.39, "load": [0, -0.5037, 1.2737]},
+    {"at": 0.51, "load": [0, -0.5037, 1.2737]},
+    {"at": 0.67, "load": [0, -0.4448, 1.0627]},
+    {"at": 0.81, "load": [0, -0.3095, 0.9113]},
+    {"at": 0.95, "load": [0, -0.1974, 0.8521]}
+  ],
+  "hands": {"Left": "pinch", "Right": "pinch"},
+  "contact": {"along": [-1, 0, 0], "palm": [0, -1, 0], "wrist": [0.2166, 0.0314, 0]},
+  "checkpoints": [
+    {"elbow": [0, 48]},
+    {"handle_axis": {"direction": [0, -1, 0], "degrees": 15}, "position": {"point": "handle", "relative_to": "Hips", "x": [-0.005, 0.005]}}
+  ]
+}

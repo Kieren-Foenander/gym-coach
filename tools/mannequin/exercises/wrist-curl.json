@@ -1,0 +1,19 @@
+{
+  "equipment": [{"type": "barbell", "plate_radius": 0.09}, {"type": "bench", "at": [0, 0.22, 0.43], "length": 0.54}],
+  "stance": {"width": 0.47, "y": -0.39, "toe_out": 13},
+  "camera": {"angle": 32, "elevation": 17},
+  "keys": [
+    {"pelvis": [0, 0.06, 0.58], "lean": 54, "head": -28, "wrist_rest": [0.223, -0.45, 0.516], "grip": "supinated", "elbows": [0.04, -0.4, -1], "hand_pitch": -23, "at": 0},
+    {"at": 0.44, "hand_pitch": 26},
+    {"at": 0.52},
+    {"at": 0.94, "hand_pitch": -23}
+  ],
+  "touching": ["bench"],
+  "checkpoints": [
+    {"fixed_elbow_m": 0.004, "position": {"point": "Hand", "y": [-0.455, -0.445], "z": [0.511, 0.521]}},
+    {"at": 0, "position": {"point": "handle", "relative_to": "Hand", "z": [-0.09, 0.014]}, "hand_pitch": [-25, -21]},
+    {"at": 0.48, "position": {"point": "handle", "relative_to": "Hand", "z": [0.005, 0.09]}, "hand_pitch": [24, 28]},
+    {"handle_axis": {"direction": [1, 0, 0], "degrees": 3}, "palm": {"direction": [0, 0, 1], "degrees": 28}}
+  ],
+  "forearm_support": "thighs"
+}

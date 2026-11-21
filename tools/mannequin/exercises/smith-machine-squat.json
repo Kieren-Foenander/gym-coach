@@ -1,0 +1,96 @@
+{
+  "equipment": [
+    {
+      "type": "barbell"
+    },
+    {
+      "type": "smith-rails",
+      "y": 0.1,
+      "travel": [
+        0.65,
+        1.5
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.34,
+    "toe_out": 20
+  },
+  "camera": {
+    "angle": 35
+  },
+  "touching": [
+    "bar"
+  ],
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 4,
+      "bar": {
+        "at": "upper back",
+        "offset": [
+          0,
+          -0.009,
+          0
+        ]
+      },
+      "clavicle": [
+        10,
+        5
+      ],
+      "grip_width": 0.365,
+      "grip": "pronated",
+      "elbows": [
+        1,
+        -0.275,
+        -0.78
+      ]
+    },
+    {
+      "at": 0.42,
+      "pelvis": [
+        0,
+        0.15,
+        0.53
+      ],
+      "lean": 38,
+      "head": -20
+    },
+    {
+      "at": 0.52
+    },
+    {
+      "at": 0.9,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 4,
+      "head": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "position": {
+        "point": "handle",
+        "y": [
+          0.099,
+          0.101
+        ]
+      }
+    },
+    {
+      "at": 0.47,
+      "knee": [
+        70,
+        145
+      ]
+    }
+  ]
+}

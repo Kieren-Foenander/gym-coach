@@ -6,8 +6,7 @@ The figure is a MakeHuman man (CC0), made through Blender's MPFB extension. Make
 with a skeleton and skin weights tuned to bend, so nothing here guesses where joints are or how
 the skin follows them. The animator drives a smaller skeleton with Mixamo's bone names, placed on
 MakeHuman's joints, and each of its bones takes over the skin of the MakeHuman bones it stands
-for. The hands are closed fists made from the same MakeHuman man (see make_fists), with a wrist
-wrap over each join.
+for. Each closed fist is stitched into the forearm of the same MakeHuman man.
 
 Each training muscle group is a soft region on the surface, stored as a float attribute named
 `muscle:<group>`. A render sets `glow` from those regions and the material lights up there.
@@ -251,7 +250,7 @@ def hand_frame(wrist, middle, index, pinky):
     return Matrix((across, along, across.cross(along))).transposed()
 
 
-def make_fists():
+def make_fists(hand_shapes):
     """Two closed fists, built from a MakeHuman man whose hands are made to bend.
 
     Each hand is replaced by a fist that never changes shape, so a grip can never deform badly: the fingers wrap round a tunnel a bar fits through, and the thumb
@@ -279,6 +278,35 @@ def make_fists():
         head = lambda name: rest[f"{name}.{tag}"].head_local.copy()  # noqa: E731
         frame = hand_frame(head("wrist"), head("finger3-1"), head("finger2-1"), head("finger5-1"))
         palm = -frame.col[2] * sign  # found by eye: this way the fingers close over the palm
+        shape = hand_shapes[side]
+        if shape != "fist":
+            if shape not in {"support", "diamond", "pinch", "cup", "relaxed", "gait"}:
+                raise ValueError(f"Unknown hand shape {shape}")
+            # Keep the MakeHuman phalanx lengths. The long fingers share a
+            # contact plane on a plate, or turn up around a dumbbell head.
+            bends = {"support": (0, 0, 0), "diamond": (0, 0, 0), "pinch": (12, 4, -3), "cup": (15, 45, 70), "gait": (28, 62, 90), "relaxed": (5, 8, 9)}[shape]
+            for finger in (2, 3, 4, 5):
+                for joint, degrees in enumerate(bends, 1):
+                    angle = math.radians(degrees)
+                    spread = (3.5 - finger)*(.055 if shape in ("support", "diamond") else .012 if shape in ("relaxed", "gait") else .028)
+                    direction = Vector((spread, math.cos(angle), -sign*math.sin(angle)))
+                    swing(f"finger{finger}-{joint}.{tag}", frame @ direction)
+            if shape in ("support", "diamond", "pinch", "cup", "gait"):
+                targets = ((.053,.063,-.038),(.047,.089,-.055),(.031,.113,-.052)) if shape == "pinch" else (
+                    (.058,.056,-.022),(.067,.080,-.039),(.060,.102,-.055))
+                if shape == "support":
+                    targets = ((.068,.052,-.008),(.079,.074,-.010),(.087,.092,-.012))
+                if shape == "gait":
+                    targets = ((.049,.061,-.022),(.032,.077,-.044),(.018,.080,-.061))
+                for joint, (x,y,z) in enumerate(targets, 1):
+                    name = f"finger1-{joint}.{tag}"
+                    direction = frame @ Vector((.75, .66, 0)) if shape == "diamond" else (
+                        head("wrist") + frame @ Vector((x, y, sign * z)) - pose[name].head)
+                    swing(name, direction)
+            origin = head("wrist") + frame @ Vector((0,.09,-sign*.018))
+            fists[side] = {"shape":shape, "frame":frame, "wrist":head("wrist"),
+                           "length":(head("finger3-1")-head("wrist")).length, "tunnel":origin}
+            continue
         # Adduct the fingers and close them around a shared cylindrical grip.
         # Pose each phalanx around one straight cylinder, rather than giving unequal
         # fingers identical joint angles (which puts the shaft through the pinky).
@@ -343,6 +371,15 @@ def make_fists():
         points = [(to_hand @ (posed.vertices[i].co - fist["wrist"])) / fist["length"] for i in keep]
         faces = [[order[v] for v in polygon.vertices] for polygon in human.data.polygons if set(polygon.vertices) <= kept]
         fist["points"], fist["faces"] = points, faces
+        if fist.get("shape") == "diamond":
+            for digit, number in (("thumb", 1), ("index", 2)):
+                distal = pose[f"finger{number}-3.{tag}"]
+                edges = [posed.vertices[i].co for i in keep
+                         if (posed.vertices[i].co - distal.tail).length < .018]
+                tip = max(edges, key=lambda point: (point - distal.head).dot(distal.vector.normalized()),
+                          default=distal.tail)
+                fist[digit] = (to_hand @ (tip - fist["wrist"])) / fist["length"]
+
         fist["tunnel"] = (to_hand @ (fist["tunnel"] - fist["wrist"])) / fist["length"]
     human.evaluated_get(depsgraph).to_mesh_clear()
     for thing in [human, skeleton]:
@@ -368,17 +405,22 @@ def remove_hands(body, rig):
             if owner in (f"{side}Hand", f"{side}ForeArm") and (vertex.co - wrist).dot(along) > -0.012:
                 doomed.append(vertex)
     bmesh.ops.delete(mesh, geom=doomed, context="VERTS")
+    # Cut a regular cross-section in the distal forearm. A boundary picked only
+    # by dominant bone can zigzag across the wrist pivot and buckle in flexion.
+    for side in ("Left", "Right"):
+        bone = rig.data.bones[side + "Hand"]
+        along = (bone.tail_local - bone.head_local).normalized()
+        local = {v for v in mesh.verts if (v.co - bone.head_local).length < .095}
+        geom = list(local) + [e for e in mesh.edges if all(v in local for v in e.verts)]
+        geom += [f for f in mesh.faces if all(v in local for v in f.verts)]
+        bmesh.ops.bisect_plane(mesh, geom=geom, dist=1e-7, plane_no=along,
+                               plane_co=bone.head_local - along * .032, clear_outer=True)
     mesh.to_mesh(body.data)
     mesh.free()
 
 
 def attach_fists(rig, body, fists, joints, material):
-    """Puts each fist on its hand bone, scaled to this figure's hand, with a wrist wrap over the join.
-
-    The fists come from the same MakeHuman man as the body, so they fit its wrists as they are.
-    """
-    skin = np.array([v.co[:] for v in body.data.vertices])
-    wrap = plain_material("wrist wrap", (0.012, 0.013, 0.016), 0.0, 0.85)
+    """Sculpt the rigid closed grip before joining it to the forearm."""
     measurements = {}
     for side, fist in fists.items():
         wrist = joints[f"{side}Hand"]
@@ -400,6 +442,23 @@ def attach_fists(rig, body, fists, joints, material):
         bpy.context.view_layer.objects.active = thing
         bpy.ops.object.modifier_apply(modifier=smooth.name)
         centre = fit_point(fist["tunnel"])
+        if fist.get("shape", "fist") != "fist":
+            if fist["shape"] in ("support", "diamond"):
+                # A loaded palm flattens at the thenar pad and fingertips.
+                sign = 1 if side == "Left" else -1
+                for v in thing.data.vertices:
+                    q = frame.transposed() @ (v.co - wrist)
+                    q.z -= sign * .010 * max(0,min(1,(q.y-.10)/.06))
+                    q.z = sign * max(-.020, sign*q.z)
+                    v.co = wrist + frame @ q
+            if fist.get("shape") == "diamond":
+                for digit in ("thumb", "index"):
+                    thing["diamond_" + digit] = wrist + frame @ fit_point(fist[digit])
+            thing["grip_axis"] = frame.col[0]
+            thing["grip_origin"] = wrist + frame @ centre
+            thing["grip_sections"] = [0.0]
+            measurements[side] = frame @ centre
+            continue
         clearance = GRIP_RADIUS + 0.00025
         moved = 0
         for vertex in thing.data.vertices:
@@ -456,60 +515,197 @@ def attach_fists(rig, body, fists, joints, material):
         thing["grip_axis"] = frame.col[0]
         thing["grip_origin"] = wrist + frame @ centre
         thing["grip_sections"] = [x * length / fist["length"] for x in (.021, .002, -.017, -.033)]
-        follow(thing, rig, f"{side}Hand")
-
-        # A fitted fabric wrap, rounded at both edges, rather than an oversized rigid tube.
-        # Its lower half follows the forearm, so bending the wrist cannot expose the cut.
-        # It is sized from the forearm and the fist's cut end where it covers them, a few
-        # millimetres proud of the skin so no skin shows through it.
-        local = (skin - np.array(wrist)) @ np.array(frame)
-        forearm = local[(local[:, 1] > -.04) & (local[:, 1] < .002) & (np.linalg.norm(local, axis=1) < .07)]
-        cut = np.array([frame.transposed() @ (v.co - wrist) for v in thing.data.vertices if 0 < (frame.transposed() @ (v.co - wrist)).y < .022])
-        covered = np.vstack([forearm, cut])
-        cx, cz = (covered[:, 0].max() + covered[:, 0].min()) / 2, (covered[:, 2].max() + covered[:, 2].min()) / 2
-        hx, hz = (covered[:, 0].max() - covered[:, 0].min()) / 2, (covered[:, 2].max() - covered[:, 2].min()) / 2
-        points, faces = [], []
-        rings = ((-.033, hx + .002, hz + .002), (-.031, hx + .004, hz + .004), (-.028, hx + .004, hz + .004),
-                 (.018, hx + .004, hz + .004), (.022, hx + .004, hz + .004), (.024, hx + .002, hz + .002))
-        for y, rx, rz in rings:
-            for i in range(48):
-                a = i * math.tau / 48
-                points.append(wrist + frame @ Vector((cx + rx * math.cos(a), y, cz + rz * math.sin(a))))
-        for j in range(len(rings)-1):
-            for i in range(48):
-                n = (i + 1) % 48
-                faces.append(((j+1)*48+i, (j+1)*48+n, j*48+n, j*48+i))
-        mesh = bpy.data.meshes.new(f"wrist wrap.{side}")
-        mesh.from_pydata(points, [], faces)
-        mesh.materials.append(wrap)
-        sleeve = bpy.data.objects.new(mesh.name, mesh)
-        bpy.context.scene.collection.objects.link(sleeve)
-        for polygon in mesh.polygons:
-            polygon.use_smooth = True
-        fore_group = sleeve.vertex_groups.new(name=f"{side}ForeArmRoll")
-        hand_group = sleeve.vertex_groups.new(name=f"{side}Hand")
-        for j, (y, _, _) in enumerate(rings):
-            weight = max(0, min(1, (y + .025) / .045))
-            indices = list(range(j*48, (j+1)*48))
-            hand_group.add(indices, weight, 'REPLACE')
-            fore_group.add(indices, 1-weight, 'REPLACE')
-        deform = sleeve.modifiers.new("wrist bend", "ARMATURE")
-        deform.object = rig
-        deform.use_deform_preserve_volume = True
-        smooth = sleeve.modifiers.new("rounded fabric edges", "SUBSURF")
-        smooth.levels = smooth.render_levels = 2
-
         measurements[side] = frame @ centre
     return measurements
 
 
-def follow(thing, rig, bone):
-    """Makes an object move rigidly with one bone, keeping where it is now."""
-    world = thing.matrix_world.copy()
-    thing.parent = rig
-    thing.parent_type = "BONE"
-    thing.parent_bone = bone
-    thing.matrix_world = world
+def continuous_skin(body, joints, rest_surface):
+    """Keep a low-resolution collision cage and stitch the finished rendering surfaces."""
+    skin = body.copy()
+    skin.data = body.data.copy()
+    skin.name = "skin"
+    bpy.context.scene.collection.objects.link(skin)
+    bpy.context.view_layer.objects.active = skin
+    smooth = skin.modifiers["smooth"]
+    smooth.levels = smooth.render_levels
+    bpy.ops.object.modifier_move_to_index(modifier=smooth.name, index=0)
+    bpy.ops.object.modifier_apply(modifier=smooth.name)
+    # Store the subdivision correspondence before adding the new hand vertices.
+    attr = skin.data.attributes.new("cage_point", "INT", "POINT")
+    attr.data.foreach_set("value", np.arange(1, len(attr.data)+1, dtype=np.int32))
+    body.hide_render = True
+    mesh = bmesh.new()
+    mesh.from_mesh(skin.data)
+    bmesh.ops.delete(mesh, geom=[e for e in mesh.edges if e.is_wire], context="EDGES")
+    weights = mesh.verts.layers.deform.active
+    for side in ("Left", "Right"):
+        wrist = joints[side + "Hand"]
+        frame = hand_frame(wrist, joints[side + "HandMiddle1"], joints[side + "HandIndex1"], joints[side + "HandPinky1"])
+        hand = skin.vertex_groups[side + "Hand"].index
+        source = bpy.data.objects["fist." + side]
+        for key in ("grip_axis", "grip_origin", "grip_sections"):
+            skin[key + "." + side] = source[key]
+        for key in ("diamond_thumb", "diamond_index"):
+            if key in source:
+                skin[key + "." + side] = source[key]
+        # Cut through the solid wrist just beyond the voxel-remesh cap.
+        fist = bmesh.new()
+        fist.from_mesh(source.data)
+        bmesh.ops.bisect_plane(fist, geom=fist.verts[:] + fist.edges[:] + fist.faces[:],
+                              plane_co=wrist + frame.col[1] * .016, plane_no=frame.col[1],
+                              dist=1e-7, clear_inner=True)
+        def boundary(part):
+            edges = [e for e in part.edges if e.is_boundary and (e.verts[0].co-wrist).length < .085]
+            neighbours = {}
+            for e in edges:
+                a, b = e.verts
+                neighbours.setdefault(a, []).append(b)
+                neighbours.setdefault(b, []).append(a)
+            if not neighbours or any(len(v) != 2 for v in neighbours.values()):
+                raise RuntimeError(f"{side} wrist has an invalid boundary")
+            ring = [next(iter(neighbours))]
+            while True:
+                a, b = neighbours[ring[-1]]
+                nxt = b if len(ring)>1 and a == ring[-2] else a
+                if nxt == ring[0]:
+                    break
+                ring.append(nxt)
+            if len(ring) != len(neighbours):
+                raise RuntimeError(f"{side} wrist has multiple boundaries")
+            return ring
+        arm_ring = boundary(mesh)
+        palm_ring = boundary(fist)
+        marker = skin.vertex_groups.new(name="GripSurface." + side).index
+        copied = {}
+        for v in fist.verts:
+            target = mesh.verts.new(v.co)
+            target[weights][hand] = target[weights][marker] = 1
+            copied[v] = target
+        for face in fist.faces:
+            mesh.faces.new([copied[v] for v in face.verts]).smooth = True
+        palm = [copied[v] for v in palm_ring]
+        # Match loop winding and starting point, then zipper by perimeter distance.
+        def order(loop):
+            coords = [frame.transposed() @ (v.co-wrist) for v in loop]
+            if sum(a.x*b.z-a.z*b.x for a,b in zip(coords,coords[1:]+coords[:1])) < 0:
+                loop.reverse()
+            start = max(range(len(loop)), key=lambda i: (loop[i].co-wrist).dot(frame.col[0]))
+            return loop[start:]+loop[:start]
+        arm, palm = order(arm_ring), order(palm)
+        def lengths(loop):
+            distance = np.cumsum([0]+[(a.co-b.co).length for a,b in zip(loop,loop[1:]+loop[:1])])
+            return distance / distance[-1]
+        # Recover the MakeHuman wrist cross-section at each station. Account for
+        # small differences at the two boundaries while preserving the wrist bones
+        # and heel of the palm between them.
+        def skin_point(point):
+            along = frame.col[1]
+            origin = wrist + along * (point - wrist).dot(along)
+            hit, _, _, _ = rest_surface.ray_cast(origin, (point - origin).normalized(), .09)
+            if hit is None:
+                raise RuntimeError(f"{side} wrist sample missed the original skin")
+            return hit
+
+        # The remeshed palm rim contains very short edges from the plane cut.
+        # Propagating those along the entire wrist creates long, nearly
+        # degenerate quads and a longitudinal streak under specular light.
+        # At the voxel-cut rim the frozen palm and MakeHuman wrist can differ
+        # by a fraction of a millimetre. Match both to the same dorsal surface,
+        # fading the rest-shape correction out before the fingers and cavity.
+        for vertex in copied.values():
+            depth = (vertex.co - wrist).dot(frame.col[1])
+            if depth < .036:
+                t = max(0, min(1, (depth - .016) / .020))
+                vertex.co = skin_point(vertex.co).lerp(vertex.co, t*t*(3-2*t))
+
+        def sample(loop, distances, station):
+            j = np.searchsorted(distances, station, side="right") - 1
+            fraction = (station - distances[j]) / (distances[j+1] - distances[j])
+            return loop[j], loop[(j+1) % len(loop)], fraction
+
+        def bridge(lower, upper, lo, hi):
+            i = j = 0
+            while i < len(lower) or j < len(upper):
+                points = [lower[i % len(lower)], upper[j % len(upper)]]
+                if j == len(upper) or (i < len(lower) and lo[i+1] <= hi[j+1]):
+                    i += 1
+                    points.append(lower[i % len(lower)])
+                else:
+                    j += 1
+                    points.append(upper[j % len(upper)])
+                mesh.faces.new(points).smooth = True
+
+        u, v = lengths(arm), lengths(palm)
+        stations = np.linspace(0, 1, len(arm) + 1)
+        rings = [[] for _ in range(9)]
+        for station in stations[:-1]:
+            a, b, fraction = sample(arm, u, station)
+            c, d, distal = sample(palm, v, station)
+            base = a.co.lerp(b.co, fraction)
+            end = c.co.lerp(d.co, distal)
+            fore_offset = base - skin_point(base)
+            palm_offset = end - skin_point(end)
+            groups = set(a[weights].keys()) | set(b[weights].keys()) | {hand}
+            for step, ring in enumerate(rings, 1):
+                t = step / (len(rings) + 1)
+                blend = t * t * (3 - 2 * t)
+                position = skin_point(base.lerp(end, t)) + fore_offset.lerp(palm_offset, blend)
+                point = mesh.verts.new(position)
+                for group in groups:
+                    proximal = a[weights].get(group, 0)*(1-fraction) + b[weights].get(group, 0)*fraction
+                    point[weights][group] = proximal * (1-blend) + (blend if group == hand else 0)
+                ring.append(point)
+        bridge(arm, rings[0], u, stations)
+        for lower, upper in zip(rings, rings[1:]):
+            for i in range(len(lower)):
+                j = (i+1) % len(lower)
+                mesh.faces.new([lower[i],lower[j],upper[j],upper[i]]).smooth = True
+        bridge(rings[-1], palm, stations, v)
+
+        # Use one continuous field across the cage, stitch and proximal palm.
+        pigment = mesh.verts.layers.float["muscle:Forearms"]
+        for vertex in mesh.verts:
+            offset = vertex.co - wrist
+            if offset.length < .15:
+                t = max(0, min(1, (.033 - offset.dot(frame.col[1])) / .15))
+                vertex[pigment] = t*t*(3-2*t)
+        if any(not edge.is_manifold for ring in [arm, *rings, palm]
+               for vertex in ring for edge in vertex.link_edges):
+            raise RuntimeError(f"{side} wrist stitch is open")
+        fist.free()
+        bpy.data.objects.remove(source, do_unlink=True)
+    bmesh.ops.recalc_face_normals(mesh, faces=mesh.faces[:])
+    mesh.to_mesh(skin.data)
+    mesh.free()
+    # Use the cage after posing and subdivision, including its pose correctives.
+    # New wrist and hand points have no cage index and retain their own skinning.
+    tree = bpy.data.node_groups.new("finished body surface", "GeometryNodeTree")
+    for direction in ("INPUT", "OUTPUT"):
+        tree.interface.new_socket(name="Geometry", in_out=direction, socket_type="NodeSocketGeometry")
+    nodes, link = tree.nodes, tree.links.new
+    inp = nodes.new("NodeGroupInput")
+    out = nodes.new("NodeGroupOutput")
+    cage = nodes.new("GeometryNodeObjectInfo")
+    cage.inputs["Object"].default_value = body
+    index = nodes.new("GeometryNodeInputNamedAttribute")
+    index.data_type = "INT"
+    index.inputs["Name"].default_value = "cage_point"
+    offset = nodes.new("ShaderNodeMath")
+    offset.operation = "SUBTRACT"
+    link(index.outputs["Attribute"], offset.inputs[0])
+    offset.inputs[1].default_value = 1
+    sample = nodes.new("GeometryNodeSampleIndex")
+    sample.data_type = "FLOAT_VECTOR"
+    link(cage.outputs["Geometry"], sample.inputs["Geometry"])
+    link(nodes.new("GeometryNodeInputPosition").outputs[0], sample.inputs["Value"])
+    link(offset.outputs[0], sample.inputs["Index"])
+    position = nodes.new("GeometryNodeSetPosition")
+    link(inp.outputs[0], position.inputs["Geometry"])
+    link(index.outputs["Attribute"], position.inputs["Selection"])
+    link(sample.outputs["Value"], position.inputs["Position"])
+    link(position.outputs[0], out.inputs[0])
+    skin.modifiers.new("posed cage", "NODES").node_group = tree
+    skin.hide_set(True)  # avoid evaluating the high-density mesh during cage checks
 
 
 # ---------------------------------------------------------------- muscles
@@ -809,7 +1005,16 @@ def main():
     out = sys.argv[sys.argv.index("--") + 1]
     bpy.ops.wm.read_factory_settings(use_empty=True)
     body, rig, joints, hand = make_body()
-    fists = make_fists()
+    args = sys.argv[sys.argv.index("--")+1:]
+    shapes = dict(zip(("Left","Right"), args[1:] or ("fist","fist")))
+    for side, shape in shapes.items():
+        rig["hand_shape." + side] = shape
+    fists = make_fists(shapes)
+    # Capture the intact wrist skin before cutting out the open hands.
+    from mathutils.bvhtree import BVHTree
+    body.modifiers["smooth"].levels = 2
+    rest_surface = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
+    body.modifiers["smooth"].levels = 0
     remove_hands(body, rig)
     silver = glowing_material("silver", SILVER, 0.49, 0.49)
     tunnels = attach_fists(rig, body, fists, joints, silver)
@@ -825,6 +1030,7 @@ def main():
     store(body, "glow", [0.0] * len(body.data.vertices))
     body.data.materials.clear()
     body.data.materials.append(silver)
+    continuous_skin(body, joints, rest_surface)
     stage()
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)
 

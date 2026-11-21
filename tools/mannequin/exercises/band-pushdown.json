@@ -1,0 +1,108 @@
+{
+  "equipment": [
+    {
+      "type": "resistance-band",
+      "attachment": "straight-bar",
+      "columns": {
+        "Both": {
+          "at": [
+            0,
+            -0.6
+          ],
+          "height": "high"
+        }
+      },
+      "rest_length": 0.57
+    }
+  ],
+  "stance": {
+    "width": 0.34,
+    "toe_out": 14
+  },
+  "camera": {
+    "angle": 48,
+    "elevation": 10
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 0,
+      "grip": "pronated",
+      "upper_arm": [
+        0.1,
+        0.165,
+        -1
+      ],
+      "curl": 90,
+      "flex_toward": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.47,
+      "curl": 9
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "at": 0,
+      "elbow": [
+        86,
+        96
+      ],
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.045,
+          0.045
+        ]
+      }
+    },
+    {
+      "at": 0.52,
+      "elbow": [
+        3,
+        12
+      ],
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.27,
+          -0.21
+        ]
+      }
+    },
+    {
+      "fixed_elbow_m": 0.015,
+      "handle_axis": {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 1
+      },
+      "upper_arm_to_torso": 12,
+      "elbow": [
+        6,
+        94
+      ]
+    }
+  ]
+}

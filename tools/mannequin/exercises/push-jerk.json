@@ -1,0 +1,21 @@
+{
+  "equipment": [{"type": "barbell"}],
+  "stance": {"width": 0.34, "toe_out": 8},
+  "camera": {"angle": 35},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.928], "lean": -4, "head": 0, "bar": [0, -0.13, 1.38], "grip_width": 0.25, "grip": "pronated", "elbows": [0.4, 0.6, -1], "clavicle": [0, 4], "foot_left": [0, 0, 0], "foot_right": [0, 0, 0]},
+    {"at": 0.14, "pelvis": [0, 0.035, 0.835], "bar": [0, -0.13, 1.287]},
+    {"at": 0.25, "elbows": [0.8, 0.35, -1], "bar": [0, -0.19, 1.53], "lean": -4, "clavicle": [0, 6], "pelvis": [0, 0, 0.928]},
+    {"at": 0.36, "pelvis": [0, 0.043, 0.808], "lean": 6, "bar": {"at": "lockout", "y": -0.025, "grip_width": 0.25}, "elbows": [1, 0.32, -1], "clavicle": [0, 12], "head": 0, "foot_left": [0, 0, 0], "foot_right": [0, 0, 0]},
+    {"at": 0.47, "bar": {"at": "lockout", "y": -0.025, "grip_width": 0.25}, "lean": 0, "clavicle": [0, 12], "pelvis": [0, 0, 0.928]},
+    {"at": 0.59},
+    {"at": 0.74, "elbows": [0.8, 0.35, -1], "bar": [0, -0.19, 1.53], "lean": -4, "clavicle": [0, 6]},
+    {"at": 0.95, "elbows": [0.4, 0.6, -1], "lean": -4, "bar": [0, -0.13, 1.38], "clavicle": [0, 4], "foot_left": [0, 0, 0], "foot_right": [0, 0, 0]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [140, 164], "handle_axis": {"direction": [1, 0, 0], "degrees": 20}},
+    {"at": 0.54, "elbow": [0, 9], "position": {"point": "handle", "z": [1.88, 1.93]}},
+    {"at": 0.36, "elbow": [0, 18], "knee": [28, 66]}
+  ],
+  "frames": 156
+}

@@ -1,0 +1,19 @@
+{
+  "equipment": [{"type": "plate", "radius": 0.071, "thickness": 0.019, "axis": [0, 0, 1]}, {"type": "bench", "at": [0, 0.082, 0.45], "length": 0.64}],
+  "stance": {"width": 0.42, "y": -0.38, "toe_out": 10},
+  "camera": {"angle": 67, "elevation": 17},
+  "touching": ["bench"],
+  "keys": [
+    {"pelvis": [0, 0, 0.585], "lean": -90, "spine": -6, "load": [0, -0.105, 0.088], "load_pitch": 79, "elbows": [0.8, 0.16, 0.2], "head": -8, "at": 0},
+    {"at": 0.44, "head": 32},
+    {"at": 0.52},
+    {"at": 0.94, "head": -8}
+  ],
+  "checkpoints": [
+    {"at": 0, "side": "Left", "head_pitch": [-10, -6]},
+    {"at": 0.44, "side": "Left", "head_pitch": [30, 34]}
+  ],
+  "hands": {"Left": "support", "Right": "support"},
+  "follow": {"bone": "Head"},
+  "contact": {"along": [-0.87, 0.49, 0], "palm": [0, 0, -1], "wrist": [0.156, -0.038, 0.0315]}
+}

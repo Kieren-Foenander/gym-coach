@@ -1,0 +1,15 @@
+{
+  "equipment": [{"type": "dumbbells"}],
+  "stance": {"width": 0.42, "y": -0.61, "toe_out": 10},
+  "camera": {"angle": 70, "elevation": 31},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.142], "lean": -90, "spine": -6, "bar": {"at": "shoulders", "offset": [0, 0.568, 0]}, "grip_width": 0.247, "grip": "pronated", "elbows": [1, -0.09, 0], "handle_direction": [1, 0, 0]},
+    {"at": 0.45, "bar": {"at": "chest", "offset": [0, 0.255, -0.01]}, "grip_width": 0.142, "handle_direction": [0.03, 0, 1]},
+    {"at": 0.52},
+    {"at": 0.9, "bar": {"at": "shoulders", "offset": [0, 0.568, 0]}, "grip_width": 0.247, "handle_direction": [1, 0, 0]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 27], "handle_axis": {"direction": [1, 0, 0], "degrees": 8}},
+    {"at": 0.48, "elbow": [65, 142], "position": {"point": "handle", "z": [0.36, 0.56]}}
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "equipment": [{"type": "dumbbells"}, {"type": "bench", "at": [0.14, -0.91, 0.34]}],
+  "stance": {"width": 0.27, "toe_out": 5},
+  "camera": {"angle": 58, "elevation": 12},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.9], "upper_arm": [0.18, 0.0, -1], "curl": 8, "grip": "neutral", "elbows": [0.12, -0.4, -1], "lean": 3, "foot_left": [0, 0, 0], "foot_right": [0, 0, 0]},
+    {"at": 0.1, "pelvis": [0, -0.02, 0.86], "foot_left": [-0.075, 0.375, 0], "foot_right": [0, 0, 0], "lean": 3},
+    {"at": 0.18, "pelvis": [0.035, -0.12, 0.835], "foot_left": [-0.46, 0.34, 0], "foot_right": [0, 0, 0], "lean": 9},
+    {"at": 0.28, "pelvis": [0.065, -0.27, 0.923], "foot_left": [-0.46, 0.34, 0], "foot_right": [0, 0, 40], "lean": 9},
+    {"at": 0.42, "pelvis": [0.085, -0.45, 1.245], "foot_left": [-0.46, 0.34, 0], "foot_right": [-0.39, 0.39, 3], "lean": 3},
+    {"at": 0.49, "pelvis": [0.085, -0.45, 1.245], "foot_left": [-0.46, 0.34, 0], "foot_right": [-0.39, 0.39, 3], "lean": 3},
+    {"at": 0.71, "pelvis": [0.065, -0.27, 0.923], "foot_left": [-0.46, 0.34, 0], "foot_right": [0, 0, 40], "lean": 9},
+    {"at": 0.81, "pelvis": [0.035, -0.12, 0.835], "foot_left": [-0.46, 0.34, 0], "foot_right": [0, 0, 0], "lean": 9},
+    {"at": 0.89, "pelvis": [0, -0.02, 0.86], "foot_left": [-0.075, 0.375, 0], "foot_right": [0, 0, 0], "lean": 3},
+    {"at": 0.99, "pelvis": [0, 0, 0.9], "foot_left": [0, 0, 0], "foot_right": [0, 0, 0], "lean": 3}
+  ],
+  "checkpoints": [
+    {"at": 0.45, "position": {"point": "Hips", "z": [1.22, 1.27]}},
+    {"at": 0.45, "side": "Left", "position": {"point": "Foot", "z": [0.395, 0.46]}}
+  ],
+  "frames": 180
+}

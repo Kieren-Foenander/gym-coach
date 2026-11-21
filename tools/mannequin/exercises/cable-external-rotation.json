@@ -1,0 +1,122 @@
+{
+  "equipment": [
+    {
+      "type": "cable",
+      "attachment": "d-handle",
+      "columns": {
+        "Left": {
+          "at": [
+            -0.96,
+            -0.29
+          ],
+          "height": "mid",
+          "exit": [
+            1,
+            0
+          ],
+          "anchor_height": 1.051
+        }
+      },
+      "stirrup_direction": [
+        0,
+        1,
+        0
+      ],
+      "resistance_direction": {
+        "during": [
+          0.09,
+          0.47
+        ],
+        "min_gain": 0.23
+      }
+    }
+  ],
+  "stance": {
+    "width": 0.34,
+    "toe_out": 14
+  },
+  "camera": {
+    "angle": 339,
+    "elevation": 24
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.925
+      ],
+      "lean": 0,
+      "free_arm": [
+        0.28,
+        0.06,
+        -1
+      ],
+      "flex_toward": [
+        -0.68,
+        0.73,
+        0
+      ],
+      "upper_arm": [
+        0.11,
+        0.035,
+        -1
+      ],
+      "curl": 89,
+      "grip": "neutral"
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.47,
+      "flex_toward": [
+        0.68,
+        0.73,
+        0
+      ]
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "frames": 108,
+  "checkpoints": [
+    {
+      "side": "Left",
+      "elbow": [
+        86,
+        93
+      ],
+      "fixed_elbow_m": 0.015,
+      "upper_arm_to_torso": 8
+    },
+    {
+      "at": 0.52,
+      "side": "Left",
+      "position": {
+        "point": "handle",
+        "x": [
+          0.43,
+          0.51
+        ]
+      }
+    },
+    {
+      "side": "Left",
+      "position": {
+        "point": "Hand",
+        "relative_to": "ForeArm",
+        "z": [
+          -0.025,
+          0.025
+        ]
+      }
+    }
+  ],
+  "hands": {
+    "Left": "fist",
+    "Right": "relaxed"
+  }
+}

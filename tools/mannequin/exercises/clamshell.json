@@ -1,0 +1,75 @@
+{
+  "equipment": [
+    {
+      "type": "thigh-band",
+      "rest_length": 0.55
+    }
+  ],
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "side_lying": true,
+  "camera": {
+    "angle": 310,
+    "elevation": 24,
+    "margin": 1.18
+  },
+  "frames": 104,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.0,
+        0.164
+      ],
+      "lean": -90,
+      "roll": 90,
+      "side_bend": 19,
+      "unloaded_arm": [
+        0.25,
+        0.24,
+        0.94
+      ],
+      "unloaded_arm_right": [
+        0.25,
+        0.75,
+        -0.6
+      ],
+      "unloaded_curl": 12,
+      "opening": 0
+    },
+    {
+      "at": 0.11
+    },
+    {
+      "at": 0.46,
+      "opening": 44
+    },
+    {
+      "at": 0.56
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        67,
+        125
+      ]
+    },
+    {
+      "at": 0.5,
+      "side": "Right",
+      "position": {
+        "point": "Leg",
+        "relative_to": "LeftLeg",
+        "z": [
+          0.23,
+          0.4
+        ]
+      }
+    }
+  ],
+  "clamshell": true
+}

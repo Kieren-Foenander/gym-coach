@@ -6,11 +6,13 @@ import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
+import { MEDIA_BUCKET } from "./src/server/media"
 
 /**
  * Everything the app runs on, declared in one place. `alchemy deploy --stage <name>` makes it so.
  *
- * Each stage is a separate copy: its own Worker, database and key-value store.
+ * Each stage is a separate copy: its own Worker, database and key-value store. They all read the same
+ * R2 bucket of exercise videos, which Alchemy only looks up: tools/mannequin/publish.sh fills it.
  *   prod      the live app. It keeps the names it had before Alchemy, so the address and the data stay.
  *   pr-<n>    a preview for one pull request, made and removed by .github/workflows/deploy.yml.
  *   anything else is yours to try things in (the default is live_<your user name>).
@@ -37,9 +39,18 @@ const grants = (names: Names) =>
 // Optional. When set, people after the first account can sign up with this invite code. Empty means sign-up is closed.
 const signupCode = Config.Redacted("SIGNUP_CODE").pipe(Config.withDefault(Redacted.make("")))
 
+// Set by tools/e2e/serve.ts: the browser tests run `alchemy dev` on a machine with no Cloudflare account.
+const NO_ACCOUNT = process.env.ALCHEMY_LOCAL_STATE === "1"
+
+// The demonstration videos and posters. Made once with `cf r2 buckets create` and never managed here,
+// so no stage can delete it, and previews show the same videos as prod. Looking it up needs the account,
+// so with none, `alchemy dev` gets an empty local bucket instead and the demos show no video.
+const exerciseMedia = NO_ACCOUNT ? Cloudflare.R2.Bucket("ExerciseMedia") : Cloudflare.R2.Bucket.lookup({ name: MEDIA_BUCKET })
+
 const bindings = (names: Names, stage: string) => ({
   DB: database(names),
   OAUTH_KV: grants(names),
+  EXERCISE_MEDIA: exerciseMedia,
   SIGNUP_CODE: signupCode,
   // Which copy this is, so a test copy's MCP server and connector name say so (src/domain/coach-apps.ts).
   STAGE: stage,
@@ -56,7 +67,7 @@ export default Alchemy.Stack(
     // its own, so upgrading Alchemy here never touches the store other projects on the account share.
     // The browser tests serve the app with `alchemy dev` on a machine with no Cloudflare account (see
     // tools/e2e/serve.ts), so they keep state in .alchemy instead.
-    state: process.env.ALCHEMY_LOCAL_STATE === "1" ? Alchemy.localState() : Cloudflare.state({ workerName: STATE_STORE }),
+    state: NO_ACCOUNT ? Alchemy.localState() : Cloudflare.state({ workerName: STATE_STORE }),
   },
   Effect.gen(function* () {
     const stage = yield* Alchemy.Stage

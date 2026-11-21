@@ -1,0 +1,84 @@
+{
+  "equipment": [
+    {
+      "type": "leg-roller",
+      "hip_drive": true,
+      "roller_offset": [
+        0,
+        0.1495,
+        -0.735
+      ],
+      "travel": [
+        7,
+        93
+      ],
+      "support_grip": [
+        0.313,
+        -0.43,
+        0.769
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        -0.251,
+        0.809
+      ],
+      "length": 0.41
+    }
+  ],
+  "camera": {
+    "angle": 119,
+    "margin": 1.23
+  },
+  "stance": {
+    "width": 0.32
+  },
+  "frames": 120,
+  "touching": [
+    "bench"
+  ],
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.045,
+        0.956
+      ],
+      "lean": 91,
+      "head": -18,
+      "lever_angle": 10
+    },
+    {
+      "at": 0.09
+    },
+    {
+      "at": 0.47,
+      "lever_angle": 88
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        3,
+        13
+      ]
+    },
+    {
+      "at": 0.52,
+      "position": {
+        "point": "Leg",
+        "relative_to": "UpLeg",
+        "z": [
+          -0.07,
+          0.05
+        ]
+      }
+    }
+  ]
+}

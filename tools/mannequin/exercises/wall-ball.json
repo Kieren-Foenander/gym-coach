@@ -1,0 +1,244 @@
+{
+  "equipment": [
+    {
+      "type": "medicine-ball",
+      "radius": 0.112,
+      "wall_y": -0.875,
+      "wall_target": 2.06
+    }
+  ],
+  "hands": {
+    "Left": "cup",
+    "Right": "cup"
+  },
+  "stance": {
+    "width": 0.38,
+    "toe_out": 14
+  },
+  "frames": 212,
+  "camera": {
+    "angle": 107,
+    "elevation": 10
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.003,
+        0.914
+      ],
+      "lean": 5,
+      "ball": [
+        0,
+        -0.268,
+        1.245
+      ],
+      "ball_hands": [
+        0,
+        -0.268,
+        1.245
+      ],
+      "ball_hand_pitch": 56,
+      "ball_open": 0
+    },
+    {
+      "at": 0.12,
+      "pelvis": [
+        0,
+        0.044,
+        0.831
+      ],
+      "lean": 12,
+      "ball": [
+        0,
+        -0.33799999999999997,
+        1.16
+      ],
+      "ball_hands": [
+        0,
+        -0.33799999999999997,
+        1.16
+      ],
+      "ball_hand_pitch": 56,
+      "ball_open": 0
+    },
+    {
+      "at": 0.29,
+      "pelvis": [
+        0,
+        0.137,
+        0.57
+      ],
+      "lean": 25,
+      "ball": [
+        0,
+        -0.38,
+        0.953
+      ],
+      "ball_hands": [
+        0,
+        -0.38,
+        0.953
+      ],
+      "ball_hand_pitch": 55,
+      "ball_open": 0
+    },
+    {
+      "at": 0.4,
+      "pelvis": [
+        0,
+        0.092,
+        0.745
+      ],
+      "lean": 19,
+      "ball": [
+        0,
+        -0.394,
+        1.213
+      ],
+      "ball_hands": [
+        0,
+        -0.394,
+        1.213
+      ],
+      "ball_hand_pitch": 65,
+      "ball_open": 0
+    },
+    {
+      "at": 0.49,
+      "pelvis": [
+        0,
+        0.008,
+        0.921
+      ],
+      "lean": 5,
+      "ball": [
+        0,
+        -0.368,
+        1.72
+      ],
+      "ball_hands": [
+        0,
+        -0.368,
+        1.72
+      ],
+      "ball_hand_pitch": 75,
+      "ball_open": 0
+    },
+    {
+      "at": 0.54,
+      "pelvis": [
+        0,
+        0.004,
+        0.922
+      ],
+      "lean": 5,
+      "ball": [
+        0,
+        -0.47,
+        1.943
+      ],
+      "ball_hands": [
+        0,
+        -0.344,
+        1.731
+      ],
+      "ball_hand_pitch": 70,
+      "ball_open": 0.055
+    },
+    {
+      "at": 0.62,
+      "pelvis": [
+        0,
+        0.004,
+        0.916
+      ],
+      "lean": 5,
+      "ball": [
+        0,
+        -0.763,
+        2.06
+      ],
+      "ball_hands": [
+        0,
+        -0.327,
+        1.623
+      ],
+      "ball_hand_pitch": 65,
+      "ball_open": 0.072
+    },
+    {
+      "at": 0.7,
+      "pelvis": [
+        0,
+        0.007,
+        0.915
+      ],
+      "lean": 5,
+      "ball": [
+        0,
+        -0.57,
+        1.91
+      ],
+      "ball_hands": [
+        0,
+        -0.324,
+        1.61
+      ],
+      "ball_hand_pitch": 68,
+      "ball_open": 0.072
+    },
+    {
+      "at": 0.79,
+      "pelvis": [
+        0,
+        0.013,
+        0.903
+      ],
+      "lean": 7,
+      "ball": [
+        0,
+        -0.42300000000000004,
+        1.567
+      ],
+      "ball_hands": [
+        0,
+        -0.42300000000000004,
+        1.567
+      ],
+      "ball_hand_pitch": 72,
+      "ball_open": 0
+    },
+    {
+      "at": 0.9,
+      "pelvis": [
+        0,
+        0.019,
+        0.866
+      ],
+      "lean": 11,
+      "ball": [
+        0,
+        -0.379,
+        1.272
+      ],
+      "ball_hands": [
+        0,
+        -0.379,
+        1.272
+      ],
+      "ball_hand_pitch": 61,
+      "ball_open": 0
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0.29,
+      "knee": [
+        30,
+        128
+      ]
+    }
+  ]
+}

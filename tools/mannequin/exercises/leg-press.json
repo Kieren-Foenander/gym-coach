@@ -1,0 +1,89 @@
+{
+  "equipment": [
+    {
+      "type": "leg-sled",
+      "origin": [
+        0,
+        -0.39,
+        0.68
+      ],
+      "travel": [
+        0,
+        0.41
+      ]
+    },
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.07,
+        0.36
+      ],
+      "angle": 48,
+      "length": 0.84
+    }
+  ],
+  "stance": {
+    "width": 0.35,
+    "y": -0.39,
+    "toe_out": 0,
+    "knee_direction": {
+      "Left": [
+        0,
+        -0.16,
+        1
+      ],
+      "Right": [
+        0,
+        -0.16,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 100
+  },
+  "touching": [
+    "bench"
+  ],
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.07,
+        0.515
+      ],
+      "lean": -38,
+      "head": 18,
+      "sled": 0.018
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "sled": 0.377
+    },
+    {
+      "at": 0.56
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "knee": [
+        75,
+        145
+      ]
+    },
+    {
+      "at": 0.52,
+      "knee": [
+        7,
+        34
+      ]
+    }
+  ]
+}

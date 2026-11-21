@@ -1,0 +1,17 @@
+{
+  "equipment": [{"type": "landmine", "pivot": [-0.16, -1.761, 0.09], "attachment": "cross", "sides": ["Right"]}],
+  "stance": {"width": 0.4, "toe_out": 14},
+  "camera": {"angle": 79, "elevation": 12},
+  "keys": [
+    {"pelvis": [0, 0, 0.916], "lean": 4, "elbows": [0.45, -0.45, -1], "landmine_angles": [39, 0], "at": 0, "clavicle": [0, 3]},
+    {"at": 0.44, "landmine_angles": [52, 0], "lean": 12, "clavicle": [0, 8]},
+    {"at": 0.52},
+    {"at": 0.94, "landmine_angles": [39, 0], "lean": 4, "clavicle": [0, 3]}
+  ],
+  "checkpoints": [
+    {"at": 0, "side": "Right", "position": {"point": "handle", "x": [-0.26, -0.23], "z": [1.277, 1.307]}},
+    {"at": 0.44, "side": "Right", "position": {"point": "handle", "x": [-0.26, -0.23], "z": [1.579, 1.611]}, "elbow": [0, 14]},
+    {"at": 0, "side": "Right", "elbow": [135, 155]},
+    {"side": "Right", "handle_axis": {"direction": [1, 0, 0], "degrees": 3}}
+  ]
+}

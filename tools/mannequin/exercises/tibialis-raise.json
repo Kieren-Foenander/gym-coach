@@ -1,0 +1,105 @@
+{
+  "equipment": [
+    {
+      "type": "wall-support",
+      "face": [
+        0,
+        0.14,
+        0.835
+      ],
+      "size": [
+        0.64,
+        1.67
+      ],
+      "pitch": 90
+    }
+  ],
+  "stance": {
+    "width": 0.26,
+    "y": -0.27,
+    "toe_out": 4
+  },
+  "camera": {
+    "angle": 66,
+    "elevation": 4
+  },
+  "frames": 94,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0.034,
+        0.842
+      ],
+      "lean": 0,
+      "unloaded_arm": [
+        0.22,
+        0.15,
+        -1
+      ],
+      "unloaded_curl": 7,
+      "foot_left": [
+        0,
+        0,
+        0
+      ],
+      "foot_right": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.46,
+      "foot_left": [
+        0,
+        0,
+        -31
+      ],
+      "foot_right": [
+        0,
+        0,
+        -31
+      ],
+      "pelvis": [
+        0,
+        0.034,
+        0.866
+      ]
+    },
+    {
+      "at": 0.58
+    }
+  ],
+  "checkpoints": [
+    {
+      "knee": [
+        7,
+        35
+      ]
+    },
+    {
+      "at": 0.5,
+      "position": {
+        "point": "ToeBase",
+        "z": [
+          0.08,
+          0.18
+        ]
+      }
+    }
+  ],
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "heel_pivot": true,
+  "grounded_heels": [
+    "Left",
+    "Right"
+  ]
+}

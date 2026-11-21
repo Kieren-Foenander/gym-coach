@@ -1,0 +1,165 @@
+{
+  "equipment": [
+    {
+      "type": "bench",
+      "at": [
+        0,
+        0.58,
+        0.42
+      ],
+      "length": 0.28
+    }
+  ],
+  "stance": {
+    "width": 0.32,
+    "y": -0.366,
+    "toe_out": 4,
+    "knee_direction": {
+      "Right": [
+        -0.31,
+        -1,
+        0
+      ]
+    }
+  },
+  "camera": {
+    "angle": 85
+  },
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0.011,
+        0.17,
+        0.31
+      ],
+      "lean": -49,
+      "head": 6,
+      "unloaded_arm": [
+        0.71,
+        0.28,
+        -0.82
+      ],
+      "unloaded_curl": 14,
+      "foot_right": [
+        -0.247,
+        0.195,
+        13,
+        -0.054
+      ]
+    },
+    {
+      "at": 0.44,
+      "pelvis": [
+        0.011,
+        0.065,
+        0.503
+      ],
+      "lean": -90,
+      "head": 18,
+      "unloaded_arm": [
+        0.71,
+        0.28,
+        -0.82
+      ],
+      "unloaded_curl": 14,
+      "foot_right": [
+        -0.247,
+        0.317,
+        13,
+        -0.054
+      ]
+    },
+    {
+      "at": 0.52
+    },
+    {
+      "at": 0.95,
+      "pelvis": [
+        0.011,
+        0.17,
+        0.31
+      ],
+      "lean": -49,
+      "head": 6,
+      "unloaded_arm": [
+        0.71,
+        0.28,
+        -0.82
+      ],
+      "unloaded_curl": 14,
+      "foot_right": [
+        -0.247,
+        0.195,
+        13,
+        -0.054
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.295,
+          0.325
+        ]
+      }
+    },
+    {
+      "at": 0.48,
+      "position": {
+        "point": "Hips",
+        "z": [
+          0.493,
+          0.515
+        ]
+      },
+      "knee": [
+        85,
+        95
+      ],
+      "shin_vertical": 5,
+      "side": "Left"
+    },
+    {
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.28,
+          0.63
+        ]
+      },
+      "side": "Right"
+    },
+    {
+      "at": 0.48,
+      "side": "Left",
+      "position": {
+        "point": "Leg",
+        "relative_to": "UpLeg",
+        "z": [
+          -0.035,
+          0.035
+        ]
+      }
+    },
+    {
+      "at": 0.48,
+      "side": "Left",
+      "position": {
+        "point": "Shoulder",
+        "relative_to": "Hips",
+        "z": [
+          -0.03,
+          0.03
+        ]
+      }
+    }
+  ],
+  "touching": [
+    "bench"
+  ],
+  "bench_upper_back": true
+}

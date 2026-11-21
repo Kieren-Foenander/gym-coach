@@ -1,0 +1,156 @@
+{
+  "equipment": [],
+  "supine_support": {
+    "head_contact": [
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "hands": {
+    "Left": "relaxed",
+    "Right": "relaxed"
+  },
+  "stance": {
+    "width": 0.32,
+    "y": -0.53,
+    "toe_out": 5,
+    "knee_direction": {
+      "Left": [
+        0,
+        0,
+        1
+      ],
+      "Right": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "camera": {
+    "angle": 67,
+    "elevation": 17,
+    "margin": 1.25
+  },
+  "frames": 180,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        0,
+        0.092
+      ],
+      "lean": -90,
+      "head": 0,
+      "neck_retraction": 0.039,
+      "unloaded_arm": [
+        0.1,
+        1,
+        0
+      ],
+      "supine_leg_left": [
+        82,
+        83
+      ],
+      "supine_leg_right": [
+        82,
+        83
+      ],
+      "unloaded_arm_left": [
+        0.1,
+        1,
+        0
+      ],
+      "unloaded_arm_right": [
+        0.1,
+        1,
+        0
+      ]
+    },
+    {
+      "at": 0.25,
+      "supine_leg_left": [
+        17,
+        12
+      ],
+      "supine_leg_right": [
+        82,
+        83
+      ],
+      "unloaded_arm_right": [
+        0.13,
+        0.23,
+        1
+      ]
+    },
+    {
+      "at": 0.5,
+      "supine_leg_left": [
+        82,
+        83
+      ],
+      "supine_leg_right": [
+        82,
+        83
+      ],
+      "unloaded_arm_right": [
+        0.1,
+        1,
+        0
+      ]
+    },
+    {
+      "at": 0.75,
+      "supine_leg_left": [
+        82,
+        83
+      ],
+      "supine_leg_right": [
+        17,
+        12
+      ],
+      "unloaded_arm_left": [
+        0.13,
+        0.23,
+        1
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "position": {
+        "point": "Leg",
+        "z": [
+          0.44,
+          0.52
+        ]
+      }
+    },
+    {
+      "at": 0.25,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.2,
+          0.32
+        ]
+      },
+      "side": "Left"
+    },
+    {
+      "at": 0.75,
+      "position": {
+        "point": "Foot",
+        "z": [
+          0.2,
+          0.32
+        ]
+      },
+      "side": "Right"
+    }
+  ]
+}

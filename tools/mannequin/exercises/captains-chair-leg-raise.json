@@ -1,0 +1,21 @@
+{
+  "equipment": [{
+    "type": "captains-chair",
+    "grip": [0.237, -0.35, 1.321],
+    "forearm_pad": [-0.13, 1.263],
+    "back": [0, 0.104, 1.459]
+  }],
+  "camera": {"angle": 58, "elevation": 10},
+  "frames": 112,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.009, 1.164], "lean": 0, "supine_leg_left": [-89, 8], "supine_leg_right": [-89, 8]},
+    {"at": 0.12},
+    {"at": 0.46, "supine_leg_left": [-4, 87], "supine_leg_right": [-4, 87]},
+    {"at": 0.58}
+  ],
+  "checkpoints": [
+    {"elbow": [70, 112]},
+    {"at": 0.52, "position": {"point": "Leg", "relative_to": "UpLeg", "y": [-0.45, -0.36], "z": [-0.065, 0.04]}},
+    {"at": 0.52, "knee": [80, 95]}
+  ]
+}

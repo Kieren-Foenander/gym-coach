@@ -1,0 +1,71 @@
+{
+  "equipment": [
+    {
+      "type": "leg-roller",
+      "side": "Left",
+      "roller_offset": [
+        0,
+        0.1025,
+        -0.34
+      ],
+      "travel": [
+        -5,
+        105
+      ],
+      "thigh_pitch": -75,
+      "support_grip": [
+        0.29,
+        -0.31,
+        1.13
+      ]
+    }
+  ],
+  "stance": {
+    "width": 0.33,
+    "toe_out": 9
+  },
+  "camera": {
+    "angle": 115
+  },
+  "frames": 108,
+  "keys": [
+    {
+      "at": 0,
+      "pelvis": [
+        0,
+        -0.025,
+        0.92
+      ],
+      "lean": 10,
+      "lever_angle": 8
+    },
+    {
+      "at": 0.1
+    },
+    {
+      "at": 0.47,
+      "lever_angle": 94
+    },
+    {
+      "at": 0.57
+    }
+  ],
+  "checkpoints": [
+    {
+      "at": 0,
+      "side": "Left",
+      "knee": [
+        0,
+        24
+      ]
+    },
+    {
+      "at": 0.52,
+      "side": "Left",
+      "knee": [
+        75,
+        115
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "equipment": [{"type": "barbell"}],
+  "stance": {"width": 0.39, "toe_out": 22},
+  "camera": {"angle": 44},
+  "touching": ["bar"],
+  "hands": {"Left": "cup", "Right": "cup"},
+  "rack_contact": {"wrist": [0.39, 0.011, 0.048], "along": [1, -0.6, 0.3], "palm": [0, 0, -1]},
+  "keys": [
+    {"at": 0, "pelvis": [0, 0, 0.925], "lean": 2, "bar": {"at": "shoulders", "offset": [0, 0.108, 0.0605]}, "elbows": [0.5, 1, 0.28]},
+    {"at": 0.46, "pelvis": [0, 0.147, 0.45], "lean": 23, "head": -12},
+    {"at": 0.54}
+  ],
+  "checkpoints": [
+    {"elbow": [115, 130], "handle_axis": {"direction": [1, 0, 0], "degrees": 2}},
+    {"position": {"point": "ForeArm", "relative_to": "Arm", "y": [-0.25, -0.20], "z": [-0.11, 0.02]}},
+    {"side": "Left", "position": {"point": "handle", "y": [-0.15, -0.12]}},
+    {"at": 0, "position": {"point": "Hips", "z": [0.91, 0.94]}},
+    {"at": 0.5, "position": {"point": "UpLeg", "relative_to": "Leg", "z": [-0.10, 0]}}
+  ]
+}
