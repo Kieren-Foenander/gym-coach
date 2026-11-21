@@ -1,5 +1,5 @@
 /** The camera views a demonstration can be rendered from, and what each adds to the file name. */
-export const DEMO_VIEWS = { front: "", back: "-rear", muscles: "-muscles" } as const
+export const DEMO_VIEWS = { front: "", back: "-rear" } as const
 
 export type DemoView = keyof typeof DEMO_VIEWS
 
@@ -13,14 +13,14 @@ export interface ExerciseDemo {
 }
 
 /**
- * Rendered demonstrations, made with tools/blender. To add one, render it to
- * public/exercises/<slug>.mp4 and .webp (the slug is in src/domain/catalog.ts) and list it here.
- * The muscles shown beside it come from the library entry.
+ * Rendered demonstrations, made with tools/mannequin from the specs in tools/mannequin/exercises.
+ * To add one, render it to public/exercises/<slug>.mp4 and .webp (the slug is in src/domain/catalog.ts)
+ * and list it here. The muscles that glow in it, and are listed beside it, come from the library entry.
  */
 const DEMOS: ReadonlyArray<ExerciseDemo> = [
   {
     slug: "dumbbell-curl",
-    views: ["front", "muscles"],
+    views: ["front"],
     cues: [
       "Stand tall with your elbows pinned to your sides.",
       "Curl both dumbbells up without swinging your body.",
@@ -28,8 +28,17 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
     ],
   },
   {
+    slug: "bench-press",
+    views: ["front"],
+    cues: [
+      "Plant your feet and draw your shoulder blades back against the bench.",
+      "Lower the bar to your mid chest with your wrists over your elbows.",
+      "Press up and slightly back over your shoulders, keeping your hips on the bench.",
+    ],
+  },
+  {
     slug: "squat",
-    views: ["front", "back", "muscles"],
+    views: ["front", "back"],
     cues: [
       "Set the bar across your upper back, feet a little wider than your hips with toes turned out.",
       "Sit your hips back and down, knees tracking over your toes, until your thighs are level.",
@@ -38,7 +47,7 @@ const DEMOS: ReadonlyArray<ExerciseDemo> = [
   },
   {
     slug: "deadlift",
-    views: ["front", "back", "muscles"],
+    views: ["front", "back"],
     cues: [
       "Set your feet about hip-width apart and grip the bar just outside your legs.",
       "Brace, keep your arms straight, and push through your feet as your hips and shoulders rise.",

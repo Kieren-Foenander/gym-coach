@@ -130,27 +130,6 @@ function SettingsPage() {
         </form>
       </Card>
 
-      <SectionTitle>Credits</SectionTitle>
-      <Card>
-        <p className="text-sm text-muted">
-          The muscles in the exercise demonstrations come from{" "}
-          <a className="font-semibold text-accent" href="https://www.z-anatomy.com/" target="_blank" rel="noreferrer">
-            Z-Anatomy
-          </a>
-          , the libre 3D atlas of anatomy, which builds on BodyParts3D by the Database Center for Life Science. The
-          demonstration videos are shared under the same licence,{" "}
-          <a
-            className="font-semibold text-accent"
-            href="https://creativecommons.org/licenses/by-sa/4.0/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            CC BY-SA 4.0
-          </a>
-          .
-        </p>
-      </Card>
-
       <SectionTitle>Account</SectionTitle>
       <Card>
         <p className="pb-3 text-muted">Signed in as {user.email}</p>

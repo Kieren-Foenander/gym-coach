@@ -1,0 +1,220 @@
+# Mannequin demonstrations
+
+A satin silver figure performs each exercise. Worked muscles take on a muted rose colour;
+primary muscles receive the full pigment and secondary muscles a lighter tint. Each movement
+is a JSON spec and uses the same cached rig, shaders, equipment and frame checks.
+
+```sh
+tools/mannequin/render.sh dumbbell-curl --check-only
+OUT=/tmp/mannequin-review tools/mannequin/render.sh squat --sheet
+OUT=/tmp/mannequin-review tools/mannequin/render.sh squat --sheet --angle 90
+OUT=/tmp/mannequin-review tools/mannequin/render.sh squat --sheet --focus LeftHand
+tools/mannequin/render.sh squat
+tools/mannequin/render.sh squat --view back
+tools/mannequin/render.sh --library             # render every shipped slug and view, including posters
+tools/mannequin/render.sh --verify-rig          # shoulder, elbow, grip and deadlift regressions
+```
+
+Run on Linux with Blender 5.2, the MPFB extension (MakeHuman, for the body and the fists),
+ffmpeg with libx264, libwebp and drawtext, bun and flock. Nothing needs downloading: MPFB
+makes the figure. Built scenes live in `$XDG_DATA_HOME/gym-trainer` (default
+`~/.local/share/gym-trainer`), and building one takes about a minute. Scene cache keys include
+the build script and Blender version. Concurrent jobs share the completed scene. If you change the installed
+MPFB assets, remove the corresponding directory under `gym-trainer/scenes` to rebuild.
+
+## Adding an exercise
+
+1. Find the slug in `src/domain/catalog.ts`. The renderer reads the primary and secondary muscles there.
+2. Copy the closest spec in `exercises/`. Express movement in terms of the body or apparatus.
+   The bar position can follow a torso landmark, and a curl interpolates a bend about the elbow.
+   Place keys at extrema and pauses. Intermediate keys are only needed to control a distinct part of the path.
+3. Run `render.sh <slug> --check-only`. Review the reported worst frame ranges before rendering.
+4. Render a sheet with `OUT=/tmp/mannequin-review`. Inspect the range of motion, each hand,
+   moving joints and equipment contacts from both sides. For instance, for the left elbow use
+   `--sheet --focus LeftForeArm --focus-distance 0.68 --angle 270`. A bone's head is the camera
+   target (the forearm starts at the elbow). Changing the distance on a hand frames the middle of the fist.
+5. Render the loop and poster, inspect the motion through its restart, and register the slug,
+   shipped views and three cues in `src/domain/demos.ts`. That registry also drives
+   `render.sh --library`. Set `OUT` on the library command to stage a complete media refresh.
+
+### Extending equipment
+
+The supported equipment types are `barbell`, `dumbbells` and `bench`. Unsupported types fail
+before rendering. Keep exercise JSON focused on the setup and movement. Put geometry, handle
+axes, travel limits and contact checks in the shared equipment implementation. Existing bar
+and dumbbell classes provide examples of grip targets and collision measurements.
+
+For the first cable exercise, model the pulley exit and moving handle as explicit anchors.
+Both the visible cable segment and the tension direction should use those anchors. For a
+machine, define its hinge or slide, limits, pads and handle in the apparatus's local coordinates.
+Drive the handle from the mechanism and solve the body to that handle. Add a known-good motion
+and a deliberately bad travel or contact case when introducing each apparatus. A subsequent
+exercise using the same apparatus should only need a spec. The current closed fists require
+a straight 28 mm grip; ropes, open hands and other handle diameters need their own grip geometry.
+
+### Choosing a colour
+
+```sh
+OUT=/tmp/mannequin-review tools/mannequin/render.sh dumbbell-curl --palette \
+  --angle 24 --focus Spine2 --focus-distance 1.95
+```
+
+This renders all four pigments on the same quarter-cycle frame, with fixed camera, lighting,
+exposure and muscle weights. The comparison uses brick, coral,
+rose and peony. Set `DEFAULT_PIGMENT` in `build.py` to choose another for the whole library.
+The shader mixes pigment into the base colour and adds a small emission component so surface
+shading stays visible. Broad area lights, jittered soft shadows, a low-contrast reflection
+environment and the AgX view transform provide the studio finish.
+
+## Coordinates
+
+Metres. The floor is z = 0. The figure faces -Y, so +Y is behind it, and its left is +X.
+The figure is 1.62 tall. Standing straight, the pelvis (`Hips`) is at z ≈ 0.925 and the hip
+joints at 0.87, the shoulder joints at 1.29. Thigh 0.39, shin 0.42, upper arm 0.24, forearm 0.25. Lying on a bench whose pad
+top is at z, the pelvis goes at about z + 0.145.
+
+## The spec
+
+```jsonc
+{
+  "equipment": [{ "type": "barbell" }, { "type": "bench", "at": [0, 0.35, 0.45] }],   // bench "at" = middle of the pad's top; or { "type": "dumbbells" }
+  "stance": { "width": 0.34, "y": 0, "toe_out": 20 },  // ankles' spacing, how far forward, toe angle in degrees
+  "camera": { "angle": 35, "elevation": 12 },          // degrees round from the front, and above the horizon
+  "touching": ["bar", "bench"],                        // fail unless these come within 2 cm of the body
+  "frames": 96,
+  "keys": [ ... ]                                      // see below
+}
+```
+
+Each key is a pose at a point through the loop (`at`, 0 to 1). A key keeps everything it leaves out
+from the key before, so `{ "at": 0.52 }` holds the previous pose. After the last key the
+motion returns to the first. Numeric channels use periodic, shape-preserving cubic Hermite
+interpolation. Each component carries velocity through travel keys, goes to zero at a
+reversal, and stays exactly constant through a hold. Tangent lengths account for unequal
+key spacing. Landmark positions are resolved in the current torso frame before blending.
+
+| field | meaning |
+| --- | --- |
+| `pelvis` | `[x, y, z]` of the pelvis |
+| `shoulder_y` | alternative to `pelvis` for a square, suspended barbell pull. Set the world Y coordinate between the shoulders and give `bar` in world coordinates. The rig derives pelvis height from bar height, grip width and arm length, keeping the arms long |
+| `clavicle` | optional pair of angles in degrees, retraction and elevation, applied on each side before hand IK |
+| `lean` | degrees the body pitches forward from the hips. -90 lies on the back with the head towards +Y |
+| `spine` | extra forward bend of the spine, degrees (negative arches) |
+| `head` | nod, degrees (negative looks up) |
+| `yaw` | turns the whole body about the vertical |
+| `bar` | where the bar's middle is: `[x, y, z]`, or `{ "at": landmark, "offset": [side, forward, up] }` measured on the torso |
+| `grip_width` | from the bar's middle to each hand |
+| `grip` | `pronated` (overhand), `supinated` (underhand) or `neutral`. A hand on a bar always turns so the bar runs straight through its fist |
+| `elbows` | which way the elbows point, `[out, forward, up]` on the torso. Default `[0.4, -0.6, -0.5]`: out, back and down (`[0.1, -0.3, -1]` with dumbbells) |
+| `upper_arm` | with dumbbells: which way the upper arm points, `[out, forward, up]` on the torso |
+| `curl` | with dumbbells: how far the elbow is bent, in degrees from straight. The hand travels round the elbow between keys, so a curl needs only a bottom and a top key |
+
+With a barbell, each key places the bar (`bar`, `grip_width`) and the arms reach for it. With
+`dumbbells`, each key sets the arms (`upper_arm`, `curl`) and a dumbbell goes in each fist, its
+handle running across the body. `exercises/deadlift.json` holds a bar on the floor with `bar` given
+as `[x, y, z]`; `exercises/dumbbell-curl.json` shows the dumbbell fields.
+
+Landmarks move with the torso, so a bar `{ "at": "chest" }` stays on the chest when the body
+lies down or leans: `upper back` (where a squat bar sits), `chest` (where a bench bar touches),
+`shoulders` (between the shoulder joints). The knees always point the way the toes do.
+
+## Checks
+
+These run on every frame before anything renders:
+
+- a hand or ankle can't reach its target
+- posed skin triangles cross on non-adjacent faces. The check ignores face pairs already crossing at rest and reports the smaller of the two inward plane depths in centimetres. The allowance is 1 cm between regions separated by at least 15 cm at rest and 2 cm for local folds
+- the body goes through the floor
+- the bar's shaft or a plate passes through the body (hands are allowed round the shaft)
+- a hand misses the bar: the bar must run through the middle of the fist
+- any **finished fist triangle**, including its edges and interior, penetrates the shaft by
+  more than 0.2 mm (not just a bone or base-mesh vertex test)
+- the actual fist cavity is skew to the shaft, or a wide grip reaches a collar
+- at any of the four digits, fewer than 24 of 32 radial probes hit skin within 1 cm of the
+  shaft surface, or its nearest contact patch is more than 3 mm away
+- the wrist bends more than 40 degrees from the forearm (reported in degrees)
+- an elbow's tracked skin cross-section falls below 75% or exceeds 135% of its rest area.
+  The check intersects the rest cage's edges with a plane through the hinge and measures the
+  same ordered points on each deformed frame. It measures the loop's projected area, a proxy
+  for pinching or swelling at the joint
+- pec, deltoid or armpit skin stretches excessively. The check follows rest-cage edges on
+  each side of the body, in patches measured from the shoulder joint. It bounds the 95th
+  percentile of local edge-length ratios at 1.55× rest length on the pec and 2.1× at the armpit,
+  and the 99th percentile on the deltoid at 2.9×. MakeHuman's long shoulder edges stretch that
+  far in a bench press without the surface distorting, so the pec patch is the one that catches
+  a twisted upper arm
+- skin passes through skin. Triangles that cross on a posed frame but not at rest are measured
+  by depth: up to 1 cm between distant parts, 2 cm within a local fold, and 3 cm across a bent
+  hip, knee or elbow, where real flesh presses together inside a closed crease (belly against
+  thigh, calf against hamstring, forearm against biceps)
+- an elbow tucks in behind the back (the arm would pass through the body)
+- an elbow, wrist, knee or ankle jumps more than 4 cm between frames, or where the loop restarts
+  (the arm solver flicking between two answers looks like this)
+- the body sinks more than 2.5 cm into a bench pad
+- a dumbbell's handle or head passes through the body, or a fist is wider than the handle
+- anything in `touching` never comes within 2 cm of the body
+
+The camera frames the whole movement automatically. With `--focus`, both sheets and videos
+track the bone through the baked movement with a fixed viewing direction. Focused sheets
+render at full resolution with 48 samples. Ordinary sheets stay small. `--focus-distance 0.3` moves the close-up
+camera nearer (metres), useful when the opposite shoulder or a plate blocks the hand.
+For an outside side view use `--angle 270 --focus LeftHand --focus-distance 0.3`, or
+`--angle 90 --focus RightHand --focus-distance 0.3`. `GRIP CHECKS` reports worst penetration, contact
+gap, wrist angle, and minimum angular coverage over the whole movement. Geometry is checked
+in the actual fist object's frame, independently of the IK target, on **every** animation frame.
+For speed, identical rigid contact relationships reuse the triangle/ray result, keyed to one
+micrometre; changes in attachment or orientation invalidate it. The wrist angle is always
+measured afresh.
+
+`render.sh --verify-rig` exercises moving grip widths with all three grips and checks that
+displaced fists fail. The elbow test reintroduces linear skinning and wrist roll at peak curl
+flexion. The shoulder test bakes the original narrow-grip squat, then puts full humeral twist
+back onto the deltoid at standing and depth. It requires the pec check to fail on both sides.
+The deadlift regression measures the baked bar speed through knee height on both passes, floor and lockout holds, bar drift, clearance to the leg surface, elbow angle and the
+relative rise of the hips and shoulders off the floor.
+
+The rigid grips fit a **28 mm shaft**. Changing the equipment diameter requires rebuilding the grip geometry. Unreachable
+poses and unnatural wrist angles are rejected rather than stretching the hand or forearm.
+The straight shaft constrains the palm rotation: `neutral` selects the nearest compatible roll;
+true palms-facing grips need parallel handles, which this barbell model does not yet provide.
+
+## How it is made
+
+The figure is a MakeHuman man (CC0), made by `build.py` through the MPFB extension and scaled
+so his hip joints are at 0.87 m. MakeHuman bodies come with a skeleton and skin weights made to
+bend, so nothing guesses where the joints are or how the skin follows them. `build.py` puts a
+smaller skeleton with Mixamo's bone names on MakeHuman's joints, and each of its bones takes
+over the skin of the MakeHuman bones it stands for. MakeHuman's two-part upper arm and forearm
+become `ArmSwing` and `Arm` (the upper arm's swing, then its twist) and `ForeArm` and
+`ForeArmRoll` (the forearm, then its twist towards the wrist). The skin deforms with
+volume-preserving skinning. Renders smooth it with two levels of subdivision; the checks use
+the plain surface. MakeHuman's helper geometry (teeth, tongue, clothes-fitting shells) is
+removed; the eyes stay.
+
+The build then paints each muscle group from `catalog.ts` as a soft region on the surface,
+measures the torso landmarks, palms and ankle height onto the rig, and saves the lit stage.
+Muscle regions were first drawn on a figure with different proportions; each point's height
+is mapped onto that figure between the knees, hip joints, neck and crown before they are
+applied.
+
+The hands are **closed fists that never change shape**, so a grip can never deform badly.
+Each comes from the same MakeHuman man: individual phalanx targets close all four fingers
+around a shared virtual shaft, and the thumb opposes at its base, then bends across the index
+and middle fingers. The build subdivides and freezes the surface, seats contact patches on a
+28 mm cylinder, closes the wrist cut, and remeshes at 0.8 mm to remove folded skin overlaps. It
+then relaxes the surface and cuts the final cylindrical cavity with 0.15 mm nominal clearance,
+using Blender's manifold boolean solver (the exact solver runs out of memory on this mesh).
+The build rejects open or inverted surfaces. Each finished fist is rigidly parented to its hand
+bone and uses the body's silver material. A dark fabric wrap, sized from the forearm and the
+fist's cut end, covers each wrist and bends between the hand and forearm.
+
+The solver aligns the elbow hinge to the flexion plane and limits upper-arm twist to 35
+degrees relative to swing, with the same excess-twist correction around the proximal forearm.
+The warm-started wrist/elbow iteration and the 4 cm joint-jump checks are retained. All
+fitting is shared, with no exercise-specific hand offsets or poses. Overhand and underhand
+orientation follow the handle and wrist axes.
+
+`animate.py` poses the skeleton directly with two-bone solving for the arms and legs, keys every
+frame, runs the checks, and renders with Eevee.
+
+MakeHuman's assets are CC0, so the renders need no credit.
