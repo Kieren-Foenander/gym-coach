@@ -33,6 +33,18 @@ const VARIANTS = {
 
 const variant = VARIANTS[APP_VARIANT]
 
+// Where the app looks for your account unless you type another address when signing in.
+const DEFAULT_SERVER_URL = process.env.EXPO_PUBLIC_GYM_SERVER_URL ?? "https://gym.kfoenander98.workers.dev"
+
+// A build for the end-to-end tests signs in to a server on the same machine over plain http. Builds for the
+// real server use https.
+const END_TO_END_BUILD = DEFAULT_SERVER_URL.startsWith("http://")
+
+// An Android release build refuses plain http unless allowed; builds for the real server stay refusing it.
+const TEST_BUILD_PLUGINS: NonNullable<ExpoConfig["plugins"]> = END_TO_END_BUILD
+  ? [["expo-build-properties", { android: { usesCleartextTraffic: true } }]]
+  : []
+
 const INK = "#08090b"
 const ACCENT = "#d7ff3e"
 
@@ -68,6 +80,16 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "expo-sqlite",
     "expo-video",
+    // Reads bodyweight, workouts, sleep and heart data from Apple Health. Gym never writes to Health.
+    [
+      "@kingstinct/react-native-healthkit",
+      {
+        NSHealthShareUsageDescription:
+          "Gym reads your bodyweight, body fat, waist, workouts, heart rate, sleep, steps, VO2 max and the food you track to log them and to help your coach judge recovery and eating.",
+        NSHealthUpdateUsageDescription: false,
+        background: false,
+      },
+    ],
     [
       "expo-notifications",
       { icon: "./assets/notification-icon.png", color: ACCENT, defaultChannel: "rest" },
@@ -85,15 +107,20 @@ const config: ExpoConfig = {
         widgets: [],
       },
     ],
+    ...TEST_BUILD_PLUGINS,
   ],
   experiments: {
     reactCompiler: true,
   },
   extra: {
     appVariant: APP_VARIANT,
-    // Where the app looks for your account unless you type another address when signing in.
-    defaultServerUrl: process.env.EXPO_PUBLIC_GYM_SERVER_URL ?? "https://gym.kfoenander98.workers.dev",
+    defaultServerUrl: DEFAULT_SERVER_URL,
+    // Read by src/lib/build.ts.
+    endToEndBuild: END_TO_END_BUILD,
+    // The EAS project builds and cloud simulator sessions run under.
+    eas: { projectId: "40998394-874e-41ed-82c0-7977979091e5" },
   },
+  owner: "kierenfoenander",
 }
 
 export default config

@@ -1,5 +1,7 @@
 import { isRedirect, useRouter } from "@tanstack/react-router"
 import { CloseIcon } from "./icons"
+import { Predicate } from "effect"
+import { testIds } from "~/domain/test-ids"
 import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react"
 
 const BUTTON_BASE =
@@ -27,8 +29,27 @@ export function Button({ variant = "secondary", className = "", type = "button",
   return <button type={type} className={buttonClass(variant, className)} {...props} />
 }
 
+/** Card styling for elements that are not a plain section, such as a card that is a link. */
+export const cardClass = "rounded-3xl border border-white/5 bg-surface p-4"
+
 export function Card({ children, className = "" }: { readonly children: ReactNode; readonly className?: string }) {
-  return <section className={`rounded-3xl border border-white/5 bg-surface p-4 ${className}`}>{children}</section>
+  return <section className={`${cardClass} ${className}`}>{children}</section>
+}
+
+/** The way back at the top of a page. Goes back in history, or to `fallback` when the page was opened directly. */
+export function BackButton({ fallback }: { readonly fallback: "/" | "/exercises" }) {
+  const router = useRouter()
+
+  const back = () => {
+    if (router.history.canGoBack()) router.history.back()
+    else void router.navigate({ to: fallback })
+  }
+
+  return (
+    <button type="button" className="eyebrow inline-flex min-h-11 items-center text-accent" onClick={back}>
+      ‹ Back
+    </button>
+  )
 }
 
 interface PageTitleProps {
@@ -62,12 +83,18 @@ interface StatProps {
   readonly label: string
   readonly value: ReactNode
   readonly unit?: string
+  /** From src/domain/test-ids.ts. A number shown is also put in `data-value` for tests. */
+  readonly testId?: string
 }
 
 /** One headline number with a label under it. */
-export function Stat({ label, value, unit }: StatProps) {
+export function Stat({ label, value, unit, testId }: StatProps) {
   return (
-    <div className="rounded-2xl bg-raised/70 px-3 py-3">
+    <div
+      className="rounded-2xl bg-raised/70 px-3 py-3"
+      data-testid={testId}
+      data-value={Predicate.isNumber(value) || Predicate.isString(value) ? value : undefined}
+    >
       <p className="display tabular text-3xl">
         {value}
         {unit ? <span className="pl-1 text-base text-muted">{unit}</span> : null}
@@ -141,6 +168,8 @@ export const parseNumber = (text: string): number | null => {
 }
 
 interface StepperProps {
+  /** From src/domain/test-ids.ts. Its buttons and field are `stepper.*` inside it. */
+  readonly testId?: string
   readonly label: string
   readonly value: string
   readonly step: number
@@ -149,7 +178,7 @@ interface StepperProps {
 }
 
 /** A number field with large minus and plus buttons either side, sized for a thumb mid-workout. */
-export function Stepper({ label, value, step, decimal = false, onChange }: StepperProps) {
+export function Stepper({ testId, label, value, step, decimal = false, onChange }: StepperProps) {
   const nudge = (direction: number) => {
     const next = Math.max(0, (parseNumber(value) ?? 0) + direction * step)
 
@@ -157,12 +186,13 @@ export function Stepper({ label, value, step, decimal = false, onChange }: Stepp
   }
 
   return (
-    <div>
+    <div data-testid={testId}>
       <span className="eyebrow mb-1.5 block text-center text-xs text-faint">{label}</span>
       <div className="flex items-center gap-1 rounded-2xl bg-ink p-1">
         <button
           type="button"
           aria-label={`Less ${label}`}
+          data-testid={testIds.stepper.less}
           onClick={() => nudge(-1)}
           className="size-12 shrink-0 rounded-xl bg-raised text-2xl text-white transition active:scale-95 active:bg-line"
         >
@@ -170,6 +200,7 @@ export function Stepper({ label, value, step, decimal = false, onChange }: Stepp
         </button>
         <input
           aria-label={label}
+          data-testid={testIds.stepper.input}
           inputMode={decimal ? "decimal" : "numeric"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -179,6 +210,7 @@ export function Stepper({ label, value, step, decimal = false, onChange }: Stepp
         <button
           type="button"
           aria-label={`More ${label}`}
+          data-testid={testIds.stepper.more}
           onClick={() => nudge(1)}
           className="size-12 shrink-0 rounded-xl bg-raised text-2xl text-white transition active:scale-95 active:bg-line"
         >

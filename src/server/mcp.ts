@@ -3,10 +3,17 @@ import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import { HttpRouter, HttpServer } from "effect/http"
 import { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
+import { connectorName, isTestStage } from "~/domain/coach-apps"
 import { EQUIPMENT, mergeLibrary, MUSCLES, searchLibrary } from "~/domain/catalog"
+import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
+import { daysAround, shiftDay } from "~/domain/days"
+import { groupByDay, isTotalsEmpty, NUTRIENT_INFO, TARGET_LIMITS } from "~/domain/nutrition"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
+import { describeGoal } from "~/domain/streaks"
 import {
+  describedDay,
   ExercisePrescription,
+  FoodInput,
   Id,
   MeasurementInput,
   measurementUnit,
@@ -16,9 +23,11 @@ import {
   SetInput,
 } from "~/domain/schema"
 import { Invalid, type DomainError } from "./errors"
+import * as Health from "./health"
+import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
-import { DbLive } from "./runtime"
+import { DbLive, stage } from "./runtime"
 
 const INSTRUCTIONS = `This server is the user's gym training log. You are acting as their strength coach.
 
@@ -29,13 +38,16 @@ How the app works:
 - The user logs sets in the app on their phone. All weights are in the unit given in the profile.
 - A set may carry an rpe: the user's effort rating from 6 to 10, where 10 means nothing left. Use it when judging whether a weight is right.
 - The user can swap an exercise for one workout when equipment is taken. Those sets appear in history under the stand-in exercise and do not change the plan.
-- The user can also log bodyweight and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
+- The user can also log bodyweight, body fat and tape measurements (waist, chest, hips, arm, thigh). Read them with get_body_measurements; record one the user tells you with log_body_measurement.
+- If the user connected Apple Health in the iPhone app, bodyweight, body fat and waist arrive from it on their own, and so do cardio workouts (from an Apple Watch, say), which appear in history named after the exercise with the note "From Apple Health". get_health_metrics returns their daily sleep, resting heart rate, HRV, steps, active energy, VO2 max and the food a tracker wrote to Health (the same food get_nutrition counts, not more of it), and every workout Health recorded, including sports the log does not show. Use sleep and resting heart rate or HRV against their usual levels when judging recovery, and the other activity when judging total load. It returns nothing if Apple Health is not connected.
+- The user can keep a food log: each entry is a meal, a snack or a day's total with calories and, when known, protein, carbs and fat in grams. When the user tells you what they ate, estimate it and record it with log_food on their own calendar day; say what you estimated. get_nutrition returns each day's totals against their calorie and protein targets, which you can set with update_profile. Food from a tracker that writes to Apple Health (MyFitnessPal, Cronometer and so on) is counted in each day's totals as well, shown apart as "health", so do not log the same meals again. Judge intake against the bodyweight trend from get_body_measurements and the user's goal.
 - An "Open workout" follows no plan day: the user added exercises as they went.
 - When a workout is finished the app applies its own rule to every exercise with autoProgress on: all prescribed sets at the top of the rep range adds one increment; ${MISSES_BEFORE_DELOAD} sessions in a row where half or more of the sets miss the bottom of the range drops the weight ${Math.round((1 - DELOAD_FACTOR) * 100)}%. A null target weight means "find it in the first session".
 - Your changes sit on top of that rule. Use update_plan_exercise for targeted changes and always give a short reason: the user sees it in the app next to the change.
 - Cardio (search_exercise_library with muscle "Cardio") is logged by time, not load: a cardio set has weight 0, reps 0, a durationSeconds and optionally a distance, in km when the unit is kg and miles when it is lb. In a plan, a cardio exercise's sets are rounds; put the target time or pace in its notes. The progression rule skips cardio.
 - The app has a built-in exercise library. Before adding an exercise to a plan, find it with search_exercise_library and use that exact name. A name the library does not have still works, but shows no muscles or demonstration.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.
+- Streak goals decide what the app's calendar and streak count: each goal is an activity ("training" is any workout except walks, "walking" is walks only, "any" is both) and how often (every day, or a number of days a week). There are one or two, the first leading. A walk is a workout whose only exercise is "Walk". When the user says what they want to keep up, such as walking daily or lifting three times a week, set it with update_profile streakGoals.
 - Use add_coach_note for a short message the user should see on the app's home screen, such as the focus for the coming week.
 - Base advice on the logged data. If there is little history, say so and ask about goals, schedule, equipment and injuries, then save what you learn with update_profile.`
 
@@ -133,7 +145,7 @@ const RemovePlanExercise = Tool.make("remove_plan_exercise", {
 
 const UpdateProfile = Tool.make("update_profile", {
   description:
-    "Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept.",
+    `Save what you learn about the user: goal, and training context such as schedule, equipment, injuries and preferences. These replace the stored text, so include what should be kept. Also sets the daily calorie target (${TARGET_LIMITS.calories.min}-${TARGET_LIMITS.calories.max} kcal) and protein target (grams) for the food log; null clears one. streakGoals replaces the one or two goals the calendar's streaks count.`,
   parameters: ProfilePatch,
   success: Schema.Unknown,
   ...options,
@@ -187,7 +199,54 @@ const LogBodyMeasurement = Tool.make("log_body_measurement", {
   ...options,
 }).annotate(Tool.Destructive, false)
 
+const GetNutrition = Tool.make("get_nutrition", {
+  description:
+    "The food log: for each day with anything eaten, the totals (calories in kcal, protein, carbs and fat in grams), split into what was logged in the app and what came from Apple Health, and each entry logged in the app with its id. Also the user's daily calorie and protein targets. Newest day first.",
+  parameters: Schema.Struct({
+    days: Schema.optional(describe(Schema.Int, "How many days back to look, today included. Default 14, at most 90.")),
+    today: Schema.optional(
+      describedDay(
+        "The user's own calendar day today, as YYYY-MM-DD, when you know it. Without it the server, which does not know their time zone, looks a day either side so today is always included.",
+      ),
+    ),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
+const LogFood = Tool.make("log_food", {
+  description:
+    "Record a meal, snack or a whole day's eating that the user describes. Estimate calories, and protein, carbs and fat in grams, from what they said; leave out a macro you cannot judge. Tell the user what you estimated.",
+  parameters: Schema.Struct({
+    day: describedDay("The user's own calendar day it was eaten on, as YYYY-MM-DD. Ask if you are not sure of it."),
+    ...FoodInput.fields,
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, false)
+
+const DeleteFood = Tool.make("delete_food", {
+  description: "Remove an entry from the food log, such as one logged twice or with the wrong amounts. Get its id from get_nutrition.",
+  parameters: Schema.Struct({ foodId: Id }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, true)
+
+const GetHealthMetrics = Tool.make("get_health_metrics", {
+  description:
+    "Daily numbers from Apple Health (sleep, resting heart rate, HRV, steps, active energy, VO2 max, and calories and macros eaten when a food tracker writes them), newest day first, and every workout Health recorded with its heart rate and energy. Today's steps and active energy are still adding up. Empty if the user has not connected Apple Health.",
+  parameters: Schema.Struct({
+    days: Schema.optional(describe(Schema.Int, "How many days back to look. Default 14, at most 90.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
 export const GymToolkit = Toolkit.make(
+  GetNutrition,
+  LogFood,
+  DeleteFood,
+  GetHealthMetrics,
   GetBodyMeasurements,
   LogBodyMeasurement,
   GetOverview,
@@ -214,6 +273,9 @@ const profileOf = (user: User) => ({
   unit: user.unit,
   goal: user.goal,
   trainingContext: user.trainingContext,
+  calorieTarget: user.calorieTarget,
+  proteinTarget: user.proteinTarget,
+  streakGoals: user.streakGoals.map((goal) => ({ ...goal, described: describeGoal(goal) })),
 })
 
 export const GymHandlers = GymToolkit.toLayer(
@@ -361,16 +423,77 @@ export const GymHandlers = GymToolkit.toLayer(
           }),
         ),
       log_workout: (input) => run(Effect.map(Repo.logPastWorkout(input), (workoutId) => ({ workoutId }))),
+      get_nutrition: ({ days, today }) =>
+        run(
+          Effect.gen(function* () {
+            const span = clamp(days, 14, 90)
+            // Without the user's day, reach from a day before today anywhere to a day after it.
+            const around = daysAround(yield* Clock.currentTimeMillis)
+            const range = today === undefined ? { from: shiftDay(around.from, 1 - span), to: around.to } : { from: shiftDay(today, 1 - span), to: today }
+            const nutrition = yield* Nutrition.getNutrition(range.from, range.to)
+            const entriesByDay = groupByDay(nutrition.entries)
+
+            return {
+              units: Object.fromEntries(Object.entries(NUTRIENT_INFO).map(([nutrient, info]) => [nutrient, info.unit])),
+              targets: nutrition.targets,
+              days: nutrition.days
+                .filter((day) => !isTotalsEmpty(day.total) || entriesByDay.has(day.day))
+                .toReversed()
+                .map((day) => ({
+                  day: day.day,
+                  total: day.total,
+                  logged: day.logged,
+                  health: day.health,
+                  entries: (entriesByDay.get(day.day) ?? [])
+                    .map((entry) => ({
+                      id: entry.id,
+                      description: entry.description,
+                      calories: entry.calories,
+                      protein: entry.protein,
+                      carbs: entry.carbs,
+                      fat: entry.fat,
+                      loggedBy: entry.source === "ai" ? "coach" : "user",
+                    })),
+                })),
+            }
+          }),
+        ),
+      log_food: ({ day, ...food }) =>
+        run(Effect.map(Nutrition.logFood(day, food, "ai"), (entry) => ({ saved: true, id: entry.id }))),
+      delete_food: ({ foodId }) => run(Effect.as(Nutrition.deleteFood(foodId), { removed: true })),
+      get_health_metrics: ({ days }) =>
+        run(
+          Effect.gen(function* () {
+            const span = clamp(days, 14, 90)
+            const readings = yield* Health.listHealthDaily(span)
+            const workouts = yield* Health.listHealthWorkouts(span)
+
+            return {
+              metrics: Object.fromEntries(
+                HEALTH_METRICS.map((metric) => [metric, `${HEALTH_METRIC_INFO[metric].unit}: ${HEALTH_METRIC_INFO[metric].meaning}`]),
+              ),
+              days: Health.healthDays(readings),
+              workouts,
+            }
+          }),
+        ),
     }
   }),
 )
 
 export const MCP_PATH = "/mcp"
 
+/**
+ * A test copy says so up front, so an agent connected to both it and the live app can tell them apart
+ * and the user can point it at the test one by name.
+ */
+const testCopyNote = (name: string, deployment: string) =>
+  `This is ${name}, a test copy of the app (stage ${deployment}) with its own database. It is not the user's real training log: use it only when the user asks for ${name} or the test version, and don't treat its data as theirs.\n\n`
+
 const McpLive = McpServer.layerHttp({
-  name: "Gym",
+  name: connectorName(stage()),
   version: "1.0.0",
-  instructions: INSTRUCTIONS,
+  instructions: (isTestStage(stage()) ? testCopyNote(connectorName(stage()), stage()) : "") + INSTRUCTIONS,
   path: MCP_PATH,
   // Newest first. The 2026 revision has no sessions; the older ones are kept for clients still using them.
   protocols: [McpProtocol.v2026_07_28, McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26],

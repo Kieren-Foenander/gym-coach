@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react"
 import { BarbellIcon } from "~/components/icons"
 import { Button, ErrorNote, Field, TextInput, useHydrated } from "~/components/ui"
 import { getSession, signIn } from "~/functions/api"
+import { testIds } from "~/domain/test-ids"
 
 const Search = Schema.Struct({ redirect: Schema.optional(Schema.String) })
 
@@ -58,6 +59,7 @@ function LoginPage() {
         <Field label="Email">
           <TextInput
             type="email"
+            data-testid={testIds.login.email}
             autoComplete="username"
             autoCapitalize="none"
             required
@@ -68,6 +70,7 @@ function LoginPage() {
         <Field label="Password">
           <TextInput
             type="password"
+            data-testid={testIds.login.password}
             autoComplete="current-password"
             required
             value={password}
@@ -75,7 +78,13 @@ function LoginPage() {
           />
         </Field>
         <ErrorNote message={error} />
-        <Button type="submit" variant="primary" className="w-full" disabled={pending || !hydrated}>
+        <Button
+          type="submit"
+          variant="primary"
+          className="w-full"
+          data-testid={testIds.login.submit}
+          disabled={pending || !hydrated}
+        >
           {pending ? "Signing in…" : "Sign in"}
         </Button>
       </form>

@@ -18,6 +18,8 @@ interface FinishedWorkoutProps {
 export function FinishedWorkout({ detail, unit }: FinishedWorkoutProps) {
   const navigation = useNavigation()
   const { workout, exercises, adjustments, records } = detail
+  // Missing from screens cached by a build from before Apple Health.
+  const health = detail.health ?? null
   const minutes = workout.finishedAt === null ? 0 : Math.round((workout.finishedAt - workout.startedAt) / 60000)
   const allSets = exercises.flatMap((exercise) => exercise.sets)
   const volume = allSets.reduce((total, set) => total + set.weight * set.reps, 0)
@@ -37,6 +39,13 @@ export function FinishedWorkout({ detail, unit }: FinishedWorkoutProps) {
         <Stat label="Sets" value={allSets.length} />
         <Stat label="Lifted" value={formatCompact(volume)} unit={unit} />
       </View>
+
+      {health ? (
+        <View className="flex-row gap-2 pt-2">
+          <Stat label="Avg heart rate" value={health.avgHeartRate === null ? "–" : Math.round(health.avgHeartRate)} unit="bpm" />
+          <Stat label="Active energy" value={health.energyKcal === null ? "–" : Math.round(health.energyKcal)} unit="kcal" />
+        </View>
+      ) : null}
 
       {records.length > 0 ? (
         <View className="mt-3 flex-row items-center gap-2 rounded-2xl bg-accent px-4 py-3">

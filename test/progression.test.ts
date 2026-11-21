@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { evaluateProgression, roundToIncrement, type ProgressionTarget } from "~/domain/progression"
+import { evaluateProgression, heaviestSet, roundToIncrement, type ProgressionTarget } from "~/domain/progression"
 
 const target = (overrides: Partial<ProgressionTarget> = {}): ProgressionTarget => ({
   sets: 3,
@@ -77,5 +77,22 @@ describe("roundToIncrement", () => {
   it("rounds to the nearest plate jump", () => {
     expect(roundToIncrement(54, 2.5)).toBe(55)
     expect(roundToIncrement(91.8, 5)).toBe(90)
+  })
+})
+
+describe("heaviestSet", () => {
+  it("picks the heaviest weight, then the most reps at it", () => {
+    const sessions = [
+      { topWeight: 60, topReps: 12 },
+      { topWeight: 80, topReps: 3 },
+      { topWeight: 80, topReps: 5 },
+      { topWeight: 50, topReps: 10 },
+    ]
+
+    expect(heaviestSet(sessions)).toEqual({ topWeight: 80, topReps: 5 })
+  })
+
+  it("returns nothing for no sessions", () => {
+    expect(heaviestSet([])).toBeUndefined()
   })
 })

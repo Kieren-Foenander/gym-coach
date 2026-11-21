@@ -1,3 +1,4 @@
+import "./src/lib/array-polyfills"
 import "react-native-gesture-handler"
 import "./global.css"
 import { registerRootComponent } from "expo"

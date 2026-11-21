@@ -11,7 +11,7 @@ import { Calls } from "~/server/calls"
 import type { DomainError } from "~/server/errors"
 import type * as Repo from "~/server/repo"
 import { CurrentUser } from "~/server/repo"
-import { runtime, signupCode } from "~/server/runtime"
+import { runtime, signupCode, stage } from "~/server/runtime"
 
 /**
  * Every call the web app makes to the server. Each one validates its input with
@@ -78,6 +78,9 @@ export const getSession = createServerFn({ method: "GET" }).handler(() =>
   ),
 )
 
+/** Which copy of the app this is. The AI coach card names the connector after it. */
+export const getDeployment = createServerFn({ method: "GET" }).handler(() => ({ stage: stage() }))
+
 export const getSignupStatus = createServerFn({ method: "GET" }).handler(() => run(Auth.signupStatus(signupCode())))
 
 export const signUp = createServerFn({ method: "POST" })
@@ -112,6 +115,8 @@ export const getWorkout = createServerFn({ method: "GET" })
   .handler(({ data }) => authed(Calls.getWorkout.run(data)))
 
 export const getHistory = createServerFn({ method: "GET" }).handler(() => authed(Calls.getHistory.run({})))
+
+export const getCalendar = createServerFn({ method: "GET" }).handler(() => authed(Calls.getCalendar.run({})))
 
 export const getExerciseProgress = createServerFn({ method: "GET" })
   .validator(input(CallInputs.getExerciseProgress))
@@ -210,3 +215,21 @@ export const logMeasurement = createServerFn({ method: "POST" })
 export const deleteMeasurement = createServerFn({ method: "POST" })
   .validator(input(CallInputs.deleteMeasurement))
   .handler(({ data }) => authed(Calls.deleteMeasurement.run(data)))
+
+// ---------------------------------------------------------------- food
+
+export const getNutrition = createServerFn({ method: "GET" })
+  .validator(input(CallInputs.getNutrition))
+  .handler(({ data }) => authed(Calls.getNutrition.run(data)))
+
+export const logFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.logFood))
+  .handler(({ data }) => authed(Calls.logFood.run(data)))
+
+export const updateFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.updateFood))
+  .handler(({ data }) => authed(Calls.updateFood.run(data)))
+
+export const deleteFood = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.deleteFood))
+  .handler(({ data }) => authed(Calls.deleteFood.run(data)))

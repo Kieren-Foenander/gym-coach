@@ -1,7 +1,7 @@
 import { Clock, Effect } from "effect"
 import { SqlClient } from "effect/sql"
 import { Invalid, Unauthorized } from "./errors"
-import type { User } from "./repo"
+import { toUser, type UserRow } from "./repo"
 
 export const SESSION_COOKIE = "gym_session"
 export const SESSION_DAYS = 90
@@ -52,7 +52,8 @@ export const verifyPassword = (password: string, stored: string) =>
     return constantTimeEqual(actual, fromHex(hash))
   })
 
-const USER_COLUMNS = `u.id, u.email, u.display_name, u.unit, u.goal, u.training_context`
+const USER_COLUMNS = `u.id, u.email, u.display_name, u.unit, u.goal, u.training_context, u.calorie_target, u.protein_target,
+  u.streak_goals`
 
 const createSession = Effect.fn("createSession")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient
@@ -130,18 +131,21 @@ export const userFromSession = Effect.fn("userFromSession")(function* (token: st
   if (!token) return yield* new Unauthorized()
   const sql = yield* SqlClient.SqlClient
 
-  const rows = yield* sql<User>`
+  const rows = yield* sql<UserRow>`
     SELECT ${sql.unsafe(USER_COLUMNS)} FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ${yield* sha256(token)} AND s.expires_at > ${yield* Clock.currentTimeMillis}`
 
-  return rows[0] ?? (yield* new Unauthorized())
+  const row = rows[0]
+
+  return row ? toUser(row) : yield* new Unauthorized()
 })
 
 export const userById = Effect.fn("userById")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient
-  const rows = yield* sql<User>`SELECT ${sql.unsafe(USER_COLUMNS)} FROM users u WHERE u.id = ${userId}`
+  const rows = yield* sql<UserRow>`SELECT ${sql.unsafe(USER_COLUMNS)} FROM users u WHERE u.id = ${userId}`
+  const row = rows[0]
 
-  return rows[0] ?? (yield* new Unauthorized())
+  return row ? toUser(row) : yield* new Unauthorized()
 })
 
 export const signupStatus = Effect.fn("signupStatus")(function* (signupCode: string | undefined) {

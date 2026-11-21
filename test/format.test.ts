@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatCompact } from "~/format"
+import { describeTrainingDay, formatCompact, formatLongDay } from "~/format"
 
 describe("formatCompact", () => {
   it("leaves small numbers alone", () => {
@@ -17,5 +17,17 @@ describe("formatCompact", () => {
 
   it("moves up a step instead of showing 1000k", () => {
     expect(formatCompact(999_960)).toBe("1m")
+  })
+})
+
+describe("calendar wording", () => {
+  it("says how many workouts and walks a calendar day had", () => {
+    const day = new Date(2026, 10, 9).getTime()
+
+    expect(describeTrainingDay(day, 0)).toBe(formatLongDay(day))
+    expect(describeTrainingDay(day, 1)).toBe(`${formatLongDay(day)}, 1 workout`)
+    expect(describeTrainingDay(day, 2)).toBe(`${formatLongDay(day)}, 2 workouts`)
+    expect(describeTrainingDay(day, 0, 1)).toBe(`${formatLongDay(day)}, 1 walk`)
+    expect(describeTrainingDay(day, 1, 2)).toBe(`${formatLongDay(day)}, 1 workout and 2 walks`)
   })
 })

@@ -8,13 +8,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context"
 import { restoreSession, useSession } from "@/api/session"
 import { startOutbox } from "@/data/outbox-store"
 import { CACHE_MAX_AGE_MS, queryClient, queryPersister, watchConnectionAndFocus } from "@/data/query-client"
+import { startHealthSync } from "@/features/health/health-sync"
 import { startRestAlerts } from "@/features/workout/rest-alert"
 import { Navigation } from "@/navigation"
 
 void SplashScreen.preventAutoHideAsync()
 
 // Bump this when the shape of what the server answers changes, so screens cached by an older build are dropped.
-const CACHE_VERSION = "1"
+const CACHE_VERSION = "2"
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -28,7 +29,7 @@ export default function App() {
   useEffect(() => {
     void restoreSession()
 
-    const stops = [watchConnectionAndFocus(), startOutbox(), startRestAlerts()]
+    const stops = [watchConnectionAndFocus(), startOutbox(), startRestAlerts(), startHealthSync()]
 
     return () => {
       for (const stop of stops) stop()

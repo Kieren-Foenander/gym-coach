@@ -4,10 +4,12 @@ import startHandler from "@tanstack/react-start/server-entry"
 import { Effect, Option, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import { SESSION_COOKIE, userById, userFromSession } from "./server/auth"
-import { API_PREFIX, handleApiRequest } from "./server/http"
+import { API_PREFIX, apiHandlerFor } from "./server/http"
 import { handleMcpRequest, MCP_PATH } from "./server/mcp"
 import type { User } from "./server/repo"
-import { runtime } from "./server/runtime"
+import { runtime, signupCode, stage } from "./server/runtime"
+
+const handleApiRequest = apiHandlerFor({ run: (effect) => runtime.runPromise(effect), signupCode, stage })
 
 /**
  * Worker entry. Four things live behind one hostname:
@@ -100,7 +102,11 @@ const authorize = async (request: Request, env: OAuthEnv): Promise<Response> => 
     if (request.method === "POST") {
       if (!user) return html("Signed out", `<h1>You were signed out</h1><p>Start connecting again from your AI app.</p>`, { status: 401 })
       const form = await request.formData()
-      const handle = String(form.get("handle"))
+      const handle = form.get("handle")
+
+      if (handle === null || handle instanceof File) {
+        return html("Something went wrong", `<h1>Something went wrong</h1><p>Start connecting again from your AI app.</p>`, { status: 400 })
+      }
 
       if (form.get("decision") !== "approve") {
         const denied = await oauth.denyConsent(request, handle)

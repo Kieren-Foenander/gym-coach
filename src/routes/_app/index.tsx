@@ -1,14 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FlameIcon } from "~/components/icons"
-import { Button, buttonClass, Card, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
-import { summariseWeek } from "~/domain/week"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "~/components/icons"
+import { NutritionCard } from "~/components/nutrition"
+import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
+import { localDay } from "~/domain/health"
+import { daysAround } from "~/domain/days"
+import { dayState, testIds } from "~/domain/test-ids"
+import { startOfWeek } from "~/domain/week"
+import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal } from "~/domain/streaks"
 import { isCardio } from "~/domain/catalog"
 import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
-import { deleteCoachNote, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
+import { deleteCoachNote, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
 import type { ActivityEntry, Adjustment } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/")({
-  loader: () => getToday(),
+  loader: async () => {
+    // The days that may be today wherever the browser is; the screen picks its own.
+    const [today, nutrition] = await Promise.all([getToday(), getNutrition({ data: daysAround(Date.now()) })])
+
+    return { ...today, nutrition }
+  },
   component: TodayPage,
 })
 
@@ -17,7 +27,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 const longDay = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" })
 
 function TodayPage() {
-  const { today, activity } = Route.useLoaderData()
+  const { today, activity, nutrition } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const navigate = useNavigate()
   const now = useNow()
@@ -37,7 +47,7 @@ function TodayPage() {
       <PageTitle eyebrow={now === null ? "" : longDay.format(now)}>Hi {user.displayName}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} now={now} unit={user.unit} />
+      <WeekCard activity={activity} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} />
 
       {today.activeWorkout ? (
         <Hero eyebrow="In progress" title={today.activeWorkout.name}>
@@ -81,6 +91,7 @@ function TodayPage() {
             variant="primary"
             className="mt-5 w-full"
             disabled={pending || nextDay.exercises.length === 0}
+            data-testid={testIds.today.startNextWorkout}
             onClick={() => start(nextDay.id)}
           >
             Start workout
@@ -93,13 +104,19 @@ function TodayPage() {
           <SectionTitle>Or do something else</SectionTitle>
           <div className="flex flex-wrap gap-2">
             {otherDays.map((day) => (
-              <Button key={day.id} disabled={pending || day.exercises.length === 0} onClick={() => start(day.id)}>
+              <Button
+                key={day.id}
+                disabled={pending || day.exercises.length === 0}
+                data-testid={testIds.today.startDay(day.name)}
+                onClick={() => start(day.id)}
+              >
                 {day.name}
               </Button>
             ))}
             <Button
               className="border border-dashed border-line bg-transparent"
               disabled={pending}
+              data-testid={testIds.today.startOpenWorkout}
               onClick={() => start(null)}
             >
               Open workout
@@ -108,6 +125,11 @@ function TodayPage() {
           <p className="pt-2 text-sm text-faint">An open workout follows no plan. You add exercises as you go.</p>
         </>
       )}
+
+      <NutritionCard
+        day={now === null ? undefined : nutrition.days.find((item) => item.day === localDay(now))}
+        targets={nutrition.targets}
+      />
 
       {today.plan ? null : (
         <Hero eyebrow="Get started" title="No plan yet">
@@ -206,44 +228,74 @@ function Hero({ eyebrow, title, children }: HeroProps) {
   )
 }
 
+/** Midnight on a day of the week containing `now`, 0 for Monday. */
+const dayOfWeek = (now: number, index: number) => {
+  const date = new Date(startOfWeek(now))
+
+  date.setDate(date.getDate() + index)
+
+  return date.getTime()
+}
+
 interface WeekCardProps {
   readonly activity: ReadonlyArray<ActivityEntry>
+  readonly goals: ReadonlyArray<StreakGoal>
   readonly now: number | null
   readonly unit: string
 }
 
-/** This week at a glance: which days were trained, the totals, and the weekly streak. */
-function WeekCard({ activity, now, unit }: WeekCardProps) {
-  const week = now === null ? null : summariseWeek(activity, now)
+/** This week at a glance: which days counted, the totals, and the streak for the first goal. Opens the calendar. */
+function WeekCard({ activity, goals, now, unit }: WeekCardProps) {
+  const week = now === null ? null : summariseWeek(activity, goals, now)
+  const streak = week ? describeGoalStreak(week.streak) : "No streak yet"
 
   return (
-    <Card>
+    <Link
+      to="/calendar"
+      aria-label={week ? `This week: ${week.workouts} workouts, ${week.walks} walks, ${streak}. Open calendar` : "Open calendar"}
+      className={`${cardClass} block transition-colors active:bg-raised`}
+      data-testid={testIds.today.weekCard}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="eyebrow text-muted">This week</p>
-        <p className={`flex items-center gap-1 text-sm font-semibold ${week?.streakWeeks ? "text-accent" : "text-faint"}`}>
+        <p
+          className={`flex items-center gap-1 text-sm font-semibold ${week?.streak.current ? "text-accent" : "text-faint"}`}
+          data-testid={testIds.today.streak}
+          data-value={week?.streak.current}
+        >
           <FlameIcon className="size-4" />
-          {week?.streakWeeks ? `${week.streakWeeks} week streak` : "No streak yet"}
+          {streak}
+          <span className="text-faint">
+            <ChevronIcon className="size-4" />
+          </span>
         </p>
       </div>
       <ol className="grid grid-cols-7 gap-1 pt-3" aria-label="Days trained this week">
         {WEEKDAYS.map((name, index) => {
-          const trained = week?.days[index] ?? false
+          const mark = week?.days[index] ?? null
           const isToday = week?.todayIndex === index
 
           return (
-            <li key={name} className="flex flex-col items-center gap-1.5">
+            <li
+              key={name}
+              className="flex flex-col items-center gap-1.5"
+              data-testid={now === null ? undefined : testIds.today.weekDay(dayOfWeek(now, index))}
+              data-state={dayState(mark)}
+            >
               <span className={`text-xs font-semibold ${isToday ? "text-white" : "text-faint"}`}>{name.charAt(0)}</span>
               <span
                 className={`flex size-9 items-center justify-center rounded-full ${
-                  trained
+                  mark === "counted"
                     ? "bg-accent text-accent-ink"
-                    : isToday
-                      ? "border-2 border-accent/70"
-                      : "border border-line bg-raised/50"
+                    : mark === "other"
+                      ? "border-2 border-accent bg-accent/15"
+                      : isToday
+                        ? "border-2 border-accent/70"
+                        : "border border-line bg-raised/50"
                 }`}
               >
-                {trained ? <CheckIcon /> : null}
-                <span className="sr-only">{trained ? "Trained" : "Not trained"}</span>
+                {mark === "counted" ? <CheckIcon /> : null}
+                <span className="sr-only">{mark ? MARK_WORDS[mark] : "Nothing logged"}</span>
               </span>
             </li>
           )
@@ -251,7 +303,14 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
       </ol>
       <dl className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-2xl bg-raised/70 px-3 py-2.5">
-          <dd className="display tabular text-3xl">{week?.workouts ?? "–"}</dd>
+          <dd className="display tabular text-3xl" data-testid={testIds.today.workoutsThisWeek} data-value={week?.workouts}>
+            {week?.workouts ?? "–"}
+            {week?.walks ? (
+              <span className="pl-1 text-base text-muted" data-testid={testIds.today.walksThisWeek} data-value={week.walks}>
+                +{week.walks} {week.walks === 1 ? "walk" : "walks"}
+              </span>
+            ) : null}
+          </dd>
           <dt className="text-xs text-muted">Workouts</dt>
         </div>
         <div className="rounded-2xl bg-raised/70 px-3 py-2.5">
@@ -262,7 +321,7 @@ function WeekCard({ activity, now, unit }: WeekCardProps) {
           <dt className="text-xs text-muted">Lifted</dt>
         </div>
       </dl>
-    </Card>
+    </Link>
   )
 }
 

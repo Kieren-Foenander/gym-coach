@@ -22,6 +22,7 @@ const detail: WorkoutDetail = {
   ],
   adjustments: [],
   records: [],
+  health: null,
 }
 
 const logged = (key: string, exerciseId: number, workoutId = 1): LogSetOp => ({

@@ -4,6 +4,7 @@ import { BodyLog } from "~/components/body"
 import { ChevronIcon } from "~/components/icons"
 import { Card, PageTitle, Segmented, Stat } from "~/components/ui"
 import { formatCompact, formatVolume } from "~/format"
+import { testIds } from "~/domain/test-ids"
 import { getHistory } from "~/functions/api"
 
 export const Route = createFileRoute("/_app/history")({
@@ -15,12 +16,10 @@ const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" })
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" })
 
 function HistoryPage() {
-  const { workouts, exercises, measurements } = Route.useLoaderData()
+  const { workouts, totals, exercises, measurements } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const [view, setView] = useState<"workouts" | "exercises" | "body">("workouts")
   const performed = exercises.filter((exercise) => exercise.lastPerformedAt !== null)
-  const totalVolume = workouts.reduce((total, workout) => total + workout.volume, 0)
-  const totalSets = workouts.reduce((total, workout) => total + workout.setCount, 0)
 
   return (
     <>
@@ -28,9 +27,10 @@ function HistoryPage() {
 
       {workouts.length > 0 ? (
         <div className="grid grid-cols-3 gap-2 pb-4">
-          <Stat label="Workouts" value={workouts.length} />
-          <Stat label="Sets" value={formatCompact(totalSets)} />
-          <Stat label="Lifted" value={formatCompact(totalVolume)} unit={user.unit} />
+          {/* Totals over every workout; the list below holds only the latest ones. */}
+          <Stat label="Workouts" value={totals.workouts} testId={testIds.history.totalWorkouts} />
+          <Stat label="Sets" value={formatCompact(totals.sets)} />
+          <Stat label="Lifted" value={formatCompact(totals.volume)} unit={user.unit} />
         </div>
       ) : null}
 

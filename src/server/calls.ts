@@ -6,6 +6,8 @@ import { catalogBySlug } from "~/domain/catalog"
 import { demoFor, RENDERED_SLUGS } from "~/domain/demos"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import { Invalid, NotFound, type DomainError } from "./errors"
+import * as Health from "./health"
+import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser } from "./repo"
 
@@ -38,12 +40,15 @@ export const Calls = {
   updateProfile: define(CallInputs.updateProfile, (data) => Repo.updateProfile(data)),
 
   // reads
-  getToday: define(CallInputs.getToday, () => Effect.all({ today: Repo.getToday(), activity: Repo.listActivity(182) })),
+  getToday: define(CallInputs.getToday, () => Effect.all({ today: Repo.getToday(), activity: Repo.listActivity() })),
+  getCalendar: define(CallInputs.getCalendar, () => Repo.listCalendar()),
   getPlan: define(CallInputs.getPlan, () => Repo.getActivePlan()),
   getWorkout: define(CallInputs.getWorkout, (data) => Repo.getWorkoutDetail(data.workoutId)),
   getHistory: define(CallInputs.getHistory, () =>
     Effect.all({
+      // The latest workouts to list, and totals over all of them for the figures above the list.
       workouts: Repo.listWorkouts(100),
+      totals: Repo.getWorkoutTotals(),
       exercises: Repo.listExercises(),
       measurements: Repo.listMeasurements(500),
     }),
@@ -114,6 +119,17 @@ export const Calls = {
   // body
   logMeasurement: define(CallInputs.logMeasurement, (data) => Repo.logMeasurement(data)),
   deleteMeasurement: define(CallInputs.deleteMeasurement, (data) => Repo.deleteMeasurement(data.measurementId)),
+
+  // food
+  getNutrition: define(CallInputs.getNutrition, (data) => Nutrition.getNutrition(data.from, data.to)),
+  logFood: define(CallInputs.logFood, (data) => Nutrition.logFood(data.day, data.food, "user")),
+  updateFood: define(CallInputs.updateFood, (data) => Nutrition.updateFood(data.foodId, data.food)),
+  deleteFood: define(CallInputs.deleteFood, (data) => Nutrition.deleteFood(data.foodId)),
+
+  // Apple Health
+  importHealth: define(CallInputs.importHealth, (data) => Health.importHealth(data)),
+  /** Daily readings from the last five weeks: enough for the latest of each and what is usual. */
+  getHealth: define(CallInputs.getHealth, () => Effect.map(Health.listHealthDaily(35), (daily) => ({ daily }))),
 } satisfies { readonly [K in CallName]: { readonly run: (data: (typeof CallInputs)[K]["Type"]) => CallEffect<Answer> } }
 
 /** What a client sends for a call: its input as JSON, before the server trims or checks it. */

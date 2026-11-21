@@ -1,0 +1,13 @@
+#!/bin/sh
+# The checks CI runs, before anything leaves this machine: lint, types and tests for the web app,
+# the server and the native app, and that no migration already on master was changed.
+# `bun install` turns this hook on (the "prepare" script). Skip it once with `git push --no-verify`.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+bun run check
+(cd apps/mobile && bun run check)
+
+if git rev-parse --verify --quiet origin/master >/dev/null; then
+  bun tools/check-migrations.ts origin/master
+fi

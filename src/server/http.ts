@@ -6,7 +6,6 @@ import * as Auth from "./auth"
 import { Calls, isCallName } from "./calls"
 import { Invalid, NotFound, type DomainError } from "./errors"
 import { CurrentUser } from "./repo"
-import { runtime, signupCode } from "./runtime"
 
 /**
  * The JSON API the native app uses. Every request is a POST with a JSON body:
@@ -15,12 +14,16 @@ import { runtime, signupCode } from "./runtime"
  *   /api/v1/account/sign-up         makes an account, answers with a session token
  *   /api/v1/account/sign-in         answers with a session token
  *   /api/v1/account/sign-out        ends the session whose token was sent
+ *   /api/v1/deployment              which copy of the app this is: { stage }
  *   /api/v1/call/<name>             one of the calls in src/domain/calls.ts
  *
  * A call needs `Authorization: Bearer <token>`. Cookies are never read here, so a web page
  * cannot make a signed-in request on someone's behalf.
  *
  * An answer is `{ ok: true, value }`, or `{ ok: false, error: { code, message } }` with a matching status.
+ *
+ * The handler is made from what the deployment provides (src/server.ts passes the Worker's), so
+ * the tests in test/server can run the same handler against a SQLite database.
  */
 
 export const API_PREFIX = "/api/v1/"
@@ -66,10 +69,20 @@ const readBody = (request: Request) =>
 /** A new session and the account it belongs to, which is what a client needs to start. */
 const sessionFor = (token: string) => Effect.map(Auth.userFromSession(token), (user) => ok({ token, user }))
 
-const route = (request: Request, path: string) => {
+/** What the API needs from the deployment it runs in. */
+export interface ApiDeployment {
+  /** Runs a request against the database. */
+  readonly run: <A>(effect: Effect.Effect<A, never, SqlClient.SqlClient>) => Promise<A>
+  readonly signupCode: () => string | undefined
+  readonly stage: () => string
+}
+
+const route = (request: Request, path: string, { signupCode, stage }: ApiDeployment) => {
   const body = readBody(request)
 
   if (path === "account/signup-status") return Effect.map(Auth.signupStatus(signupCode()), ok)
+
+  if (path === "deployment") return Effect.succeed(ok({ stage: stage() }))
 
   if (path === "account/sign-up") {
     return body.pipe(
@@ -101,8 +114,11 @@ const route = (request: Request, path: string) => {
   })
 }
 
-const settle = (effect: Effect.Effect<Response, DomainError | SqlError | Schema.SchemaError, SqlClient.SqlClient>) =>
-  runtime.runPromise(
+const settle = (
+  effect: Effect.Effect<Response, DomainError | SqlError | Schema.SchemaError, SqlClient.SqlClient>,
+  { run }: ApiDeployment,
+) =>
+  run(
     effect.pipe(
       Effect.catchTags({
         Unauthorized: () => failure(401, "unauthorized", "Not signed in"),
@@ -115,12 +131,14 @@ const settle = (effect: Effect.Effect<Response, DomainError | SqlError | Schema.
     ),
   )
 
-export const handleApiRequest = (request: Request): Promise<Response> => {
-  if (request.method !== "POST") {
-    return Promise.resolve(
-      json(405, { ok: false, error: { code: "invalid" satisfies ErrorCode, message: "Use POST" } }),
-    )
-  }
+export const apiHandlerFor =
+  (deployment: ApiDeployment) =>
+  (request: Request): Promise<Response> => {
+    if (request.method !== "POST") {
+      return Promise.resolve(
+        json(405, { ok: false, error: { code: "invalid" satisfies ErrorCode, message: "Use POST" } }),
+      )
+    }
 
-  return settle(route(request, new URL(request.url).pathname.slice(API_PREFIX.length)))
-}
+    return settle(route(request, new URL(request.url).pathname.slice(API_PREFIX.length), deployment), deployment)
+  }

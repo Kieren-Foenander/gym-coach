@@ -1,10 +1,8 @@
-import { formatDay, formatWeight } from "~/format"
+import { useId } from "react"
+import { CHART, layoutTrend, type TrendPoint } from "~/domain/chart"
+import { formatWeight } from "~/format"
 
-export interface TrendPoint {
-  readonly id: number
-  readonly date: number
-  readonly value: number
-}
+export type { TrendPoint }
 
 interface TrendChartProps {
   /** Oldest first. */
@@ -12,66 +10,69 @@ interface TrendChartProps {
   readonly unit: string
   /** What the line measures, for screen readers. */
   readonly label: string
+  /** Also draw the highest value so far, for numbers that should climb. */
+  readonly best?: boolean
 }
 
-const WIDTH = 320
-const HEIGHT = 140
-const PAD = 8
+const ACCENT = "#d7ff3e"
+const LINE = "#272b33"
+const MUTED = "#9299a5"
+const FAINT = "#737a86"
 
-/** A single line over time, oldest on the left, with the high and low marked. */
-export function TrendChart({ points, unit, label }: TrendChartProps) {
-  const values = points.map((point) => point.value)
-  const low = Math.min(...values)
-  const high = Math.max(...values)
-  const span = high - low || 1
-  const x = (index: number) => (points.length === 1 ? WIDTH / 2 : PAD + (index * (WIDTH - PAD * 2)) / (points.length - 1))
-  const y = (value: number) => HEIGHT - PAD - ((value - low) / span) * (HEIGHT - PAD * 2)
-  const path = values.map((value, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ")
-  const first = points[0]
-  const last = points.at(-1)
+/** A line over time with dates along the bottom and values up the side. */
+export function TrendChart({ points, unit, label, best = false }: TrendChartProps) {
+  const layout = layoutTrend(points, { best })
+  // An id per chart, so two charts on one page do not share a fill.
+  const fill = `trend-fill-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`
+  const first = layout.points[0]
+  const last = layout.points.at(-1)
 
   return (
     <figure>
-      <div className="flex justify-between pb-1 text-xs text-faint">
-        <span className="tabular">
-          High {formatWeight(high)} {unit}
-        </span>
-        <span className="tabular">
-          Low {formatWeight(low)} {unit}
-        </span>
-      </div>
+      {layout.best ? (
+        <div className="flex justify-end gap-4 pb-1 text-xs text-faint">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 rounded bg-accent" />
+            Each session
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-4 border-t-2 border-dashed border-muted" />
+            Best so far
+          </span>
+        </div>
+      ) : null}
       <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        viewBox={`0 0 ${CHART.width} ${CHART.height}`}
         className="w-full"
         role="img"
-        aria-label={`${label} over ${points.length} entries, from ${formatWeight(values[0] ?? 0)} to ${formatWeight(values.at(-1) ?? 0)} ${unit}`}
+        aria-label={`${label} over ${points.length} entries, from ${formatWeight(first?.value ?? 0)} to ${formatWeight(last?.value ?? 0)} ${unit}`}
       >
         <defs>
-          <linearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#d7ff3e" stopOpacity="0.28" />
-            <stop offset="1" stopColor="#d7ff3e" stopOpacity="0" />
+          <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor={ACCENT} stopOpacity="0.22" />
+            <stop offset="1" stopColor={ACCENT} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <line x1={PAD} x2={WIDTH - PAD} y1={PAD} y2={PAD} stroke="#272b33" strokeDasharray="3 4" />
-        <line x1={PAD} x2={WIDTH - PAD} y1={HEIGHT - PAD} y2={HEIGHT - PAD} stroke="#272b33" strokeDasharray="3 4" />
-        {points.length > 1 ? (
-          <path d={`${path} L${x(points.length - 1).toFixed(1)},${HEIGHT} L${x(0).toFixed(1)},${HEIGHT} Z`} fill="url(#trend-fill)" />
-        ) : null}
-        <path d={path} fill="none" stroke="#d7ff3e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point, index) => (
-          <circle
-            key={point.id}
-            cx={x(index)}
-            cy={y(point.value)}
-            r={index === points.length - 1 ? 4.5 : 3}
-            fill="#d7ff3e"
-          />
+        {layout.valueTicks.map((tick) => (
+          <g key={tick.label}>
+            <line x1={CHART.left} x2={CHART.right} y1={tick.y} y2={tick.y} stroke={LINE} strokeDasharray="3 4" />
+            <text x={CHART.left - 6} y={tick.y} dy="0.32em" textAnchor="end" fontSize="10" fill={FAINT} className="tabular">
+              {tick.label}
+            </text>
+          </g>
+        ))}
+        {layout.dateTicks.map((tick) => (
+          <text key={tick.label} x={tick.x} y={CHART.dateLabelY} textAnchor={tick.anchor} fontSize="10" fill={FAINT}>
+            {tick.label}
+          </text>
+        ))}
+        {layout.area ? <path d={layout.area} fill={`url(#${fill})`} /> : null}
+        {layout.best ? <path d={layout.best} fill="none" stroke={MUTED} strokeWidth="1.5" strokeDasharray="4 3" /> : null}
+        <path d={layout.line} fill="none" stroke={ACCENT} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {layout.points.map((point, index) => (
+          <circle key={point.id} cx={point.x} cy={point.y} r={index === layout.points.length - 1 ? 4.5 : 3} fill={ACCENT} />
         ))}
       </svg>
-      <figcaption className="flex justify-between pt-1 text-xs text-faint">
-        <span>{first ? formatDay(first.date) : ""}</span>
-        <span>{last && points.length > 1 ? formatDay(last.date) : ""}</span>
-      </figcaption>
     </figure>
   )
 }

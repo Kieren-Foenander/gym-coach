@@ -5,3 +5,6 @@ dist
 .tanstack
 .env
 *.local
+
+# e2e run output: reports, traces, screenshots and its replay cache
+.e2e/

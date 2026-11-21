@@ -9,6 +9,7 @@ import type { Measurement } from "~/server/repo"
 
 const LABELS: Record<MeasurementKind, string> = {
   weight: "Bodyweight",
+  bodyFat: "Body fat",
   waist: "Waist",
   chest: "Chest",
   hips: "Hips",
