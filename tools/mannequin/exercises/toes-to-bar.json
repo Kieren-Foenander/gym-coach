@@ -1,0 +1,29 @@
+{
+  "equipment": [
+    {"type": "pullup-bar", "at": [0, -0.06, 2.33], "grip_width": 0.365, "toe_contact": [[0.555, 0.58]]}
+  ],
+  "stance": {"width": 0.16, "toe_out": 10, "y": 0.067},
+  "camera": {"angle": 62, "elevation": 6},
+  "frames": 310,
+  "keys": [
+    {"at": 0, "pelvis": [0, 0.016, 1.17], "lean": 0, "shoulder_y": 0.015, "clavicle": [0, 12], "free_leg_left": [-90, 6], "free_leg_right": [-90, 6], "knee_pole_left": [0.12, -1, 0], "knee_pole_right": [-0.12, -1, 0]},
+    {"at": 0.035},
+    {"at": 0.148, "lean": -5, "shoulder_y": 0.025, "free_leg_left": [-64, 15], "free_leg_right": [-64, 15], "knee_pole_left": [0.2, -1, 0.3], "knee_pole_right": [-0.2, -1, 0.3]},
+    {"at": 0.272, "lean": -21, "shoulder_y": 0.11, "free_leg_left": [-15, 40], "free_leg_right": [-15, 40], "knee_pole_left": [0.5, -0.6, 0.7], "knee_pole_right": [-0.5, -0.6, 0.7]},
+    {"at": 0.42, "lean": -33, "shoulder_y": 0.23, "free_leg_left": [63, 72], "free_leg_right": [63, 72], "knee_pole_left": [1, -0.27, 0.72], "knee_pole_right": [-1, -0.27, 0.72]},
+    {"at": 0.513, "lean": -38, "shoulder_y": 0.31, "free_leg_left": [137.391, 86.775], "free_leg_right": [137.391, 86.775], "knee_pole_left": [1, -0.22, 0.49], "knee_pole_right": [-1, -0.22, 0.49]},
+    {"at": 0.55, "lean": -38, "shoulder_y": 0.31, "free_leg_left": [132.652, 77.235], "free_leg_right": [132.652, 77.235], "knee_pole_left": [1, -0.22, 0.49], "knee_pole_right": [-1, -0.22, 0.49]},
+    {"at": 0.585},
+    {"at": 0.63, "lean": -38, "shoulder_y": 0.31, "free_leg_left": [137.391, 86.775], "free_leg_right": [137.391, 86.775], "knee_pole_left": [1, -0.22, 0.49], "knee_pole_right": [-1, -0.22, 0.49]},
+    {"at": 0.724, "lean": -33, "shoulder_y": 0.23, "free_leg_left": [63, 72], "free_leg_right": [63, 72], "knee_pole_left": [1, -0.27, 0.72], "knee_pole_right": [-1, -0.27, 0.72]},
+    {"at": 0.853, "lean": -21, "shoulder_y": 0.11, "free_leg_left": [-15, 40], "free_leg_right": [-15, 40], "knee_pole_left": [0.5, -0.6, 0.7], "knee_pole_right": [-0.5, -0.6, 0.7]},
+    {"at": 0.945, "lean": -5, "shoulder_y": 0.025, "free_leg_left": [-64, 15], "free_leg_right": [-64, 15], "knee_pole_left": [0.2, -1, 0.3], "knee_pole_right": [-0.2, -1, 0.3]}
+  ],
+  "checkpoints": [
+    {"at": 0, "elbow": [0, 15]},
+    {"at": 0, "knee": [0, 25]},
+    {"at": 0.55, "position": {"point": "ToeBase", "y": [-0.16, 0.01], "z": [2.25, 2.31]}},
+    {"at": 0.55, "knee": [35, 110]}
+  ],
+  "shoulder_smoothing": {"elevation_range": [-0.55, 0.34], "radius": 0.24}
+}

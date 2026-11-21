@@ -292,6 +292,20 @@ def pose_extended_legs(pelvis, abduction):
             place(side + bone, lift @ pelvis @ REST[side + bone])
 
 
+def pose_bent_leg(side, hip, knee, ankle, hip_rotation=28):
+    """Align the thigh and shin to the knee's flexion plane when steering its pole."""
+    thigh, shin = side + "UpLeg", side + "Leg"
+    upper, lower = (knee - hip).normalized(), (ankle - knee).normalized()
+    swing(thigh, upper)
+    hinge = upper.cross(lower)
+    if hinge.length_squared > 1e-8:
+        rest = REST[thigh].col[1].cross(REST[shin].col[1]).normalized()
+        natural = world_rotation(thigh) @ (REST[thigh].transposed() @ rest)
+        twist = math.degrees(math.atan2(upper.dot(natural.cross(hinge)), natural.dot(hinge)))
+        turn(thigh, upper, max(-hip_rotation, min(hip_rotation, twist)))
+    swing(shin, lower)
+
+
 def pose_legs(spec, key, pelvis, except_side=None, support=None):
     gaps = []
     # Knees point where the toes do: forward along the floor, whatever the hips are doing.
@@ -308,8 +322,17 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
             for bone, pitch in (("UpLeg", thigh_pitch), ("Leg", shin_pitch)):
                 angle = math.radians(pitch)
                 swing(side + bone, Vector((0, math.cos(angle) if prone else -math.cos(angle), math.sin(angle))))
+            pole = key.get("knee_pole_" + side.lower())
+            if pole is not None:
+                hip, ankle = head(side + "UpLeg"), head(side + "Foot")
+                thigh, shin = segment(side + "UpLeg", side + "Leg", side + "Foot")
+                direction = Matrix.Rotation(math.radians(yaw), 3, "Z") @ Vector(pole)
+                knee, _ = bend(hip, ankle, thigh, shin, direction)
+                pose_bent_leg(side, hip, knee, ankle, hip_rotation=64)
             foot_pitch = 168 + shin_pitch if prone else -shin_pitch - 12
             foot = Matrix.Rotation(math.radians(foot_pitch), 3, "X")
+            if pole is not None:
+                foot = Matrix.Rotation(math.radians(yaw), 3, "Z") @ foot
             place(side + "Foot", foot @ REST[side + "Foot"])
             place(side + "ToeBase", foot @ REST[side + "ToeBase"])
             continue
@@ -332,8 +355,11 @@ def pose_legs(spec, key, pelvis, except_side=None, support=None):
             pole = support.rotation @ pole
             turned = support.rotation @ turned
         knee, gap = bend(hip, ankle, thigh, shin, pole)
-        swing(f"{side}UpLeg", knee - hip)
-        swing(f"{side}Leg", ankle - head(f"{side}Leg"))
+        if side in spec.get("align_knees", ()):
+            pose_bent_leg(side, hip, knee, ankle)
+        else:
+            swing(f"{side}UpLeg", knee - hip)
+            swing(f"{side}Leg", ankle - head(f"{side}Leg"))
         place(f"{side}Foot", turned @ pitch @ REST[f"{side}Foot"])
         if stride is not None:
             toe_pitch = key.get("sled_toe_pitch", {}).get(side, heel if spec.get("heel_pivot") else None)
@@ -2987,6 +3013,7 @@ class PullupBar:
         self.grip_width = config["grip_width"]
         self.grip = config.get("grip", "pronated")
         self.feet_supported = config.get("feet_supported", False)
+        self.toe_contact = config.get("toe_contact", [])
         finish = material("pull-up frame", (.08, .09, .105), .55, .43)
         shaft = CableStation.part("pull-up bar", Barbell.SHAFT, finish)
         spread = Vector((.69, 0, 0))
@@ -3025,10 +3052,17 @@ class PullupBar:
             pole = torso.direction(span.sample("elbows", [.42, .47, -.14]), sign)
             gaps.append((side + " pull-up grip", pose_arm(side, target, pole, self.grip, torso, self.axis)))
 
-    def check(self, points, contact, hands, grips, frame, problems, samples):
+    def check(self, points, contact, hands, grips, frame, problems, samples, phase):
         check_rendered_grips(self.handles, grips, frame, problems)
         check_hardware_clearance(self.parts, points, contact.faces, hands, grips, frame, problems)
         for side, vertices in contact.foot_vertices.items():
+            if any(start <= phase < end for start, end in self.toe_contact):
+                toes = points[vertices]
+                toes = toes[(np.linalg.norm(toes - np.array(head(side + "ToeBase")), axis=1) < .09) &
+                            (np.abs(toes[:, 0] - self.centre.x) < .69)]
+                gap = np.linalg.norm(toes[:, 1:] - np.array(self.centre)[1:], axis=1).min(initial=1) - Barbell.SHAFT
+                if gap > .003:
+                    problems.add(frame, side + " toes miss the pull-up bar", gap)
             height = points[vertices, 2].min()
             if self.feet_supported:
                 if not -.006 <= height <= .012:
@@ -4587,16 +4621,18 @@ def planar_grip(pitch):
     return along, Vector((1, 0, 0)).cross(along)
 
 
-def arm_arc_target(side, elbow_x, upper_pitch, grip_x, hand_frame):
+def arm_arc_target(side, elbow_x, upper_pitch, grip_x, hand_frame, fore_direction=None):
     """Keep the elbow on an authored arc and derive the grip from both limb lengths."""
     shoulder = head(side + "Arm")
     upper, fore = segment(side + "Arm", side + "ForeArm", side + "Hand")
-    dx, fore_x = elbow_x - shoulder.x, grip_x - elbow_x
+    dx = elbow_x - shoulder.x
     upper_radius = math.sqrt(upper ** 2 - dx ** 2)
     angle = math.radians(upper_pitch)
     pole = Vector((dx, -upper_radius * math.cos(angle), upper_radius * math.sin(angle)))
     along, palm = hand_frame
-    wrist = shoulder + pole + Vector((fore_x, 0, 0)) + along * math.sqrt(fore ** 2 - fore_x ** 2)
+    fore_x = grip_x - elbow_x - palm.x * GRIP[side][1]
+    lower = along if fore_direction is None else fore_direction
+    wrist = shoulder + pole + Vector((fore_x, 0, 0)) + lower * math.sqrt(fore ** 2 - fore_x ** 2)
     grip = wrist + along * GRIP[side][0] + palm * GRIP[side][1]
     return grip, pole
 
@@ -5309,6 +5345,7 @@ def bake(spec, keys):
     rack_contact = spec.get("rack_contact")
     cradle = spec.get("elbow_cradle")
     floor_hands = spec.get("floor_hands")
+    plant_sides = spec.get("plant_sides", SIDES) if floor_hands else ()
     if (rack_contact or cradle) and type(barbell) is not Barbell:
         raise ValueError("Open rack contact requires a straight barbell")
     core_bench = next((CoreBench(e) for e in spec.get("equipment", []) if e["type"] == "core-bench"), None)
@@ -5318,7 +5355,7 @@ def bake(spec, keys):
     ) if item is not None and item.handles), None)
     for side in SIDES:
         shape = spec.get("hands", {}).get(side, "fist")
-        if (side == support_side or floor_hands) and shape not in ("support", "diamond"):
+        if (side == support_side or side in plant_sides) and shape not in ("support", "diamond"):
             raise ValueError("Bench contact needs the open support hand")
         if rack_contact and shape == "fist":
             raise ValueError("Rack contact requires open hands")
@@ -5705,7 +5742,8 @@ def bake(spec, keys):
                 gaps.append((side + " unloaded arm", gap))
         if floor_hands:
             palm = Vector((0, 0, -1))
-            for side, sign in SIDES.items():
+            for side in plant_sides:
+                sign = SIDES[side]
                 palm_yaw = math.radians(spec.get("palm_toe_in", 0))
                 along = Vector((-sign * math.sin(palm_yaw), -math.cos(palm_yaw), 0))
                 radius, y, z = floor_hands
@@ -5720,7 +5758,7 @@ def bake(spec, keys):
                     out, back, up = spec.get("plant_elbow", (.58, .14, -.45))
                     pole = Vector((sign * out, back, up))
                 gap = pose_arm(side, target, pole, "pronated", torso, contact_frame=(along, palm),
-                               planted_wrist=elevated_palms)
+                               planted_wrist=elevated_palms or len(plant_sides) == 1)
                 gaps.append((side + " floor wrist", gap))
                 if side in planted_sides and not planted:
                     relaxation = relax_unsupported_hand(side, wrist, along, palm, torso)
@@ -5773,10 +5811,22 @@ def bake(spec, keys):
                 pole = torso.direction(elbows, sign)
                 if "arm_arc" in arm_key:
                     elbow_x, pitch = arm_span.sample("arm_arc")
-                    hand_frame = planar_grip(arm_span.sample("grip_pitch"))
-                    grip_point, pole = arm_arc_target(side, sign * elbow_x, pitch,
-                                                     sign * arm_span.sample("grip_x"), hand_frame)
-                    forward_axis = Vector((1, 0, 0))
+                    hand_pitch = arm_span.sample("grip_pitch")
+                    along, palm = planar_grip(hand_pitch)
+                    roll = Matrix.Rotation(sign * math.radians(arm_span.sample("grip_roll", 0)), 3, along)
+                    hand_frame = along, roll @ palm
+                    fore_direction, _ = planar_grip(arm_span.sample("forearm_pitch", hand_pitch))
+                    origin_x = head(side + "Arm").x if arm_key.get("arm_relative_x") else 0
+                    grip_point, pole = arm_arc_target(side, origin_x + sign * elbow_x, pitch,
+                                                     origin_x + sign * arm_span.sample("grip_x"),
+                                                     hand_frame, fore_direction)
+                    forward_axis = roll @ Vector((1, 0, 0))
+                    if "supported_grip" in arm_key:
+                        fixed = Vector(arm_span.sample("supported_grip"))
+                        fixed.x *= sign
+                        support = arm_span.sample("support_weight")
+                        grip_point = grip_point.lerp(fixed, support)
+                        pole = pole.normalized().lerp(torso.direction(elbows, sign), support)
                 elif "wrist_rest" in arm_key:
                     grip_point, hand_frame = supported_wrist(arm_key, arm_span, side)
                     forward_axis = torso.forward
@@ -5789,6 +5839,8 @@ def bake(spec, keys):
                     if "flex_toward" in arm_key:
                         arms["flex_toward"] = arm_span.sample("flex_toward")
                     forward_axis, grip_point = held_point(side, arms, torso)
+                if "load_offset_" + side.lower() in arm_key:
+                    grip_point += Vector(arm_span.sample("load_offset_" + side.lower()))
                 axis = forward_axis if "arm_arc" in arm_key or arm_key.get("grip") == "neutral" else torso.left
                 if "handle_direction" in arm_key:
                     axis = torso.direction(arm_span.sample("handle_direction"), sign)
@@ -5895,7 +5947,7 @@ def bake(spec, keys):
             samples.append(np.array([wall.face + Vector((sign * wall.width / 2, 0, z))
                                      for sign in (-1, 1) for z in (-wall.length / 2, wall.length / 2)]))
         if pullup:
-            pullup.check(everything, contact, hands, grips, frame, problems, samples)
+            pullup.check(everything, contact, hands, grips, frame, problems, samples, phase)
         if core_bench:
             core_bench.check(everything, contact, hands, grips, frame, phase, problems, samples, spec)
         if dip_bars:

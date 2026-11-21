@@ -1,0 +1,51 @@
+{
+  "equipment": [
+    {"type": "dumbbells"}
+  ],
+  "stance": {"width": 0.54, "y": 0.942, "toe_out": 0},
+  "camera": {"angle": 49},
+  "keys": [
+    {"at": 0.0, "pelvis": [0, 0.092, 0.534], "lean": 75, "foot_left": [0, 0, 65, 0], "foot_right": [0, 0, 65, 0], "elbows": [0.42, -1, -0.55], "load_offset_left": [0, 0, 0], "load_offset_right": [0, 0, 0], "clavicle": [0, 0], "head": -8, "grip": "neutral", "grip_pitch": -90, "grip_roll": -90, "supported_grip": [0.276, -0.285, 0.063], "support_weight": 1, "grip_x": 0.276, "arm_arc": [0.29, -85], "forearm_pitch": -92},
+    {"at": 0.0399, "pelvis": [0, 0.1, 0.32], "lean": 82, "foot_left": [0, 0, 62, 0], "foot_right": [0, 0, 62, 0], "elbows": [0.69, -1, -0.25]},
+    {"at": 0.0798, "pelvis": [0, 0.092, 0.534], "lean": 75, "foot_left": [0, 0, 65, 0], "foot_right": [0, 0, 65, 0], "elbows": [0.42, -1, -0.55]},
+    {"at": 0.1197, "load_offset_left": [0.026, 0.148, 0.311]},
+    {"at": 0.1539, "load_offset_left": [0, 0, 0]},
+    {"at": 0.1881, "load_offset_right": [-0.026, 0.148, 0.311]},
+    {"at": 0.2223, "load_offset_right": [0, 0, 0]},
+    {"at": 0.25935, "pelvis": [0, 0.015, 0.48], "lean": 76, "foot_left": [-0.38, 0.13, 40, -0.075], "foot_right": [-0.38, 0.13, 40, 0.075]},
+    {"at": 0.2964, "pelvis": [0, -0.01, 0.444], "lean": 62, "foot_left": [-0.93, 0, 0, -0.138], "foot_right": [-0.93, 0, 0, 0.138], "elbows": [0.3, -0.4, -1], "head": -9, "arm_arc": [0.261, -115.95], "forearm_pitch": -78.96},
+    {"at": 0.3014, "support_weight": 0},
+    {"at": 0.3222, "pelvis": [0, 0.055, 0.61], "lean": 46, "head": -13, "grip_roll": -82, "grip_x": 0.3, "arm_arc": [0.29, -82], "forearm_pitch": -90},
+    {"at": 0.348, "pelvis": [0, 0.045, 0.79], "lean": 29, "clavicle": [0, 1], "head": -8, "grip_pitch": -88, "grip_roll": -63, "grip_x": 0.312, "arm_arc": [0.3, -75], "forearm_pitch": -89},
+    {"at": 0.3738, "pelvis": [0, 0.005, 0.885], "lean": 7, "foot_left": [-0.93, 0, 2, -0.138], "foot_right": [-0.93, 0, 2, 0.138], "clavicle": [0, 5], "head": -2, "grip_pitch": -85, "grip_roll": -42, "grip_x": 0.322, "arm_arc": [0.32, -53], "forearm_pitch": -86},
+    {"at": 0.391, "pelvis": [0, -0.011, 0.916], "lean": 0, "foot_left": [-0.93, 0, 8, -0.138], "foot_right": [-0.93, 0, 8, 0.138], "clavicle": [0, 9], "head": 0, "grip_pitch": -69, "grip_roll": -15, "grip_x": 0.34, "arm_arc": [0.37, 43], "forearm_pitch": -70},
+    {"at": 0.4082, "pelvis": [0, -0.008, 0.89], "lean": 5, "foot_left": [-0.93, 0, 3, -0.138], "foot_right": [-0.93, 0, 3, 0.138], "clavicle": [0, 8], "head": -1, "grip_pitch": -30, "grip_roll": 0, "grip_x": 0.342, "arm_arc": [0.392, 145], "forearm_pitch": -30},
+    {"at": 0.4254, "pelvis": [0, -0.002, 0.83], "lean": 8, "foot_left": [-0.93, 0, 0, -0.138], "foot_right": [-0.93, 0, 0, 0.138], "clavicle": [0, 5], "head": -2, "grip_pitch": 34, "grip_x": 0.34, "arm_arc": [0.393, 218], "forearm_pitch": 34},
+    {"at": 0.45378, "pelvis": [0, 0.035, 0.768], "lean": 11, "clavicle": [0, 3], "head": -3, "grip_pitch": 89, "grip_x": 0.31, "arm_arc": [0.245, 304], "forearm_pitch": 89},
+    {"at": 0.4727, "pelvis": [0, -0.011, 0.87], "lean": 2, "head": -1},
+    {"at": 0.50108, "pelvis": [0, -0.018, 0.889], "lean": 0, "clavicle": [0, 8], "head": 0, "grip_pitch": 85, "grip_x": 0.294, "arm_arc": [0.304, 386], "forearm_pitch": 85},
+    {"at": 0.53634, "pelvis": [0, -0.019, 0.89], "clavicle": [0, 12], "grip_pitch": 89, "grip_x": 0.228, "arm_arc": [0.219, 452], "forearm_pitch": 89},
+    {"at": 0.55},
+    {"at": 0.60201, "pelvis": [0, -0.018, 0.889], "clavicle": [0, 8], "grip_pitch": 85, "grip_x": 0.294, "arm_arc": [0.304, 386], "forearm_pitch": 85},
+    {"at": 0.64146, "pelvis": [0, -0.011, 0.87], "lean": 2, "clavicle": [0, 3], "head": -1, "grip_pitch": 89, "grip_x": 0.31, "arm_arc": [0.245, 304], "forearm_pitch": 89},
+    {"at": 0.66776, "pelvis": [0, 0.035, 0.768], "lean": 11, "head": -3},
+    {"at": 0.70721, "pelvis": [0, -0.002, 0.83], "lean": 8, "clavicle": [0, 5], "head": -2, "grip_pitch": 34, "grip_x": 0.34, "arm_arc": [0.393, 218], "forearm_pitch": 34},
+    {"at": 0.73111, "pelvis": [0, -0.008, 0.89], "lean": 5, "foot_left": [-0.93, 0, 3, -0.138], "foot_right": [-0.93, 0, 3, 0.138], "clavicle": [0, 8], "head": -1, "grip_pitch": -30, "grip_x": 0.342, "arm_arc": [0.392, 145], "forearm_pitch": -30},
+    {"at": 0.75502, "pelvis": [0, -0.011, 0.916], "lean": 0, "foot_left": [-0.93, 0, 8, -0.138], "foot_right": [-0.93, 0, 8, 0.138], "clavicle": [0, 9], "head": 0, "grip_pitch": -69, "grip_roll": -15, "grip_x": 0.34, "arm_arc": [0.37, 43], "forearm_pitch": -70},
+    {"at": 0.77893, "pelvis": [0, 0.005, 0.885], "lean": 7, "foot_left": [-0.93, 0, 2, -0.138], "foot_right": [-0.93, 0, 2, 0.138], "clavicle": [0, 5], "head": -2, "grip_pitch": -85, "grip_roll": -42, "grip_x": 0.322, "arm_arc": [0.32, -53], "forearm_pitch": -86},
+    {"at": 0.81479, "pelvis": [0, 0.045, 0.79], "lean": 29, "foot_left": [-0.93, 0, 0, -0.138], "foot_right": [-0.93, 0, 0, 0.138], "clavicle": [0, 1], "head": -8, "grip_pitch": -88, "grip_roll": -63, "grip_x": 0.312, "arm_arc": [0.3, -75], "forearm_pitch": -89},
+    {"at": 0.85065, "pelvis": [0, 0.055, 0.61], "lean": 46, "clavicle": [0, 0], "head": -13, "grip_pitch": -90, "grip_roll": -82, "grip_x": 0.3, "arm_arc": [0.29, -82], "forearm_pitch": -90},
+    {"at": 0.88052, "pelvis": [0, -0.01, 0.444], "lean": 62, "head": -9, "grip_roll": -90, "grip_x": 0.276, "arm_arc": [0.261, -115.95], "forearm_pitch": -78.96},
+    {"at": 0.88652, "support_weight": 1},
+    {"at": 0.93802, "pelvis": [0, 0.015, 0.48], "lean": 76, "foot_left": [-0.38, 0.13, 40, -0.075], "foot_right": [-0.38, 0.13, 40, 0.075], "elbows": [0.42, -1, -0.55], "head": -8, "arm_arc": [0.29, -85], "forearm_pitch": -92},
+    {"at": 0.98952, "pelvis": [0, 0.092, 0.534], "lean": 75, "foot_left": [0, 0, 65, 0], "foot_right": [0, 0, 65, 0]},
+    {"at": 0.997}
+  ],
+  "checkpoints": [
+    {"at": 0.0399, "elbow": [70, 145]},
+    {"at": 0.1197, "side": "Left", "elbow": [85, 155]},
+    {"at": 0.1881, "side": "Right", "elbow": [85, 155]},
+    {"at": 0.54, "elbow": [0, 14]}
+  ],
+  "frames": 660
+}
