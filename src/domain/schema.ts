@@ -101,6 +101,8 @@ export const SetInput = Schema.Struct({
   rpe: Schema.optional(Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 10 })))),
   durationSeconds: Schema.optional(Schema.NullOr(Int(1, 86_400))),
   distance: Schema.optional(Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1000 })))),
+  /** Something to remember about this set, such as "left knee twinged". Empty or left out means none. */
+  note: Schema.optional(Text(200)),
 })
 
 export type SetInput = typeof SetInput.Type

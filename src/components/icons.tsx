@@ -44,6 +44,22 @@ export function ChevronIcon({ className = "size-5" }: IconProps) {
   )
 }
 
+export function ChevronDownIcon({ className = "size-5" }: IconProps) {
+  return (
+    <svg {...stroke} className={className}>
+      <path d="M5 9l7 7 7-7" />
+    </svg>
+  )
+}
+
+export function ChevronUpIcon({ className = "size-5" }: IconProps) {
+  return (
+    <svg {...stroke} className={className}>
+      <path d="M5 15l7-7 7 7" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ className = "size-5" }: IconProps) {
   return (
     <svg {...stroke} className={className}>

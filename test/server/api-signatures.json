@@ -1167,6 +1167,11 @@
                 "string"
               ]
             },
+            "note": {
+              "kinds": [
+                "string"
+              ]
+            },
             "previous": {
               "array": true,
               "items": {
@@ -1216,6 +1221,11 @@
                   "id": {
                     "kinds": [
                       "number"
+                    ]
+                  },
+                  "note": {
+                    "kinds": [
+                      "string"
                     ]
                   },
                   "planExerciseId": {
@@ -1500,6 +1510,11 @@
     ]
   },
   "removeWorkoutExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "setExerciseNote": {
     "kinds": [
       "null"
     ]

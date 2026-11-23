@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from "react"
+import { adjustRest, REST_MINIMISED_KEY } from "~/domain/rest"
+import { storage } from "@/data/storage"
 import { endRestActivity, showRestActivity } from "./rest-activity"
 import { cancelRestAlert, scheduleRestAlert } from "./rest-alert"
 
@@ -64,10 +66,17 @@ export const startRest = (seconds: number, title: string) => {
   announce(next)
 }
 
-export const extendRest = (seconds: number) => {
+/** Moves the end of the rest by some seconds, later or sooner. Cutting it to nothing ends it. */
+export const adjustCurrentRest = (seconds: number) => {
   if (rest === null) return
 
-  const next = { ...rest, endsAt: rest.endsAt + seconds * 1000, total: rest.total + seconds }
+  const next = adjustRest(rest, seconds, Date.now())
+
+  if (next === null) {
+    clearRest()
+
+    return
+  }
 
   setRest(next)
   announce(next)
@@ -76,4 +85,18 @@ export const extendRest = (seconds: number) => {
 /** Schedules the alert again, for after its sound has been switched on or off. */
 export const refreshRestAlert = () => {
   if (rest !== null && rest.endsAt > Date.now()) void scheduleRestAlert((rest.endsAt - Date.now()) / 1000)
+}
+
+// Whether the timer is minimised to a strip. Remembered, so the next rest starts the same way.
+let minimised = storage.get(REST_MINIMISED_KEY) === "yes"
+
+const getMinimised = () => minimised
+
+export const useRestMinimised = () => useSyncExternalStore(subscribe, getMinimised, getMinimised)
+
+export const setRestMinimised = (next: boolean) => {
+  minimised = next
+  storage.set(REST_MINIMISED_KEY, next ? "yes" : "no")
+
+  for (const listener of listeners) listener()
 }

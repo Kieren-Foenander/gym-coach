@@ -95,8 +95,10 @@ export const testIds = {
   workout: {
     finish: "workout.finish",
     discard: "workout.discard",
-    /** One exercise's card, keyed by the exercise. */
+    /** One exercise's card, keyed by the exercise. Its `data-state` is one of EXERCISE_STATES. */
     exercise: (name: string) => `workout.exercise:${slugFor(name)}`,
+    /** The exercise's name in its card, which opens the exercise's page. */
+    exerciseName: "workout.exercise-name",
     addExercise: "workout.add-exercise",
     weight: "workout.weight",
     /** A cardio exercise's time and distance, in place of weight and reps. */
@@ -106,6 +108,25 @@ export const testIds = {
     logSet: "workout.log-set",
     /** A logged set inside an exercise's card, keyed by its number. */
     set: keyed<number>("workout.set"),
+    /** Inside a logged set: change its weight, reps or note. */
+    editSet: "workout.edit-set",
+    saveSet: "workout.save-set",
+    cancelEdit: "workout.cancel-edit",
+    /** Opens the note field for the set about to be logged or being changed. */
+    addSetNote: "workout.add-set-note",
+    setNote: "workout.set-note",
+    /** The note on one exercise in this workout: the button that opens it, its field, and saving it. */
+    editExerciseNote: "workout.edit-exercise-note",
+    exerciseNote: "workout.exercise-note",
+    saveExerciseNote: "workout.save-exercise-note",
+    /** The rest countdown; `data-value` is the seconds left. */
+    rest: "workout.rest",
+    restLess: "workout.rest-less",
+    restMore: "workout.rest-more",
+    /** Shrinks the rest timer to a strip along the bottom. The rest's `data-state` is "open" or "minimised". */
+    restMinimise: "workout.rest-minimise",
+    /** The minimised strip; tapping it brings the full timer back. */
+    restExpand: "workout.rest-expand",
     summary: "workout.summary",
     summarySets: "workout.summary-sets",
     /** Back to Today from a finished workout. */

@@ -25,7 +25,7 @@ import { PlanScreen } from "@/features/plan/PlanScreen"
 import { SettingsScreen } from "@/features/settings/SettingsScreen"
 import { TodayScreen } from "@/features/today/TodayScreen"
 import { LoadingGuideSheet } from "@/features/workout/LoadingGuideSheet"
-import { AddWorkoutExerciseSheet, SwapExerciseSheet } from "@/features/workout/WorkoutSheets"
+import { AddWorkoutExerciseSheet, ExerciseNoteSheet, SwapExerciseSheet } from "@/features/workout/WorkoutSheets"
 import { WorkoutScreen } from "@/features/workout/WorkoutScreen"
 import { UserContext } from "@/features/user"
 import { colors } from "@/theme"
@@ -55,6 +55,7 @@ export type AppStackParams = {
   readonly AddWorkoutExercise: { readonly workoutId: number }
   readonly SwapExercise: { readonly workoutId: number; readonly planExerciseId: number }
   readonly LoadingGuide: { readonly exerciseName: string; readonly weight: number }
+  readonly ExerciseNote: { readonly workoutId: number; readonly exerciseId: number }
 }
 
 export type AuthStackParams = {
@@ -182,6 +183,7 @@ export function Navigation() {
               <AppStack.Screen name="AddWorkoutExercise" component={AddWorkoutExerciseSheet} />
               <AppStack.Screen name="SwapExercise" component={SwapExerciseSheet} />
               <AppStack.Screen name="LoadingGuide" component={LoadingGuideSheet} />
+              <AppStack.Screen name="ExerciseNote" component={ExerciseNoteSheet} />
             </AppStack.Group>
           </AppStack.Navigator>
         </UserContext>

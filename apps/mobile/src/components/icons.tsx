@@ -38,6 +38,10 @@ export const ArrowDownIcon = (props: IconProps) => <StrokeIcon path="M12 5v14M6 
 
 export const ChevronIcon = (props: IconProps) => <StrokeIcon path="M9 5l7 7-7 7" {...props} />
 
+export const ChevronDownIcon = (props: IconProps) => <StrokeIcon path="M5 9l7 7 7-7" {...props} />
+
+export const ChevronUpIcon = (props: IconProps) => <StrokeIcon path="M5 15l7-7 7 7" {...props} />
+
 export const BackIcon = (props: IconProps) => <StrokeIcon path="M15 5l-7 7 7 7" {...props} />
 
 export const CloseIcon = (props: IconProps) => <StrokeIcon path="M6 6l12 12M18 6L6 18" {...props} />

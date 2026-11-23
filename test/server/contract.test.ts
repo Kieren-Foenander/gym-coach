@@ -104,7 +104,10 @@ const STEPS = {
 
     return record("logSet", { workoutId, exerciseId: first.exerciseId, set: { weight: 60, reps: 7 }, clientKey: "contract-set-2" })
   },
-  updateSet: async () => record("updateSet", { setId: await lastSetId(), set: { weight: 62.5, reps: 6, rpe: 9 } }),
+  updateSet: async () =>
+    record("updateSet", { setId: await lastSetId(), set: { weight: 62.5, reps: 6, rpe: 9, note: "Grip slipped" } }),
+  setExerciseNote: async () =>
+    record("setExerciseNote", { workoutId: await activeWorkoutId(), exerciseId: (await firstPlanExercise()).exerciseId, note: "Seat on 4" }),
   deleteSet: async () => record("deleteSet", { setId: await lastSetId() }),
   swapExercise: async () => {
     const workoutId = await activeWorkoutId()
@@ -224,6 +227,7 @@ const ORDER: ReadonlyArray<CallName> = [
   "getWorkout",
   "logSet",
   "updateSet",
+  "setExerciseNote",
   "logSet",
   "deleteSet",
   "swapExercise",

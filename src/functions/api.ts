@@ -156,6 +156,10 @@ export const updateSet = createServerFn({ method: "POST" })
   .validator(input(CallInputs.updateSet))
   .handler(({ data }) => authed(Calls.updateSet.run(data)))
 
+export const setExerciseNote = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.setExerciseNote))
+  .handler(({ data }) => authed(Calls.setExerciseNote.run(data)))
+
 export const deleteSet = createServerFn({ method: "POST" })
   .validator(input(CallInputs.deleteSet))
   .handler(({ data }) => authed(Calls.deleteSet.run(data)))

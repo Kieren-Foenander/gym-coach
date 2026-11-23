@@ -12,21 +12,21 @@ export const describeItem = (item: LibraryItem): string =>
   item.entry ? `${item.entry.equipment} · ${item.entry.primary.join(", ")}` : item.known?.muscleGroup || "Your own"
 
 /** The poster of an exercise's demonstration, or the app's mark until one has been rendered. */
-function Thumbnail({ entry }: { readonly entry: CatalogExercise | null }) {
+export function ExerciseThumbnail({ entry, size = 48 }: { readonly entry: CatalogExercise | null; readonly size?: number }) {
   const { demoFor, demoFile } = useDemos()
   const demo = entry ? demoFor(entry.slug) : null
 
   return (
-    <View className="size-12 items-center justify-center overflow-hidden rounded-xl bg-ink">
+    <View className="items-center justify-center overflow-hidden rounded-xl bg-ink" style={{ width: size, height: size }}>
       {demo ? (
         <Image
           source={{ uri: `${demoFile(demo, demo.views[0] ?? "front")}.webp` }}
-          style={{ width: 48, height: 48 }}
+          style={{ width: size, height: size }}
           contentFit="cover"
           cachePolicy="disk"
         />
       ) : (
-        <BarbellIcon size={24} color={colors.line} />
+        <BarbellIcon size={size / 2} color={colors.line} />
       )}
     </View>
   )
@@ -42,7 +42,7 @@ interface ExerciseLineProps {
 export function ExerciseLine({ item, trailing }: ExerciseLineProps) {
   return (
     <View className="min-h-16 flex-row items-center gap-3 py-2">
-      <Thumbnail entry={item.entry} />
+      <ExerciseThumbnail entry={item.entry} />
       <View className="flex-1">
         <Text numberOfLines={1} className="font-semibold">
           {item.name}
