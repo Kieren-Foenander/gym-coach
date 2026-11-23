@@ -65,6 +65,14 @@ describe("a workout", { requires: ["browser"] }, () => {
     await screen.getByTestId(testIds.workout.restLess).tap()
     await expect.poll(async () => Number(await rest.getAttribute("data-value"))).toBeLessThanOrEqual(before - 29)
 
+    // Minimised, the timer keeps counting in a strip along the bottom, and a tap brings it back.
+    await screen.getByTestId(testIds.workout.restMinimise).tap()
+    await expect(rest).toHaveAttribute("data-state", "minimised")
+    await expect(screen.getByTestId(testIds.workout.restLess)).not.toBeVisible()
+    await screen.getByTestId(testIds.workout.restExpand).tap()
+    await expect(rest).toHaveAttribute("data-state", "open")
+    await expect(screen.getByTestId(testIds.workout.restLess)).toBeVisible()
+
     const set = second.getByTestId(testIds.workout.set(1))
 
     await set.getByTestId(testIds.workout.editSet).tap()

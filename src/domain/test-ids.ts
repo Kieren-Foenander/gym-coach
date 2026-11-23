@@ -123,6 +123,10 @@ export const testIds = {
     rest: "workout.rest",
     restLess: "workout.rest-less",
     restMore: "workout.rest-more",
+    /** Shrinks the rest timer to a strip along the bottom. The rest's `data-state` is "open" or "minimised". */
+    restMinimise: "workout.rest-minimise",
+    /** The minimised strip; tapping it brings the full timer back. */
+    restExpand: "workout.rest-expand",
     summary: "workout.summary",
     summarySets: "workout.summary-sets",
     /** Back to Today from a finished workout. */

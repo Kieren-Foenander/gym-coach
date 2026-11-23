@@ -19,3 +19,10 @@ export const adjustRest = <R extends RestSpan>(rest: R, seconds: number, now: nu
 
   return { ...rest, endsAt, total: Math.max(1, rest.total + seconds) }
 }
+
+/** How much of the rest has gone, from 0 when it starts to 1 when it runs out. The minimised bar fills up by it. */
+export const restElapsed = (rest: RestSpan, now: number): number =>
+  Math.min(1, Math.max(0, 1 - (rest.endsAt - now) / (rest.total * 1000)))
+
+/** Where both apps remember whether the rest timer was last minimised, so the next rest opens the same way. */
+export const REST_MINIMISED_KEY = "gym.restMinimised"

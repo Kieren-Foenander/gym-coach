@@ -16,7 +16,7 @@ import { useNow } from "@/lib/useNow"
 import type { AppScreenProps } from "@/navigation"
 import { ExerciseCard } from "./ExerciseCard"
 import { FinishedWorkout } from "./FinishedWorkout"
-import { REST_BAR_SPACE, RestBar, useRestShowing } from "./RestBar"
+import { RestBar, useRestSpace } from "./RestBar"
 import { clearRest } from "./rest-timer"
 
 const focusOf = (exercise: ShownExercise): FocusExercise => ({
@@ -58,7 +58,7 @@ function ActiveWorkout({ detail, unit, onLeave, onAdd }: ActiveWorkoutProps) {
 
   const now = useNow(true)
   const outbox = useOutbox()
-  const restShowing = useRestShowing()
+  const restSpace = useRestSpace()
   const { act, pending, error } = useAction()
   const [finishError, setFinishError] = useState<string | null>(null)
   const shown = withPending(detail, outbox.ops)
@@ -144,7 +144,7 @@ function ActiveWorkout({ detail, unit, onLeave, onAdd }: ActiveWorkoutProps) {
   )
 
   return (
-    <Screen header={header} footer={<RestBar />} bottomSpace={restShowing ? REST_BAR_SPACE : 0}>
+    <Screen header={header} footer={<RestBar />} bottomSpace={restSpace}>
       <View className="gap-3">
         <ErrorNote message={finishError ?? error} />
         {outbox.problem === null ? null : (

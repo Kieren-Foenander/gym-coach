@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { ExercisePicker, ExerciseThumbnail } from "~/components/exercise"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, CloseIcon, TrophyIcon } from "~/components/icons"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, TrophyIcon } from "~/components/icons"
 import {
   Button,
   buttonClass,
@@ -22,7 +22,7 @@ import {
 import { catalogByName, isCardio } from "~/domain/catalog"
 import { EXERCISE_STATES, exerciseStates, skippedSetCount, type ExerciseState, type FocusExercise } from "~/domain/focus"
 import { BAR_WEIGHTS, loadKindFor, platesPerSide, warmupFor, type LoadKind } from "~/domain/loading"
-import { REST_STEP_SECONDS } from "~/domain/rest"
+import { REST_STEP_SECONDS, restElapsed } from "~/domain/rest"
 import { distanceUnit, type SetInput, type Unit } from "~/domain/schema"
 import { formatClock, formatCompact, formatDay, formatPrescription, formatReps, formatSet, formatWeight } from "~/format"
 import {
@@ -38,7 +38,15 @@ import {
   updateSet,
 } from "~/functions/api"
 import { primeRestAlert, setSoundEnabled, soundEnabled } from "~/restAlert"
-import { adjustCurrentRest, clearRest, refreshRestAlert, startRest, useRest } from "~/restTimer"
+import {
+  adjustCurrentRest,
+  clearRest,
+  refreshRestAlert,
+  restMinimised,
+  setRestMinimised,
+  startRest,
+  useRest,
+} from "~/restTimer"
 import type { Adjustment, WorkoutDetail, WorkoutExercise, WorkoutSet } from "~/server/repo"
 import { testIds } from "~/domain/test-ids"
 
@@ -95,9 +103,18 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
   const taken = detail.exercises.map((item) => item.exerciseName)
   const restOver = rest !== null && now !== null && restLeft <= 0 && now - rest.endsAt < REST_OVER_MS
   const [sound, setSound] = useState(true)
+  const [minimised, setMinimised] = useState(false)
 
   // The rest itself outlives this page, so a look at an exercise's page mid-rest does not stop it.
-  useEffect(() => setSound(soundEnabled()), [])
+  useEffect(() => {
+    setSound(soundEnabled())
+    setMinimised(restMinimised())
+  }, [])
+
+  const changeMinimised = (next: boolean) => {
+    setRestMinimised(next)
+    setMinimised(next)
+  }
 
   // Phones that support it also buzz. iPhones do not allow this from a web page.
   useEffect(() => {
@@ -169,7 +186,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
 
       <ErrorNote message={error} />
 
-      <div className={`space-y-3 pt-1 ${restLeft > 0 || restOver ? "pb-36" : "pb-4"}`}>
+      <div className={`space-y-3 pt-1 ${restOver || (restLeft > 0 && !minimised) ? "pb-36" : restLeft > 0 ? "pb-20" : "pb-4"}`}>
         {detail.exercises.map((exercise, index) => (
           <ExerciseCard
             key={exercise.exerciseId}
@@ -210,50 +227,15 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
       ) : null}
 
       {restLeft > 0 && rest !== null ? (
-        <div className="bottom-safe fixed inset-x-0 z-30 px-4">
-          <div className="mx-auto max-w-md animate-pop overflow-hidden rounded-3xl border border-white/10 bg-surface/95 shadow-2xl shadow-black/70 backdrop-blur-xl">
-            <div className="flex items-end justify-between gap-2 px-4 pt-3">
-              <div>
-                <p className="eyebrow text-xs text-accent">Rest</p>
-                <p className="display tabular text-5xl" role="timer" data-testid={testIds.workout.rest} data-value={restLeft}>
-                  {formatClock(restLeft)}
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-pressed={sound}
-                className="min-h-11 text-sm font-semibold text-muted"
-                onClick={toggleSound}
-              >
-                Sound: <span className={sound ? "text-accent" : "text-white"}>{sound ? "on" : "off"}</span>
-              </button>
-            </div>
-            {/* Three equal buttons on their own row, so they fit the narrowest phone. */}
-            <div className="grid grid-cols-3 gap-1.5 px-4 pt-2 pb-3">
-              <Button
-                aria-label="30 seconds less"
-                data-testid={testIds.workout.restLess}
-                onClick={() => adjustCurrentRest(-REST_STEP_SECONDS)}
-              >
-                −30s
-              </Button>
-              <Button
-                aria-label="30 seconds more"
-                data-testid={testIds.workout.restMore}
-                onClick={() => adjustCurrentRest(REST_STEP_SECONDS)}
-              >
-                +30s
-              </Button>
-              <Button onClick={clearRest}>Skip</Button>
-            </div>
-            <div className="h-1 bg-raised" aria-hidden="true">
-              <div
-                className="h-full bg-accent transition-[width] duration-1000 ease-linear"
-                style={{ width: `${Math.min(100, (restLeft / rest.total) * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
+        <RestTimer
+          left={restLeft}
+          elapsed={now === null ? 0 : restElapsed(rest, now)}
+          minimised={minimised}
+          onMinimise={() => changeMinimised(true)}
+          onExpand={() => changeMinimised(false)}
+          sound={sound}
+          onToggleSound={toggleSound}
+        />
       ) : null}
 
       {restOver ? (
@@ -319,6 +301,104 @@ const draftOf = (set: WorkoutSet): SetDraft => ({
   effort: set.rpe,
   note: set.note,
 })
+
+interface RestTimerProps {
+  /** Seconds left. */
+  readonly left: number
+  /** How much of the rest has gone, from 0 to 1. */
+  readonly elapsed: number
+  readonly minimised: boolean
+  readonly onMinimise: () => void
+  readonly onExpand: () => void
+  readonly sound: boolean
+  readonly onToggleSound: () => void
+}
+
+/**
+ * The countdown between sets, over the bottom of the workout. Minimised, it is a strip that fills up as the
+ * rest runs out, and a tap anywhere on it brings the full timer back.
+ */
+function RestTimer({ left, elapsed, minimised, onMinimise, onExpand, sound, onToggleSound }: RestTimerProps) {
+  const clock = (className: string) => (
+    <span
+      className={`display tabular block ${className}`}
+      role="timer"
+      data-testid={testIds.workout.rest}
+      data-value={left}
+      data-state={minimised ? "minimised" : "open"}
+    >
+      {formatClock(left)}
+    </span>
+  )
+
+  const fill = (color: string) => (
+    <span
+      aria-hidden="true"
+      className={`absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear ${color}`}
+      style={{ width: `${elapsed * 100}%` }}
+    />
+  )
+
+  if (minimised) {
+    return (
+      <div className="bottom-safe fixed inset-x-0 z-30 px-4">
+        <button
+          type="button"
+          aria-label={`Rest, ${formatClock(left)} left. Show the timer`}
+          data-testid={testIds.workout.restExpand}
+          onClick={onExpand}
+          className="relative mx-auto flex h-14 w-full max-w-md animate-pop items-center gap-3 overflow-hidden rounded-full border border-white/10 bg-surface/95 px-5 text-left shadow-2xl shadow-black/70 backdrop-blur-xl"
+        >
+          {fill("bg-accent/20")}
+          <span className="eyebrow relative text-xs text-accent">Rest</span>
+          <span className="relative">{clock("text-3xl")}</span>
+          <span className="relative ml-auto text-muted">
+            <ChevronUpIcon />
+          </span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bottom-safe fixed inset-x-0 z-30 px-4">
+      <div className="mx-auto max-w-md animate-pop overflow-hidden rounded-3xl border border-white/10 bg-surface/95 shadow-2xl shadow-black/70 backdrop-blur-xl">
+        <div className="flex items-end justify-between gap-2 px-4 pt-3">
+          <div>
+            <p className="eyebrow text-xs text-accent">Rest</p>
+            {clock("text-5xl")}
+          </div>
+          <div className="flex items-center gap-1">
+            <button type="button" aria-pressed={sound} className="min-h-11 px-1 text-sm font-semibold text-muted" onClick={onToggleSound}>
+              Sound: <span className={sound ? "text-accent" : "text-white"}>{sound ? "on" : "off"}</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Minimise the timer"
+              data-testid={testIds.workout.restMinimise}
+              onClick={onMinimise}
+              className="grid size-11 place-items-center rounded-full text-muted active:bg-raised"
+            >
+              <ChevronDownIcon />
+            </button>
+          </div>
+        </div>
+        {/* Three equal buttons on their own row, so they fit the narrowest phone. */}
+        <div className="grid grid-cols-3 gap-1.5 px-4 pt-2 pb-3">
+          <Button aria-label="30 seconds less" data-testid={testIds.workout.restLess} onClick={() => adjustCurrentRest(-REST_STEP_SECONDS)}>
+            −30s
+          </Button>
+          <Button aria-label="30 seconds more" data-testid={testIds.workout.restMore} onClick={() => adjustCurrentRest(REST_STEP_SECONDS)}>
+            +30s
+          </Button>
+          <Button onClick={clearRest}>Skip</Button>
+        </div>
+        {/* Fills up as the rest runs out, the same as the minimised strip. */}
+        <div className="relative h-1 bg-raised">{fill("bg-accent")}</div>
+      </div>
+    </div>
+  )
+}
 
 function ExerciseCard({ exercise, position, state, unit, workoutId, taken, onLogged }: ExerciseCardProps) {
   const { act, pending, error } = useAction()

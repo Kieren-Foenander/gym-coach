@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import { adjustRest, type RestSpan } from "~/domain/rest"
+import { adjustRest, REST_MINIMISED_KEY, type RestSpan } from "~/domain/rest"
 import { cancelRestAlert, scheduleRestAlert } from "~/restAlert"
 
 /**
@@ -77,4 +77,21 @@ export const adjustCurrentRest = (seconds: number) => {
 export const refreshRestAlert = () => {
   if (rest !== null && rest.endsAt > Date.now()) scheduleRestAlert((rest.endsAt - Date.now()) / 1000)
   else cancelRestAlert()
+}
+
+/** Whether the timer was last minimised, so the next rest starts the same way. */
+export const restMinimised = (): boolean => {
+  try {
+    return window.localStorage.getItem(REST_MINIMISED_KEY) === "yes"
+  } catch {
+    return false
+  }
+}
+
+export const setRestMinimised = (minimised: boolean) => {
+  try {
+    window.localStorage.setItem(REST_MINIMISED_KEY, minimised ? "yes" : "no")
+  } catch {
+    // Private browsing can refuse storage. The choice then lasts for this visit only.
+  }
 }
