@@ -294,16 +294,23 @@ export function useAction() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const act = async (work: () => Promise<void>) => {
+  /** Runs `work`, then reloads the page's data. True when both went through. */
+  const act = async (work: () => Promise<void>): Promise<boolean> => {
     setPending(true)
     setError(null)
 
     try {
       await work()
-      await router.invalidate()
+      // sync waits for the fresh data. Without it the reload runs in the background, and the page
+      // shows the old numbers for as long as the round trip takes.
+      await router.invalidate({ sync: true })
+
+      return true
     } catch (cause) {
       if (isRedirect(cause)) await router.navigate({ to: "/login" })
       else setError(cause instanceof Error ? cause.message : "Something went wrong")
+
+      return false
     } finally {
       setPending(false)
     }

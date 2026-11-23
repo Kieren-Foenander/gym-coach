@@ -6,7 +6,7 @@ import type { WorkoutDetail } from "~/server/repo"
 import { isApiError } from "@/api/client"
 import { call, getSession, onSessionChange } from "@/api/session"
 import { workoutKey } from "@/data/calls"
-import { withoutOp, withoutSet, withSentSet, type PendingOp, type SetValues } from "./outbox"
+import { withChangedSet, withEditedSet, withoutOp, withoutSet, withSentSet, type PendingOp, type SetValues } from "./outbox"
 import { queryClient } from "./query-client"
 import { storage } from "./storage"
 
@@ -33,6 +33,13 @@ const RETRY_MS = 15_000
 
 let state: OutboxState = { ops: [], sending: null, problem: null }
 let flushing = false
+
+// The id the server gave each set sent this session, by the key it waited under, so a form opened on a
+// waiting set can still save once the set has been sent.
+const sentIds = new Map<string, number>()
+
+/** The id the server gave a set that waited under this key, once it has been sent. */
+export const sentSetId = (pendingKey: string): number | null => sentIds.get(pendingKey) ?? null
 
 const listeners = new Set<() => void>()
 
@@ -85,9 +92,18 @@ const send = async (op: PendingOp) => {
       clientKey: op.key,
     })
 
+    sentIds.set(op.key, setId)
+
     queryClient.setQueryData<WorkoutDetail>(workoutKey(op.workoutId), (detail) =>
       detail ? withSentSet(detail, op, setId) : detail,
     )
+
+    return
+  }
+
+  if (op.kind === "updateSet") {
+    await call("updateSet", { setId: op.setId, set: op.set })
+    queryClient.setQueryData<WorkoutDetail>(workoutKey(op.workoutId), (detail) => (detail ? withChangedSet(detail, op) : detail))
 
     return
   }
@@ -158,6 +174,24 @@ export const withdrawSet = (key: string) => {
 export const removeSet = (workoutId: number, setId: number) => {
   setState({ ...state, ops: [...state.ops, { kind: "deleteSet", key: Crypto.randomUUID(), workoutId, setId }] })
   void flushOutbox()
+}
+
+/**
+ * Changes a set's values. It shows at once and the server is told as soon as possible.
+ * Returns false when the set is being sent at this moment, so it cannot be changed yet.
+ */
+export const editSet = (
+  target: { readonly workoutId: number; readonly setId: number; readonly pendingKey: string | null },
+  values: SetValues,
+): boolean => {
+  const ops = withEditedSet(state.ops, target, values, state.sending, Crypto.randomUUID(), sentIds)
+
+  if (ops === null) return false
+
+  setState({ ...state, ops })
+  void flushOutbox()
+
+  return true
 }
 
 /** Drops everything waiting for a workout, for when the workout itself is discarded. */
