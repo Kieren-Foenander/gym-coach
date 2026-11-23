@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { adjustRest } from "~/domain/rest"
 import { endRestActivity, showRestActivity } from "./rest-activity"
 import { cancelRestAlert, scheduleRestAlert } from "./rest-alert"
 
@@ -64,10 +65,17 @@ export const startRest = (seconds: number, title: string) => {
   announce(next)
 }
 
-export const extendRest = (seconds: number) => {
+/** Moves the end of the rest by some seconds, later or sooner. Cutting it to nothing ends it. */
+export const adjustCurrentRest = (seconds: number) => {
   if (rest === null) return
 
-  const next = { ...rest, endsAt: rest.endsAt + seconds * 1000, total: rest.total + seconds }
+  const next = adjustRest(rest, seconds, Date.now())
+
+  if (next === null) {
+    clearRest()
+
+    return
+  }
 
   setRest(next)
   announce(next)

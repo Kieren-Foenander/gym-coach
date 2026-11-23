@@ -55,6 +55,8 @@ export const CallInputs = {
   }),
   swapExercise: Schema.Struct({ workoutId: Id, planExerciseId: Id, exercise: ExerciseName }),
   updateSet: Schema.Struct({ setId: Id, set: SetInput }),
+  /** A note on one exercise in this workout, such as "seat on 4". An empty note removes it. */
+  setExerciseNote: Schema.Struct({ workoutId: Id, exerciseId: Id, note: Schema.Trim.check(Schema.isMaxLength(500)) }),
   deleteSet: Schema.Struct({ setId: Id }),
   finishWorkout: Schema.Struct({ workoutId: Id }),
   discardWorkout: Schema.Struct({ workoutId: Id }),

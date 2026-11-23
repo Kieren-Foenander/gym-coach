@@ -54,13 +54,14 @@ export const describeItem = (item: LibraryItem): string =>
 const isMuscle = (text: string): text is Muscle => MUSCLES.some((muscle) => muscle === text)
 
 /** The poster of an exercise's demonstration, or the app's mark until one has been rendered. */
-function Thumbnail({ entry }: { readonly entry: CatalogExercise | null }) {
-  const demo = entry ? demoFor(entry.slug) : null
+export function ExerciseThumbnail({ entry, className = "size-12" }: { readonly entry: CatalogExercise | null; readonly className?: string }) {
+  const [failed, setFailed] = useState(false)
+  const demo = entry && !failed ? demoFor(entry.slug) : null
 
   return (
-    <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-ink text-line">
+    <span className={`flex ${className} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-ink text-line`}>
       {demo ? (
-        <img src={`${demoFile(demo, demo.views[0] ?? "front")}.webp`} alt="" loading="lazy" className="size-full object-cover" />
+        <img src={`${demoFile(demo, demo.views[0] ?? "front")}.webp`} alt="" loading="lazy" className="size-full object-cover" onError={() => setFailed(true)} />
       ) : (
         <BarbellIcon className="size-6" />
       )}
@@ -78,7 +79,7 @@ interface ExerciseLineProps {
 export function ExerciseLine({ item, trailing }: ExerciseLineProps) {
   return (
     <>
-      <Thumbnail entry={item.entry} />
+      <ExerciseThumbnail entry={item.entry} />
       <span className="min-w-0 flex-1 text-left">
         <span className="block truncate font-semibold">{item.name}</span>
         <span className="block truncate text-sm text-muted">

@@ -1,3 +1,4 @@
+import { catalogByName, type Equipment } from "./catalog"
 import type { Unit } from "./schema"
 
 /** Plate sizes found in most gyms, heaviest first. */
@@ -61,6 +62,63 @@ export const warmupSets = (target: number, bar: number, unit: Unit): ReadonlyArr
     const heaviest = sets.at(-1)?.weight ?? 0
 
     if (weight > Math.max(bar, heaviest) && weight < target) sets.push({ weight, reps })
+  }
+
+  return sets
+}
+
+/**
+ * How an exercise is loaded, which decides what its warm-up looks like:
+ * - bar: plates on a bar, warmed up from the empty bar;
+ * - stack: a machine or cable, warmed up with lighter settings and no bar;
+ * - dumbbells: dumbbells or kettlebells, warmed up with lighter ones;
+ * - none: bodyweight or bands, which need no weighted warm-up.
+ */
+export type LoadKind = "bar" | "stack" | "dumbbells" | "none"
+
+const LOAD_KINDS: Record<Equipment, LoadKind> = {
+  Barbell: "bar",
+  "EZ bar": "bar",
+  "Trap bar": "bar",
+  "Smith machine": "bar",
+  Machine: "stack",
+  Cable: "stack",
+  Plate: "stack",
+  Other: "stack",
+  Dumbbell: "dumbbells",
+  Kettlebell: "dumbbells",
+  Bodyweight: "none",
+  Band: "none",
+}
+
+/** How an exercise is loaded. One the library does not know is treated as a barbell lift, which shows the most. */
+export const loadKindFor = (exerciseName: string): LoadKind => {
+  const entry = catalogByName(exerciseName)
+
+  return entry ? LOAD_KINDS[entry.equipment] : "bar"
+}
+
+/** Lighter sets on the same machine or dumbbells: no empty bar to start from, so the ramp starts lower and does more reps. */
+const LIGHT_RAMP = [
+  { fraction: 0.4, reps: 10 },
+  { fraction: 0.6, reps: 6 },
+  { fraction: 0.8, reps: 3 },
+] as const
+
+/** The warm-up for an exercise loaded the given way. The bar weight only counts for a bar. */
+export const warmupFor = (kind: LoadKind, target: number, bar: number, unit: Unit): ReadonlyArray<WarmupSet> => {
+  if (kind === "none") return []
+
+  if (kind === "bar") return warmupSets(target, bar, unit)
+
+  // Stacks and dumbbell racks jump in bigger steps than plates do.
+  const step = kind === "stack" ? (unit === "kg" ? 5 : 10) : unit === "kg" ? 2 : 5
+  const sets: Array<WarmupSet> = []
+
+  for (const { fraction, reps } of LIGHT_RAMP) {
+    const weight = Math.round((target * fraction) / step) * step
+
+    if (weight > (sets.at(-1)?.weight ?? 0) && weight < target) sets.push({ weight, reps })
   }
 
   return sets

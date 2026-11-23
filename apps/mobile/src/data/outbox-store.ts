@@ -6,7 +6,7 @@ import type { WorkoutDetail } from "~/server/repo"
 import { isApiError } from "@/api/client"
 import { call, getSession, onSessionChange } from "@/api/session"
 import { workoutKey } from "@/data/calls"
-import { withoutOp, withoutSet, withSentSet, type PendingOp, type SetValues } from "./outbox"
+import { withChangedSet, withEditedSet, withoutOp, withoutSet, withSentSet, type PendingOp, type SetValues } from "./outbox"
 import { queryClient } from "./query-client"
 import { storage } from "./storage"
 
@@ -92,6 +92,13 @@ const send = async (op: PendingOp) => {
     return
   }
 
+  if (op.kind === "updateSet") {
+    await call("updateSet", { setId: op.setId, set: op.set })
+    queryClient.setQueryData<WorkoutDetail>(workoutKey(op.workoutId), (detail) => (detail ? withChangedSet(detail, op) : detail))
+
+    return
+  }
+
   await call("deleteSet", { setId: op.setId })
   queryClient.setQueryData<WorkoutDetail>(workoutKey(op.workoutId), (detail) =>
     detail ? withoutSet(detail, op.setId) : detail,
@@ -158,6 +165,24 @@ export const withdrawSet = (key: string) => {
 export const removeSet = (workoutId: number, setId: number) => {
   setState({ ...state, ops: [...state.ops, { kind: "deleteSet", key: Crypto.randomUUID(), workoutId, setId }] })
   void flushOutbox()
+}
+
+/**
+ * Changes a set's values. It shows at once and the server is told as soon as possible.
+ * Returns false when the set is being sent at this moment, so it cannot be changed yet.
+ */
+export const editSet = (
+  target: { readonly workoutId: number; readonly setId: number; readonly pendingKey: string | null },
+  values: SetValues,
+): boolean => {
+  const ops = withEditedSet(state.ops, target, values, state.sending, Crypto.randomUUID())
+
+  if (ops === null) return false
+
+  setState({ ...state, ops })
+  void flushOutbox()
+
+  return true
 }
 
 /** Drops everything waiting for a workout, for when the workout itself is discarded. */

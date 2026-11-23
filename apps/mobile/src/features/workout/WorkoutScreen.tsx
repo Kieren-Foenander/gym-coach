@@ -1,6 +1,7 @@
 import { useKeepAwake } from "expo-keep-awake"
 import { useState } from "react"
 import { Alert, View } from "react-native"
+import { exerciseStates, skippedSetCount, type FocusExercise } from "~/domain/focus"
 import type { Unit } from "~/domain/units"
 import { formatClock } from "~/format"
 import type { WorkoutDetail } from "~/server/repo"
@@ -8,15 +9,21 @@ import { describeError } from "@/api/client"
 import { call } from "@/api/session"
 import { BackLink, Button, Display, Empty, ErrorNote, Loading, Screen, Text } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
-import { waitingFor, withPending } from "@/data/outbox"
+import { waitingFor, withPending, type ShownExercise } from "@/data/outbox"
 import { dismissOutboxProblem, flushOutbox, forgetWorkout, pendingOps, useOutbox } from "@/data/outbox-store"
 import { useUser } from "@/features/user"
 import { useNow } from "@/lib/useNow"
 import type { AppScreenProps } from "@/navigation"
-import { ExerciseCard, isDone } from "./ExerciseCard"
+import { ExerciseCard } from "./ExerciseCard"
 import { FinishedWorkout } from "./FinishedWorkout"
 import { REST_BAR_SPACE, RestBar, useRestShowing } from "./RestBar"
 import { clearRest } from "./rest-timer"
+
+const focusOf = (exercise: ShownExercise): FocusExercise => ({
+  planned: exercise.target?.sets ?? 0,
+  logged: exercise.sets.length,
+  latest: exercise.sets.reduce<number | null>((latest, set) => Math.max(latest ?? 0, set.order), null),
+})
 
 export function WorkoutScreen({ navigation, route }: AppScreenProps<"Workout">) {
   const user = useUser()
@@ -65,9 +72,9 @@ function ActiveWorkout({ detail, unit, onLeave, onAdd }: ActiveWorkoutProps) {
     0,
   )
 
-  // The first planned exercise still to do, or failing that the one added most recently.
-  const currentId = (shown.exercises.find((exercise) => exercise.target !== null && !isDone(exercise)) ?? shown.exercises.at(-1))
-    ?.exerciseId
+  const focus = shown.exercises.map(focusOf)
+  const states = exerciseStates(focus)
+  const skippedSets = skippedSetCount(focus)
 
   const finish = () =>
     act(async () => {
@@ -115,6 +122,7 @@ function ActiveWorkout({ detail, unit, onLeave, onAdd }: ActiveWorkoutProps) {
           <Text className="text-sm tabular-nums text-muted">
             {formatClock((now - detail.workout.startedAt) / 1000)}
             {prescribed > 0 ? ` · ${completed} of ${prescribed} sets` : ""}
+            {skippedSets > 0 ? ` · ${skippedSets} skipped` : ""}
             {waiting > 0 ? ` · ${waiting} to send` : ""}
           </Text>
         </View>
@@ -152,7 +160,7 @@ function ActiveWorkout({ detail, unit, onLeave, onAdd }: ActiveWorkoutProps) {
             key={exercise.exerciseId}
             exercise={exercise}
             position={index + 1}
-            current={exercise.exerciseId === currentId}
+            state={states[index] ?? "todo"}
             unit={unit}
             workoutId={workoutId}
           />

@@ -87,6 +87,9 @@ export const Calls = {
     Repo.swapExercise(data.workoutId, data.planExerciseId, data.exercise),
   ),
   updateSet: define(CallInputs.updateSet, (data) => Repo.updateSet(data.setId, data.set)),
+  setExerciseNote: define(CallInputs.setExerciseNote, (data) =>
+    Repo.setExerciseNote(data.workoutId, data.exerciseId, data.note),
+  ),
   deleteSet: define(CallInputs.deleteSet, (data) => Repo.deleteSet(data.setId)),
   finishWorkout: define(CallInputs.finishWorkout, (data) => Repo.finishWorkout(data.workoutId)),
   discardWorkout: define(CallInputs.discardWorkout, (data) => Repo.discardWorkout(data.workoutId)),

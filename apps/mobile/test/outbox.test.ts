@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest"
 import type { WorkoutDetail, WorkoutSet } from "~/server/repo"
-import { waitingFor, withoutOp, withoutSet, withPending, withSentSet, type LogSetOp, type PendingOp } from "@/data/outbox"
+import {
+  waitingFor,
+  withChangedSet,
+  withEditedSet,
+  withoutOp,
+  withoutSet,
+  withPending,
+  withSentSet,
+  type LogSetOp,
+  type PendingOp,
+  type UpdateSetOp,
+} from "@/data/outbox"
 
 const set = (id: number, exerciseId: number, setNumber: number): WorkoutSet => ({
   id,
@@ -12,13 +23,14 @@ const set = (id: number, exerciseId: number, setNumber: number): WorkoutSet => (
   rpe: null,
   durationSeconds: null,
   distance: null,
+  note: "",
 })
 
 const detail: WorkoutDetail = {
   workout: { id: 1, planDayId: null, name: "Push", startedAt: 0, finishedAt: null, notes: "" },
   exercises: [
-    { exerciseId: 10, exerciseName: "Bench Press", target: null, swappedFrom: null, previous: [], sets: [set(100, 10, 1)] },
-    { exerciseId: 11, exerciseName: "Dip", target: null, swappedFrom: null, previous: [], sets: [] },
+    { exerciseId: 10, exerciseName: "Bench Press", target: null, swappedFrom: null, note: "", previous: [], sets: [set(100, 10, 1)] },
+    { exerciseId: 11, exerciseName: "Dip", target: null, swappedFrom: null, note: "", previous: [], sets: [] },
   ],
   adjustments: [],
   records: [],
@@ -33,12 +45,20 @@ const logged = (key: string, exerciseId: number, workoutId = 1): LogSetOp => ({
   set: { weight: 62.5, reps: 6, rpe: 9 },
 })
 
+const changed = (key: string, setId: number, weight: number): UpdateSetOp => ({
+  kind: "updateSet",
+  key,
+  workoutId: 1,
+  setId,
+  set: { weight, reps: 5, note: " Belt " },
+})
+
 const setsOf = (ops: ReadonlyArray<PendingOp>, exerciseId: number) =>
   withPending(detail, ops).exercises.find((exercise) => exercise.exerciseId === exerciseId)?.sets ?? []
 
 describe("withPending", () => {
   it("leaves the workout as it is when nothing is waiting", () => {
-    expect(setsOf([], 10)).toEqual([{ ...set(100, 10, 1), pendingKey: null }])
+    expect(setsOf([], 10)).toEqual([{ ...set(100, 10, 1), pendingKey: null, order: 100 }])
   })
 
   it("adds sets that are waiting after the ones the server has, in the order they were logged", () => {
@@ -60,6 +80,55 @@ describe("withPending", () => {
 
   it("ignores what is waiting for another workout", () => {
     expect(setsOf([logged("a", 10, 2)], 10)).toHaveLength(1)
+  })
+
+  it("shows the latest change waiting for a set the server has", () => {
+    const sets = setsOf([changed("u1", 100, 70), changed("u2", 100, 72.5)], 10)
+
+    expect(sets).toMatchObject([{ id: 100, weight: 72.5, reps: 5, note: "Belt", pendingKey: null }])
+  })
+
+  it("orders waiting sets after the server's, in the order they were logged", () => {
+    const orders = withPending(detail, [logged("a", 11), logged("b", 10)]).exercises.map((exercise) =>
+      exercise.sets.map((item) => item.order),
+    )
+
+    expect(orders[0]![0]).toBe(100)
+    expect(orders[0]![1]).toBeGreaterThan(orders[1]![0]!)
+  })
+})
+
+describe("withEditedSet", () => {
+  const values = { weight: 80, reps: 3 }
+
+  it("logs a set still waiting with the new values instead", () => {
+    const ops = withEditedSet([logged("a", 10)], { workoutId: 1, setId: 0, pendingKey: "a" }, values, null, "new")
+
+    expect(ops).toEqual([{ ...logged("a", 10), set: values }])
+  })
+
+  it("queues a change for a set the server has, and replaces one not yet sent", () => {
+    const once = withEditedSet([], { workoutId: 1, setId: 100, pendingKey: null }, values, null, "u1")!
+    const twice = withEditedSet(once, { workoutId: 1, setId: 100, pendingKey: null }, { weight: 85, reps: 2 }, null, "u2")!
+
+    expect(once).toEqual([{ kind: "updateSet", key: "u1", workoutId: 1, setId: 100, set: values }])
+    expect(twice).toEqual([{ kind: "updateSet", key: "u1", workoutId: 1, setId: 100, set: { weight: 85, reps: 2 } }])
+  })
+
+  it("queues another change when the last one is on its way", () => {
+    const sending = withEditedSet([], { workoutId: 1, setId: 100, pendingKey: null }, values, null, "u1")!
+
+    expect(withEditedSet(sending, { workoutId: 1, setId: 100, pendingKey: null }, values, "u1", "u2")).toHaveLength(2)
+  })
+
+  it("refuses to change a set while it is being sent", () => {
+    expect(withEditedSet([logged("a", 10)], { workoutId: 1, setId: 0, pendingKey: "a" }, values, "a", "new")).toBeNull()
+  })
+})
+
+describe("withChangedSet", () => {
+  it("puts the confirmed values on the set", () => {
+    expect(withChangedSet(detail, changed("u", 100, 70)).exercises[0]?.sets[0]).toMatchObject({ weight: 70, note: "Belt" })
   })
 })
 

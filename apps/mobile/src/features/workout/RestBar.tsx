@@ -2,11 +2,13 @@ import * as Haptics from "expo-haptics"
 import { useEffect, useState } from "react"
 import { Pressable, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { REST_STEP_SECONDS } from "~/domain/rest"
+import { testIds } from "~/domain/test-ids"
 import { formatClock } from "~/format"
 import { Button, Display, Eyebrow, Text } from "@/components/ui"
 import { useNow } from "@/lib/useNow"
 import { setSoundEnabled, soundEnabled } from "./rest-alert"
-import { clearRest, extendRest, refreshRestAlert, useRest } from "./rest-timer"
+import { adjustCurrentRest, clearRest, refreshRestAlert, useRest } from "./rest-timer"
 
 /** How long the "rest over" message stays up. */
 const REST_OVER_MS = 6000
@@ -69,13 +71,20 @@ export function RestBar() {
           <View className="flex-row items-center justify-between gap-3 px-4 pt-3">
             <View>
               <Eyebrow className="text-xs text-accent">Rest</Eyebrow>
-              <Display accessibilityRole="timer" className="text-5xl tabular-nums">
+              <Display testID={testIds.workout.rest} accessibilityRole="timer" className="text-5xl tabular-nums">
                 {formatClock(left)}
               </Display>
             </View>
-            <View className="flex-row gap-2">
-              <Button onPress={() => extendRest(30)}>+30s</Button>
-              <Button onPress={clearRest}>Skip</Button>
+            <View className="flex-row gap-1.5">
+              <Button className="px-3" testID={testIds.workout.restLess} accessibilityLabel="30 seconds less" onPress={() => adjustCurrentRest(-REST_STEP_SECONDS)}>
+                −30s
+              </Button>
+              <Button className="px-3" testID={testIds.workout.restMore} accessibilityLabel="30 seconds more" onPress={() => adjustCurrentRest(REST_STEP_SECONDS)}>
+                +30s
+              </Button>
+              <Button className="px-3" onPress={clearRest}>
+                Skip
+              </Button>
             </View>
           </View>
           <Pressable

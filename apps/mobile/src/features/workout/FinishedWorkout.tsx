@@ -104,6 +104,14 @@ export function FinishedWorkout({ detail, unit }: FinishedWorkoutProps) {
               ))}
               {isCardio(exercise.exerciseName) ? null : <Text className="pl-1 text-sm text-faint">{unit}</Text>}
             </View>
+            {exercise.sets.map((set, index) =>
+              set.note === "" ? null : (
+                <Text key={set.id} className="pt-1 text-sm text-muted">
+                  Set {index + 1}: {set.note}
+                </Text>
+              ),
+            )}
+            {exercise.note === "" ? null : <Text className="pt-2 text-sm text-muted">{exercise.note}</Text>}
           </Pressable>
         ))}
       </View>

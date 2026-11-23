@@ -134,6 +134,28 @@ describe("training", () => {
     expect((await me.call("getWorkout", { workoutId })).exercises[0]!.sets).toHaveLength(1)
   })
 
+  it("corrects a logged set and keeps notes on sets and exercises", async () => {
+    const me = await server.signUp()
+    const workoutId = await me.call("startOpenWorkout", {})
+
+    await me.call("addWorkoutExercise", { workoutId, exercise: "Squat" })
+    const { exerciseId } = (await me.call("getWorkout", { workoutId })).exercises[0]!
+    const setId = await me.call("logSet", { workoutId, exerciseId, set: { weight: 100, reps: 5, note: " belt on " } })
+
+    await me.call("updateSet", { setId, set: { weight: 105, reps: 4, note: "Belt on" } })
+    await me.call("setExerciseNote", { workoutId, exerciseId, note: "  Rack on 12  " })
+
+    const exercise = (await me.call("getWorkout", { workoutId })).exercises[0]!
+
+    expect(exercise.sets).toMatchObject([{ id: setId, weight: 105, reps: 4, note: "Belt on" }])
+    expect(exercise.note).toBe("Rack on 12")
+
+    await me.call("finishWorkout", { workoutId })
+    await me.call("setExerciseNote", { workoutId, exerciseId, note: "" })
+
+    expect((await me.call("getWorkout", { workoutId })).exercises[0]!.note).toBe("")
+  })
+
   it("puts a finished workout on the calendar and leaves a discarded one off", async () => {
     const me = await server.signUp()
     const kept = await me.call("startOpenWorkout", {})

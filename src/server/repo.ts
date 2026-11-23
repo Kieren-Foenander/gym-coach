@@ -109,6 +109,8 @@ export interface WorkoutSet {
   /** Set for cardio, which is logged by time. */
   readonly durationSeconds: number | null
   readonly distance: number | null
+  /** What the user wrote on the set while doing it. Empty when nothing. */
+  readonly note: string
 }
 
 export interface Workout {
@@ -157,6 +159,8 @@ export interface WorkoutExercise {
   readonly sets: ReadonlyArray<WorkoutSet>
   /** The planned exercise this one stands in for, when it was swapped in for this workout. */
   readonly swappedFrom: string | null
+  /** What the user wrote on this exercise during this workout. Empty when nothing. */
+  readonly note: string
   /** What was done for this exercise in the most recent earlier workout. */
   readonly previous: ReadonlyArray<Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">>
 }
@@ -606,7 +610,7 @@ const workoutSets = Effect.fn("workoutSets")(function* (workoutId: number) {
 
   return yield* sql<WorkoutSet & { exerciseName: string }>`
     SELECT s.id, s.exercise_id, e.name AS exercise_name, s.plan_exercise_id, s.set_number, s.weight, s.reps, s.rpe,
-      s.duration_seconds, s.distance
+      s.duration_seconds, s.distance, s.note
     FROM workout_sets s JOIN exercises e ON e.id = s.exercise_id
     WHERE s.workout_id = ${workoutId} ORDER BY s.set_number, s.id`
 })
@@ -717,6 +721,9 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
     }
   }
 
+  const notes = yield* sql<{ exerciseId: number; body: string }>`
+    SELECT exercise_id, body FROM workout_exercise_notes WHERE workout_id = ${workout.id}`
+
   const exercises = yield* Effect.forEach(
     entries,
     ([exerciseId, entry]) =>
@@ -725,6 +732,7 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
         exerciseName: entry.exerciseName,
         target: entry.target,
         swappedFrom: entry.swappedFrom,
+        note: notes.find((note) => note.exerciseId === exerciseId)?.body ?? "",
         sets: sets.flatMap((set): ReadonlyArray<WorkoutSet> =>
           set.exerciseId === exerciseId
             ? [
@@ -738,6 +746,7 @@ export const getWorkoutDetail = Effect.fn("getWorkoutDetail")(function* (workout
                   rpe: set.rpe,
                   durationSeconds: set.durationSeconds,
                   distance: set.distance,
+                  note: set.note,
                 },
               ]
             : [],
@@ -802,12 +811,12 @@ export const logSet = Effect.fn("logSet")(function* (
   const rows = yield* sql<{ id: number }>`
     INSERT INTO workout_sets
       (workout_id, exercise_id, plan_exercise_id, set_number, weight, reps, rpe, duration_seconds, distance,
-        client_key, created_at)
+        note, client_key, created_at)
     VALUES (${workout.id}, ${input.exerciseId}, ${planExercises[0]?.id ?? null},
       (SELECT COALESCE(MAX(set_number), 0) + 1 FROM workout_sets
         WHERE workout_id = ${workout.id} AND exercise_id = ${input.exerciseId}),
       ${input.weight}, ${input.reps}, ${input.rpe ?? null}, ${input.durationSeconds ?? null},
-      ${input.distance || null}, ${clientKey}, ${yield* now})
+      ${input.distance || null}, ${input.note?.trim() ?? ""}, ${clientKey}, ${yield* now})
     RETURNING id`
 
   return rows[0]!.id
@@ -924,8 +933,31 @@ export const updateSet = Effect.fn("updateSet")(function* (setId: number, input:
   const sql = yield* sqlClient
   const set = yield* ownedSet(setId)
   yield* sql`UPDATE workout_sets SET weight = ${input.weight}, reps = ${input.reps}, rpe = ${input.rpe ?? null},
-    duration_seconds = ${input.durationSeconds ?? null}, distance = ${input.distance || null}
+    duration_seconds = ${input.durationSeconds ?? null}, distance = ${input.distance || null},
+    note = ${input.note?.trim() ?? ""}
     WHERE id = ${set.id}`
+})
+
+/** Writes the note on one exercise in a workout, finished or not. An empty note removes it. */
+export const setExerciseNote = Effect.fn("setExerciseNote")(function* (workoutId: number, exerciseId: number, note: string) {
+  const sql = yield* sqlClient
+  const user = yield* CurrentUser
+  const workout = yield* ownedWorkout(workoutId)
+  const body = note.trim()
+
+  const exercises = yield* sql<{ id: number }>`SELECT id FROM exercises WHERE id = ${exerciseId} AND user_id = ${user.id}`
+
+  if (!exercises[0]) return yield* new NotFound({ what: `Exercise ${exerciseId}` })
+
+  if (body === "") {
+    yield* sql`DELETE FROM workout_exercise_notes WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId}`
+
+    return
+  }
+
+  yield* sql`
+    INSERT INTO workout_exercise_notes (workout_id, exercise_id, body) VALUES (${workout.id}, ${exerciseId}, ${body})
+    ON CONFLICT (workout_id, exercise_id) DO UPDATE SET body = excluded.body`
 })
 
 export const deleteSet = Effect.fn("deleteSet")(function* (setId: number) {
@@ -940,6 +972,7 @@ export const discardWorkout = Effect.fn("discardWorkout")(function* (workoutId: 
   yield* sql`DELETE FROM workout_sets WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workout_extras WHERE workout_id = ${workout.id}`
+  yield* sql`DELETE FROM workout_exercise_notes WHERE workout_id = ${workout.id}`
   yield* sql`DELETE FROM workouts WHERE id = ${workout.id}`
 })
 
@@ -1086,11 +1119,14 @@ export interface HistoryWorkout {
   readonly notes: string
   readonly exercises: ReadonlyArray<{
     readonly exercise: string
+    /** What the user wrote on the exercise during the workout, when they wrote something. */
+    readonly note?: string
     readonly sets: ReadonlyArray<HistorySet>
   }>
 }
 
-type HistorySet = Pick<WorkoutSet, "weight" | "reps" | "rpe" | "durationSeconds" | "distance">
+/** A set as the coach reads it. `note` is there only when the user wrote one. */
+type HistorySet = Pick<WorkoutSet, "weight" | "reps" | "rpe" | "durationSeconds" | "distance"> & { readonly note?: string }
 
 /** Finished workouts with every set, newest first. This is what the AI coach reads. */
 export const getHistory = Effect.fn("getHistory")(function* (options: {
@@ -1114,17 +1150,22 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
     rpe: number | null
     durationSeconds: number | null
     distance: number | null
+    note: string
+    exerciseNote: string | null
   }>`
     SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name AS exercise_name, s.weight, s.reps, s.rpe,
-      s.duration_seconds, s.distance
+      s.duration_seconds, s.distance, s.note, n.body AS exercise_note
     FROM workouts w
     JOIN workout_sets s ON s.workout_id = w.id
     JOIN exercises e ON e.id = s.exercise_id
+    LEFT JOIN workout_exercise_notes n ON n.workout_id = w.id AND n.exercise_id = s.exercise_id
     WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${options.since}
       AND (${exercise} IS NULL OR e.name = ${exercise})
     ORDER BY w.started_at DESC, s.id`
 
-  type MutableEntry = { exercise: string; sets: Array<HistorySet> }
+  type MutableEntry = { exercise: string; note?: string; sets: Array<HistorySet> }
+
+  type Mutable<T> = { -readonly [K in keyof T]: T[K] }
 
   const workouts = new Map<number, Omit<HistoryWorkout, "exercises"> & { exercises: Array<MutableEntry> }>()
 
@@ -1148,16 +1189,23 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
 
     if (!entry) {
       entry = { exercise: row.exerciseName, sets: [] }
+
+      if (row.exerciseNote) entry.note = row.exerciseNote
+
       workout.exercises.push(entry)
     }
 
-    entry.sets.push({
+    const set: Mutable<HistorySet> = {
       weight: row.weight,
       reps: row.reps,
       rpe: row.rpe,
       durationSeconds: row.durationSeconds,
       distance: row.distance,
-    })
+    }
+
+    if (row.note !== "") set.note = row.note
+
+    entry.sets.push(set)
   }
 
   return [...workouts.values()] satisfies ReadonlyArray<HistoryWorkout>
@@ -1275,9 +1323,9 @@ export const logPastWorkout = Effect.fn("logPastWorkout")(function* (input: {
     for (const [index, set] of entry.sets.entries()) {
       yield* sql`
         INSERT INTO workout_sets
-          (workout_id, exercise_id, set_number, weight, reps, rpe, duration_seconds, distance, created_at)
+          (workout_id, exercise_id, set_number, weight, reps, rpe, duration_seconds, distance, note, created_at)
         VALUES (${workoutId}, ${exerciseId}, ${index + 1}, ${set.weight}, ${set.reps}, ${set.rpe ?? null},
-          ${set.durationSeconds ?? null}, ${set.distance || null}, ${startedAt})`
+          ${set.durationSeconds ?? null}, ${set.distance || null}, ${set.note?.trim() ?? ""}, ${startedAt})`
     }
   }
 

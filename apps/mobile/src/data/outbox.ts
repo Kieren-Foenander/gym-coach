@@ -25,11 +25,25 @@ export interface DeleteSetOp {
   readonly setId: number
 }
 
-export type PendingOp = LogSetOp | DeleteSetOp
+/** A change to a set the server already has, such as a weight typed wrong. */
+export interface UpdateSetOp {
+  readonly kind: "updateSet"
+  readonly key: string
+  readonly workoutId: number
+  readonly setId: number
+  readonly set: SetValues
+}
+
+export type PendingOp = LogSetOp | DeleteSetOp | UpdateSetOp
+
+/** Puts every set logged on the phone after every set the server has. */
+const PENDING_ORDER = 2 ** 40
 
 /** A set as the workout screen shows it. `pendingKey` is set while it is still waiting to be sent. */
 export interface ShownSet extends WorkoutSet {
   readonly pendingKey: string | null
+  /** When it was logged relative to the workout's other sets: higher is later. */
+  readonly order: number
 }
 
 export interface ShownExercise extends Omit<WorkoutExercise, "sets"> {
@@ -40,16 +54,22 @@ export interface ShownWorkout extends Omit<WorkoutDetail, "exercises"> {
   readonly exercises: ReadonlyArray<ShownExercise>
 }
 
+/** A set's values as the server would describe them. */
+const valuesOf = (values: SetValues) => ({
+  weight: values.weight,
+  reps: values.reps,
+  rpe: values.rpe ?? null,
+  durationSeconds: values.durationSeconds ?? null,
+  distance: values.distance ?? null,
+  note: values.note?.trim() ?? "",
+})
+
 const asSet = (op: LogSetOp, setNumber: number): WorkoutSet => ({
   id: 0,
   exerciseId: op.exerciseId,
   planExerciseId: null,
   setNumber,
-  weight: op.set.weight,
-  reps: op.set.reps,
-  rpe: op.set.rpe ?? null,
-  durationSeconds: op.set.durationSeconds ?? null,
-  distance: op.set.distance ?? null,
+  ...valuesOf(op.set),
 })
 
 /** The workout as the server last described it, with everything still waiting to be sent laid over it. */
@@ -57,12 +77,21 @@ export const withPending = (detail: WorkoutDetail, ops: ReadonlyArray<PendingOp>
   const mine = ops.filter((op) => op.workoutId === detail.workout.id)
   const deleted = new Set(mine.flatMap((op) => (op.kind === "deleteSet" ? [op.setId] : [])))
 
+  // The latest change to each set wins, as it will on the server once they are all sent.
+  const changes = new Map(mine.flatMap((op) => (op.kind === "updateSet" ? [[op.setId, op.set] as const] : [])))
+
   return {
     ...detail,
     exercises: detail.exercises.map((exercise) => {
-      const kept = exercise.sets.flatMap((set): ReadonlyArray<ShownSet> =>
-        deleted.has(set.id) ? [] : [{ ...set, pendingKey: null }],
-      )
+      const kept = exercise.sets.flatMap((set): ReadonlyArray<ShownSet> => {
+        if (deleted.has(set.id)) return []
+
+        const change = changes.get(set.id)
+
+        const values = change ? { ...set, ...valuesOf(change) } : set
+
+        return [{ ...values, pendingKey: null, order: set.id }]
+      })
 
       const waiting = mine.flatMap((op) => (op.kind === "logSet" && op.exerciseId === exercise.exerciseId ? [op] : []))
 
@@ -70,7 +99,13 @@ export const withPending = (detail: WorkoutDetail, ops: ReadonlyArray<PendingOp>
         ...exercise,
         sets: [
           ...kept,
-          ...waiting.map((op, index): ShownSet => ({ ...asSet(op, kept.length + index + 1), pendingKey: op.key })),
+          ...waiting.map(
+            (op, index): ShownSet => ({
+              ...asSet(op, kept.length + index + 1),
+              pendingKey: op.key,
+              order: PENDING_ORDER + mine.indexOf(op),
+            }),
+          ),
         ],
       }
     }),
@@ -86,6 +121,40 @@ export const withSentSet = (detail: WorkoutDetail, op: LogSetOp, setId: number):
       : { ...exercise, sets: [...exercise.sets, { ...asSet(op, exercise.sets.length + 1), id: setId }] },
   ),
 })
+
+/** The same, once the server has confirmed a change to a set. */
+export const withChangedSet = (detail: WorkoutDetail, op: UpdateSetOp): WorkoutDetail => ({
+  ...detail,
+  exercises: detail.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.map((set) => (set.id === op.setId ? { ...set, ...valuesOf(op.set) } : set)),
+  })),
+})
+
+/**
+ * The queue with a set changed: a set still waiting to be sent is logged with the new values
+ * instead, and a set the server has gets a change queued, replacing one not yet sent.
+ * Null when the set is on its way right now, which the screen does not allow.
+ */
+export const withEditedSet = (
+  ops: ReadonlyArray<PendingOp>,
+  target: { readonly workoutId: number; readonly setId: number; readonly pendingKey: string | null },
+  values: SetValues,
+  sending: string | null,
+  newKey: string,
+): ReadonlyArray<PendingOp> | null => {
+  if (target.pendingKey !== null) {
+    if (target.pendingKey === sending) return null
+
+    return ops.map((op) => (op.key === target.pendingKey && op.kind === "logSet" ? { ...op, set: values } : op))
+  }
+
+  const queued = ops.find((op) => op.kind === "updateSet" && op.setId === target.setId && op.key !== sending)
+
+  if (queued) return ops.map((op) => (op === queued ? { ...queued, set: values } : op))
+
+  return [...ops, { kind: "updateSet", key: newKey, workoutId: target.workoutId, setId: target.setId, set: values }]
+}
 
 /** The same, once the server has confirmed a set is gone. */
 export const withoutSet = (detail: WorkoutDetail, setId: number): WorkoutDetail => ({
