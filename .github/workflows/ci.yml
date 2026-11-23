@@ -80,7 +80,7 @@ jobs:
           # e2e sends anonymous usage data unless told not to.
           E2E_TELEMETRY_DISABLED: "1"
       # The report, and a trace page, screenshots and any missing or different screenshot for each failed test.
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-report
