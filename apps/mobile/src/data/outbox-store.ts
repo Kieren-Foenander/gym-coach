@@ -34,6 +34,13 @@ const RETRY_MS = 15_000
 let state: OutboxState = { ops: [], sending: null, problem: null }
 let flushing = false
 
+// The id the server gave each set sent this session, by the key it waited under, so a form opened on a
+// waiting set can still save once the set has been sent.
+const sentIds = new Map<string, number>()
+
+/** The id the server gave a set that waited under this key, once it has been sent. */
+export const sentSetId = (pendingKey: string): number | null => sentIds.get(pendingKey) ?? null
+
 const listeners = new Set<() => void>()
 
 const currentUserId = () => {
@@ -84,6 +91,8 @@ const send = async (op: PendingOp) => {
       set: op.set,
       clientKey: op.key,
     })
+
+    sentIds.set(op.key, setId)
 
     queryClient.setQueryData<WorkoutDetail>(workoutKey(op.workoutId), (detail) =>
       detail ? withSentSet(detail, op, setId) : detail,
@@ -175,7 +184,7 @@ export const editSet = (
   target: { readonly workoutId: number; readonly setId: number; readonly pendingKey: string | null },
   values: SetValues,
 ): boolean => {
-  const ops = withEditedSet(state.ops, target, values, state.sending, Crypto.randomUUID())
+  const ops = withEditedSet(state.ops, target, values, state.sending, Crypto.randomUUID(), sentIds)
 
   if (ops === null) return false
 

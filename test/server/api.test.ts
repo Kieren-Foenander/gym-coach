@@ -156,6 +156,43 @@ describe("training", () => {
     expect((await me.call("getWorkout", { workoutId })).exercises[0]!.note).toBe("")
   })
 
+  it("shows the coach a note on an exercise with no sets", async () => {
+    const me = await server.signUp()
+    const workoutId = await me.call("startOpenWorkout", {})
+
+    await me.call("addWorkoutExercise", { workoutId, exercise: "Squat" })
+    await me.call("addWorkoutExercise", { workoutId, exercise: "Bench Press" })
+    const [squat, bench] = (await me.call("getWorkout", { workoutId })).exercises
+
+    await me.call("logSet", { workoutId, exerciseId: squat!.exerciseId, set: { weight: 100, reps: 5 } })
+    await me.call("setExerciseNote", { workoutId, exerciseId: bench!.exerciseId, note: "Bench was taken, skipped it" })
+    await me.call("finishWorkout", { workoutId })
+
+    const [workout] = await server.coachHistory(me.email)
+
+    expect(workout!.exercises).toEqual([
+      { exercise: "Squat", sets: [expect.objectContaining({ weight: 100, reps: 5 })] },
+      { exercise: "Bench Press", note: "Bench was taken, skipped it", sets: [] },
+    ])
+  })
+
+  it("keeps notes only on exercises in the workout, and drops one that is taken out", async () => {
+    const me = await server.signUp()
+    const workoutId = await me.call("startOpenWorkout", {})
+
+    await me.call("addWorkoutExercise", { workoutId, exercise: "Squat" })
+    const { exerciseId } = (await me.call("getWorkout", { workoutId })).exercises[0]!
+
+    await me.call("setExerciseNote", { workoutId, exerciseId, note: "Safety bars on 3" })
+    await me.call("removeWorkoutExercise", { workoutId, exerciseId })
+    await me.call("addWorkoutExercise", { workoutId, exercise: "Squat" })
+
+    expect((await me.call("getWorkout", { workoutId })).exercises[0]!.note).toBe("")
+
+    await me.call("removeWorkoutExercise", { workoutId, exerciseId })
+    await expect(me.call("setExerciseNote", { workoutId, exerciseId, note: "Not in it" })).rejects.toThrow(/not_found|404|That exercise/)
+  })
+
   it("puts a finished workout on the calendar and leaves a discarded one off", async () => {
     const me = await server.signUp()
     const kept = await me.call("startOpenWorkout", {})

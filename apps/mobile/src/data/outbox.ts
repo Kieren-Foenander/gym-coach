@@ -134,7 +134,9 @@ export const withChangedSet = (detail: WorkoutDetail, op: UpdateSetOp): WorkoutD
 /**
  * The queue with a set changed: a set still waiting to be sent is logged with the new values
  * instead, and a set the server has gets a change queued, replacing one not yet sent.
- * Null when the set is on its way right now, which the screen does not allow.
+ * A set that was waiting when its form opened may have been sent since; `sentIds` gives the id the
+ * server gave it, and the change is queued against that. Null when the set is on its way right now,
+ * or was sent and its id is not known, which the screen asks to try again.
  */
 export const withEditedSet = (
   ops: ReadonlyArray<PendingOp>,
@@ -142,18 +144,29 @@ export const withEditedSet = (
   values: SetValues,
   sending: string | null,
   newKey: string,
+  sentIds: ReadonlyMap<string, number> = new Map(),
 ): ReadonlyArray<PendingOp> | null => {
+  let setId = target.setId
+
   if (target.pendingKey !== null) {
     if (target.pendingKey === sending) return null
 
-    return ops.map((op) => (op.key === target.pendingKey && op.kind === "logSet" ? { ...op, set: values } : op))
+    if (ops.some((op) => op.key === target.pendingKey && op.kind === "logSet")) {
+      return ops.map((op) => (op.key === target.pendingKey && op.kind === "logSet" ? { ...op, set: values } : op))
+    }
+
+    const sent = sentIds.get(target.pendingKey)
+
+    if (sent === undefined) return null
+
+    setId = sent
   }
 
-  const queued = ops.find((op) => op.kind === "updateSet" && op.setId === target.setId && op.key !== sending)
+  const queued = ops.find((op) => op.kind === "updateSet" && op.setId === setId && op.key !== sending)
 
   if (queued) return ops.map((op) => (op === queued ? { ...queued, set: values } : op))
 
-  return [...ops, { kind: "updateSet", key: newKey, workoutId: target.workoutId, setId: target.setId, set: values }]
+  return [...ops, { kind: "updateSet", key: newKey, workoutId: target.workoutId, setId, set: values }]
 }
 
 /** The same, once the server has confirmed a set is gone. */

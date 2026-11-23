@@ -430,6 +430,27 @@ function ExerciseCard({ exercise, position, state, unit, workoutId, taken, onLog
     setNoteOpen(false)
   }
 
+  /** Closes the form after a correction. The next set starts from the corrected numbers, not the ones shown before it. */
+  const finishEditing = (setId: number, values: SetInput) => {
+    const corrected = exercise.sets.map((item) =>
+      item.id === setId
+        ? {
+            ...item,
+            weight: values.weight,
+            reps: values.reps,
+            rpe: values.rpe ?? null,
+            durationSeconds: values.durationSeconds ?? null,
+            distance: values.distance ?? null,
+            note: values.note ?? "",
+          }
+        : item,
+    )
+
+    setEditing(null)
+    setDraft(nextSetDraft({ ...exercise, sets: corrected }))
+    setNoteOpen(false)
+  }
+
   /** The set the form describes, or null when a number in it cannot be read. */
   const readDraft = (): SetInput | null => {
     const parsedWeight = cardio ? 0 : parseNumber(draft.weight)
@@ -472,7 +493,7 @@ function ExerciseCard({ exercise, position, state, unit, workoutId, taken, onLog
     void act(async () => {
       await updateSet({ data: { setId, set } })
     }).then((saved) => {
-      if (saved) stopEditing()
+      if (saved) finishEditing(setId, set)
     })
   }
 

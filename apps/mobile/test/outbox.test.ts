@@ -121,6 +121,16 @@ describe("withEditedSet", () => {
     expect(withEditedSet(sending, { workoutId: 1, setId: 100, pendingKey: null }, values, "u1", "u2")).toHaveLength(2)
   })
 
+  it("changes a set sent while its form was open by the id the server gave it", () => {
+    const ops = withEditedSet([], { workoutId: 1, setId: 0, pendingKey: "a" }, values, null, "u1", new Map([["a", 42]]))
+
+    expect(ops).toEqual([{ kind: "updateSet", key: "u1", workoutId: 1, setId: 42, set: values }])
+  })
+
+  it("asks to try again when a sent set's id is not known, rather than dropping the change", () => {
+    expect(withEditedSet([], { workoutId: 1, setId: 0, pendingKey: "a" }, values, null, "u1")).toBeNull()
+  })
+
   it("refuses to change a set while it is being sent", () => {
     expect(withEditedSet([logged("a", 10)], { workoutId: 1, setId: 0, pendingKey: "a" }, values, "a", "new")).toBeNull()
   })

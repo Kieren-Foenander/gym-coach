@@ -13,7 +13,7 @@ import { CheckIcon, CloseIcon } from "@/components/icons"
 import { Button, Display, EffortPicker, ErrorNote, Eyebrow, Field, parseNumber, Stepper, Text, TextInput } from "@/components/ui"
 import { useAction } from "@/data/calls"
 import type { SetValues, ShownExercise, ShownSet } from "@/data/outbox"
-import { editSet, logSet, removeSet, useOutbox, withdrawSet } from "@/data/outbox-store"
+import { editSet, logSet, removeSet, sentSetId, useOutbox, withdrawSet } from "@/data/outbox-store"
 import { ExerciseThumbnail } from "@/features/exercises/ExerciseLine"
 import { cn } from "@/lib/cn"
 import { colors } from "@/theme"
@@ -83,7 +83,10 @@ export function ExerciseCard({ exercise, position, state, unit, workoutId }: Exe
   const loadKind = loadKindFor(exercise.exerciseName)
   const noun = cardio ? "round" : "set"
   const change = (patch: Partial<SetDraft>) => setDraft((before) => ({ ...before, ...patch }))
-  const editingNumber = editing === null ? 0 : sets.findIndex((set) => sameSet(set, editing)) + 1
+  // A set that was waiting when its form opened keeps its place once it has been sent and has an id.
+  const editingSentId = editing?.pendingKey == null ? null : sentSetId(editing.pendingKey)
+  const isEditing = (set: ShownSet) => editing !== null && (sameSet(set, editing) || (editingSentId !== null && set.id === editingSentId))
+  const editingNumber = sets.findIndex(isEditing) + 1
   const sending = (set: ShownSet) => set.pendingKey !== null && outbox.sending === set.pendingKey
 
   const startEditing = (set: ShownSet) => {
@@ -96,6 +99,28 @@ export function ExerciseCard({ exercise, position, state, unit, workoutId }: Exe
   const stopEditing = () => {
     setEditing(null)
     setDraft(nextSetDraft(exercise))
+    setNoteOpen(false)
+    setEditError(null)
+  }
+
+  /** Closes the form after a correction. The next set starts from the corrected numbers, not the ones shown before it. */
+  const finishEditing = (values: SetValues) => {
+    const corrected = sets.map((item) =>
+      isEditing(item)
+        ? {
+            ...item,
+            weight: values.weight,
+            reps: values.reps,
+            rpe: values.rpe ?? null,
+            durationSeconds: values.durationSeconds ?? null,
+            distance: values.distance ?? null,
+            note: values.note ?? "",
+          }
+        : item,
+    )
+
+    setEditing(null)
+    setDraft(nextSetDraft({ ...exercise, sets: corrected }))
     setNoteOpen(false)
     setEditError(null)
   }
@@ -143,11 +168,11 @@ export function ExerciseCard({ exercise, position, state, unit, workoutId }: Exe
     }
 
     void Haptics.selectionAsync()
-    stopEditing()
+    finishEditing(values)
   }
 
   const remove = (set: ShownSet) => {
-    if (editing !== null && sameSet(editing, set)) stopEditing()
+    if (isEditing(set)) stopEditing()
 
     if (set.pendingKey === null) removeSet(workoutId, set.id)
     else withdrawSet(set.pendingKey)
@@ -239,13 +264,13 @@ export function ExerciseCard({ exercise, position, state, unit, workoutId }: Exe
       {sets.length > 0 ? (
         <View className="mt-3 gap-1.5">
           {sets.map((set, index) => {
-            const isEditing = editing !== null && sameSet(editing, set)
+            const editingThis = isEditing(set)
 
             return (
               <View
                 key={set.pendingKey ?? set.id}
                 testID={testIds.workout.set(index + 1)}
-                className={cn("rounded-2xl pl-3", isEditing ? "border border-accent/40 bg-accent/15" : "bg-raised/70")}
+                className={cn("rounded-2xl pl-3", editingThis ? "border border-accent/40 bg-accent/15" : "bg-raised/70")}
               >
                 <View className="flex-row items-center justify-between gap-2">
                   <Pressable
@@ -253,7 +278,7 @@ export function ExerciseCard({ exercise, position, state, unit, workoutId }: Exe
                     accessibilityLabel={`Change ${noun} ${index + 1}`}
                     testID={testIds.workout.editSet}
                     disabled={sending(set)}
-                    onPress={() => (isEditing ? stopEditing() : startEditing(set))}
+                    onPress={() => (editingThis ? stopEditing() : startEditing(set))}
                     className="min-h-11 flex-1 flex-row items-center gap-3"
                   >
                     <Display className="w-4 text-lg text-faint">{index + 1}</Display>

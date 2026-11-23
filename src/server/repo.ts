@@ -854,7 +854,13 @@ export const swapExercise = Effect.fn("swapExercise")(function* (
 
   if (logged[0]) return yield* new Invalid({ reason: "Remove the sets you logged for it before swapping" })
 
+  const outgoingId = current[0]?.exerciseId ?? original.exerciseId
   const replacementId = yield* exerciseIdFor(exerciseName, original.muscleGroup)
+
+  // A note on the exercise going out would stay hidden and come back if it returned, so it goes with it.
+  if (replacementId !== outgoingId) {
+    yield* sql`DELETE FROM workout_exercise_notes WHERE workout_id = ${workout.id} AND exercise_id = ${outgoingId}`
+  }
 
   if (replacementId === original.exerciseId) {
     yield* sql`DELETE FROM workout_swaps WHERE workout_id = ${workout.id} AND plan_exercise_id = ${original.id}`
@@ -912,6 +918,7 @@ export const removeWorkoutExercise = Effect.fn("removeWorkoutExercise")(function
   if (logged[0]) return yield* new Invalid({ reason: "Remove its sets first" })
 
   yield* sql`DELETE FROM workout_extras WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId}`
+  yield* sql`DELETE FROM workout_exercise_notes WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId}`
 })
 
 const ownedSet = Effect.fn("ownedSet")(function* (setId: number) {
@@ -941,13 +948,14 @@ export const updateSet = Effect.fn("updateSet")(function* (setId: number, input:
 /** Writes the note on one exercise in a workout, finished or not. An empty note removes it. */
 export const setExerciseNote = Effect.fn("setExerciseNote")(function* (workoutId: number, exerciseId: number, note: string) {
   const sql = yield* sqlClient
-  const user = yield* CurrentUser
-  const workout = yield* ownedWorkout(workoutId)
+  const detail = yield* getWorkoutDetail(workoutId)
+  const workout = detail.workout
   const body = note.trim()
 
-  const exercises = yield* sql<{ id: number }>`SELECT id FROM exercises WHERE id = ${exerciseId} AND user_id = ${user.id}`
-
-  if (!exercises[0]) return yield* new NotFound({ what: `Exercise ${exerciseId}` })
+  // Only an exercise the workout shows: planned, swapped in, added, or with sets logged.
+  if (!detail.exercises.some((exercise) => exercise.exerciseId === exerciseId)) {
+    return yield* new NotFound({ what: "That exercise in this workout" })
+  }
 
   if (body === "") {
     yield* sql`DELETE FROM workout_exercise_notes WHERE workout_id = ${workout.id} AND exercise_id = ${exerciseId}`
@@ -1145,6 +1153,8 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
     finishedAt: number
     notes: string
     exerciseName: string
+    /** Null on the row for an exercise that has a note but no sets, such as one skipped with a reason. */
+    setId: number | null
     weight: number
     reps: number
     rpe: number | null
@@ -1153,15 +1163,25 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
     note: string
     exerciseNote: string | null
   }>`
-    SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name AS exercise_name, s.weight, s.reps, s.rpe,
-      s.duration_seconds, s.distance, s.note, n.body AS exercise_note
-    FROM workouts w
-    JOIN workout_sets s ON s.workout_id = w.id
-    JOIN exercises e ON e.id = s.exercise_id
-    LEFT JOIN workout_exercise_notes n ON n.workout_id = w.id AND n.exercise_id = s.exercise_id
-    WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${options.since}
-      AND (${exercise} IS NULL OR e.name = ${exercise})
-    ORDER BY w.started_at DESC, s.id`
+    SELECT * FROM (
+      SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name AS exercise_name, s.id AS set_id, s.weight,
+        s.reps, s.rpe, s.duration_seconds, s.distance, s.note, n.body AS exercise_note
+      FROM workouts w
+      JOIN workout_sets s ON s.workout_id = w.id
+      JOIN exercises e ON e.id = s.exercise_id
+      LEFT JOIN workout_exercise_notes n ON n.workout_id = w.id AND n.exercise_id = s.exercise_id
+      WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${options.since}
+        AND (${exercise} IS NULL OR e.name = ${exercise})
+      UNION ALL
+      SELECT w.id, w.name, w.started_at, w.finished_at, w.notes, e.name, NULL, 0, 0, NULL, NULL, NULL, '', n.body
+      FROM workouts w
+      JOIN workout_exercise_notes n ON n.workout_id = w.id
+      JOIN exercises e ON e.id = n.exercise_id
+      WHERE w.user_id = ${user.id} AND w.finished_at IS NOT NULL AND w.started_at >= ${options.since}
+        AND (${exercise} IS NULL OR e.name = ${exercise})
+        AND NOT EXISTS (SELECT 1 FROM workout_sets s WHERE s.workout_id = w.id AND s.exercise_id = n.exercise_id)
+    )
+    ORDER BY started_at DESC, set_id IS NULL, set_id`
 
   type MutableEntry = { exercise: string; note?: string; sets: Array<HistorySet> }
 
@@ -1194,6 +1214,8 @@ export const getHistory = Effect.fn("getHistory")(function* (options: {
 
       workout.exercises.push(entry)
     }
+
+    if (row.setId === null) continue
 
     const set: Mutable<HistorySet> = {
       weight: row.weight,

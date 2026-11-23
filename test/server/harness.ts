@@ -3,10 +3,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { SqliteClient } from "@effect/sql-sqlite-node"
-import { Layer, ManagedRuntime, Schema, String as Str } from "effect"
+import { Effect, Layer, ManagedRuntime, Schema, String as Str } from "effect"
 import type { CallName } from "~/domain/calls"
 import type { CallInput, CallOutput } from "~/server/calls"
+import { userById } from "~/server/auth"
 import { apiHandlerFor } from "~/server/http"
+import { CurrentUser, getHistory, type HistoryWorkout } from "~/server/repo"
 import { seedStatements, type History } from "../../tools/seed/history"
 
 /**
@@ -49,6 +51,8 @@ export interface TestServer {
   readonly exec: (sql: string) => void
   /** Reads one text value straight from the database, for checking what is stored rather than what a call shows. */
   readonly readText: (sql: string) => string
+  /** Every finished workout of an account as the AI coach reads it (get_training_history). */
+  readonly coachHistory: (email: string) => Promise<ReadonlyArray<HistoryWorkout>>
   readonly close: () => Promise<void>
 }
 
@@ -113,6 +117,17 @@ export const makeServer = (): TestServer => {
     },
     exec: (sql) => direct.exec(sql),
     readText: (sql) => Schema.decodeUnknownSync(Schema.String)(Object.values(direct.prepare(sql).get() ?? {})[0]),
+    coachHistory: async (email) => {
+      const id = Schema.decodeUnknownSync(Schema.String)(direct.prepare("SELECT id FROM users WHERE email = ?").get(email)?.id)
+
+      return runtime.runPromise(
+        Effect.gen(function* () {
+          const user = yield* userById(id)
+
+          return yield* getHistory({ since: 0, limit: 20 }).pipe(Effect.provideService(CurrentUser, user))
+        }),
+      )
+    },
     close: async () => {
       await runtime.dispose()
       direct.close()
