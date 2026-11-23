@@ -10,20 +10,24 @@ name: iOS tour
 # Building takes about half an hour, so the built app is cached, keyed on everything that goes into it: the native
 # app's files, src/domain, the lockfiles, apps/mobile/e2e/build-simulator.sh and the Xcode version. A change to the
 # tests, the server or this file reuses it. Pull requests can read the cache that runs on master make.
+# Paused: it only runs when started by hand (Actions → iOS tour → Run workflow). The simulator runner kept
+# failing on its own, and the tour is more use once there is an Apple developer account. To turn it back on,
+# put these triggers back under `on:`:
+#
+#   push:
+#     branches: [master]
+#     paths: &paths
+#       - apps/mobile/**
+#       - src/domain/**
+#       - src/server/**
+#       - migrations/**
+#       - e2e/native/**
+#       - e2e.config.ts
+#       - .github/workflows/ios-tour.yml
+#   pull_request:
+#     paths: *paths
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths: &paths
-      - apps/mobile/**
-      - src/domain/**
-      - src/server/**
-      - migrations/**
-      - e2e/native/**
-      - e2e.config.ts
-      - .github/workflows/ios-tour.yml
-  pull_request:
-    paths: *paths
 
 permissions:
   contents: read
