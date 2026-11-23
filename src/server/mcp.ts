@@ -66,7 +66,8 @@ const GetOverview = Tool.make("get_overview", {
 }).annotate(Tool.Readonly, true)
 
 const GetTrainingHistory = Tool.make("get_training_history", {
-  description: "Finished workouts with every logged set (weight, reps, RPE), newest first.",
+  description:
+    "Finished workouts with every logged set (weight, reps, RPE), newest first, with any note the user wrote on a set or an exercise during the workout.",
   parameters: Schema.Struct({
     days: Schema.optional(describe(Schema.Int, "How many days back to look. Default 30.")),
     exercise: Schema.optional(describe(Schema.String, "Only this exercise, by exact name.")),
