@@ -68,35 +68,36 @@ export function RestBar() {
         </Pressable>
       ) : (
         <View className="overflow-hidden rounded-3xl border border-white/10 bg-surface">
-          <View className="flex-row items-center justify-between gap-3 px-4 pt-3">
+          <View className="flex-row items-end justify-between gap-3 px-4 pt-3">
             <View>
               <Eyebrow className="text-xs text-accent">Rest</Eyebrow>
               <Display testID={testIds.workout.rest} accessibilityRole="timer" className="text-5xl tabular-nums">
                 {formatClock(left)}
               </Display>
             </View>
-            <View className="flex-row gap-1.5">
-              <Button className="px-3" testID={testIds.workout.restLess} accessibilityLabel="30 seconds less" onPress={() => adjustCurrentRest(-REST_STEP_SECONDS)}>
-                −30s
-              </Button>
-              <Button className="px-3" testID={testIds.workout.restMore} accessibilityLabel="30 seconds more" onPress={() => adjustCurrentRest(REST_STEP_SECONDS)}>
-                +30s
-              </Button>
-              <Button className="px-3" onPress={clearRest}>
-                Skip
-              </Button>
-            </View>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: sound }}
+              onPress={toggleSound}
+              className="min-h-11 justify-center"
+            >
+              <Text className="text-sm font-semibold text-muted">
+                Sound: <Text className={sound ? "text-sm font-semibold text-accent" : "text-sm font-semibold"}>{sound ? "on" : "off"}</Text>
+              </Text>
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: sound }}
-            onPress={toggleSound}
-            className="min-h-11 justify-center px-4"
-          >
-            <Text className="text-sm font-semibold text-muted">
-              Sound at the end: <Text className={sound ? "text-sm font-semibold text-accent" : "text-sm font-semibold"}>{sound ? "on" : "off"}</Text>
-            </Text>
-          </Pressable>
+          {/* Three equal buttons on their own row, so they fit the narrowest phone. */}
+          <View className="flex-row gap-1.5 px-4 pt-2 pb-3">
+            <Button className="flex-1" testID={testIds.workout.restLess} accessibilityLabel="30 seconds less" onPress={() => adjustCurrentRest(-REST_STEP_SECONDS)}>
+              −30s
+            </Button>
+            <Button className="flex-1" testID={testIds.workout.restMore} accessibilityLabel="30 seconds more" onPress={() => adjustCurrentRest(REST_STEP_SECONDS)}>
+              +30s
+            </Button>
+            <Button className="flex-1" onPress={clearRest}>
+              Skip
+            </Button>
+          </View>
           <View className="h-1 bg-raised">
             <View className="h-full bg-accent" style={{ width: `${Math.min(100, (left / rest.total) * 100)}%` }} />
           </View>

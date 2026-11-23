@@ -212,43 +212,40 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
       {restLeft > 0 && rest !== null ? (
         <div className="bottom-safe fixed inset-x-0 z-30 px-4">
           <div className="mx-auto max-w-md animate-pop overflow-hidden rounded-3xl border border-white/10 bg-surface/95 shadow-2xl shadow-black/70 backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-2 px-4 pt-3">
+            <div className="flex items-end justify-between gap-2 px-4 pt-3">
               <div>
                 <p className="eyebrow text-xs text-accent">Rest</p>
                 <p className="display tabular text-5xl" role="timer" data-testid={testIds.workout.rest} data-value={restLeft}>
                   {formatClock(restLeft)}
                 </p>
               </div>
-              <div className="flex gap-1.5">
-                <Button
-                  className="px-3"
-                  aria-label="30 seconds less"
-                  data-testid={testIds.workout.restLess}
-                  onClick={() => adjustCurrentRest(-REST_STEP_SECONDS)}
-                >
-                  −30s
-                </Button>
-                <Button
-                  className="px-3"
-                  aria-label="30 seconds more"
-                  data-testid={testIds.workout.restMore}
-                  onClick={() => adjustCurrentRest(REST_STEP_SECONDS)}
-                >
-                  +30s
-                </Button>
-                <Button className="px-3" onClick={clearRest}>
-                  Skip
-                </Button>
-              </div>
+              <button
+                type="button"
+                aria-pressed={sound}
+                className="min-h-11 text-sm font-semibold text-muted"
+                onClick={toggleSound}
+              >
+                Sound: <span className={sound ? "text-accent" : "text-white"}>{sound ? "on" : "off"}</span>
+              </button>
             </div>
-            <button
-              type="button"
-              aria-pressed={sound}
-              className="min-h-11 px-4 text-sm font-semibold text-muted"
-              onClick={toggleSound}
-            >
-              Sound at the end: <span className={sound ? "text-accent" : "text-white"}>{sound ? "on" : "off"}</span>
-            </button>
+            {/* Three equal buttons on their own row, so they fit the narrowest phone. */}
+            <div className="grid grid-cols-3 gap-1.5 px-4 pt-2 pb-3">
+              <Button
+                aria-label="30 seconds less"
+                data-testid={testIds.workout.restLess}
+                onClick={() => adjustCurrentRest(-REST_STEP_SECONDS)}
+              >
+                −30s
+              </Button>
+              <Button
+                aria-label="30 seconds more"
+                data-testid={testIds.workout.restMore}
+                onClick={() => adjustCurrentRest(REST_STEP_SECONDS)}
+              >
+                +30s
+              </Button>
+              <Button onClick={clearRest}>Skip</Button>
+            </div>
             <div className="h-1 bg-raised" aria-hidden="true">
               <div
                 className="h-full bg-accent transition-[width] duration-1000 ease-linear"
