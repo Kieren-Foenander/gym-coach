@@ -301,7 +301,9 @@ export function useAction() {
 
     try {
       await work()
-      await router.invalidate()
+      // sync waits for the fresh data. Without it the reload runs in the background, and the page
+      // shows the old numbers for as long as the round trip takes.
+      await router.invalidate({ sync: true })
 
       return true
     } catch (cause) {
