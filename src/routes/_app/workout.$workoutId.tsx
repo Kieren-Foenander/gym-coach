@@ -186,7 +186,7 @@ function ActiveWorkout({ detail, unit }: WorkoutViewProps) {
 
       <ErrorNote message={error} />
 
-      <div className={`space-y-3 pt-1 ${restOver || (restLeft > 0 && !minimised) ? "pb-36" : restLeft > 0 ? "pb-20" : "pb-4"}`}>
+      <div className={`space-y-3 pt-1 ${restOver || (restLeft > 0 && !minimised) ? "pb-36" : restLeft > 0 ? "pb-16" : "pb-4"}`}>
         {detail.exercises.map((exercise, index) => (
           <ExerciseCard
             key={exercise.exerciseId}
@@ -347,13 +347,13 @@ function RestTimer({ left, elapsed, minimised, onMinimise, onExpand, sound, onTo
           aria-label={`Rest, ${formatClock(left)} left. Show the timer`}
           data-testid={testIds.workout.restExpand}
           onClick={onExpand}
-          className="relative mx-auto flex h-14 w-full max-w-md animate-pop items-center gap-3 overflow-hidden rounded-full border border-white/10 bg-surface/95 px-5 text-left shadow-2xl shadow-black/70 backdrop-blur-xl"
+          className="relative mx-auto flex h-10 w-full max-w-md animate-pop items-center gap-2 overflow-hidden rounded-full border border-white/10 bg-surface/95 px-4 text-left shadow-xl shadow-black/60 backdrop-blur-xl"
         >
           {fill("bg-accent/20")}
-          <span className="eyebrow relative text-xs text-accent">Rest</span>
-          <span className="relative">{clock("text-3xl")}</span>
+          <span className="eyebrow relative text-[11px] text-accent">Rest</span>
+          <span className="relative">{clock("text-xl")}</span>
           <span className="relative ml-auto text-muted">
-            <ChevronUpIcon />
+            <ChevronUpIcon className="size-4" />
           </span>
         </button>
       </div>

@@ -19,7 +19,7 @@ const REST_OVER_MS = 6000
 const REST_BAR_SPACE = 150
 
 /** Room to leave under the content while the timer is minimised to a strip. */
-const REST_STRIP_SPACE = 76
+const REST_STRIP_SPACE = 60
 
 /** How much room the content needs to leave at the bottom for the rest bar right now. */
 export const useRestSpace = () => {
@@ -86,15 +86,16 @@ export function RestBar() {
           accessibilityRole="button"
           accessibilityLabel={`Rest, ${formatClock(left)} left. Show the timer`}
           onPress={() => setRestMinimised(false)}
-          className="h-14 flex-row items-center gap-3 overflow-hidden rounded-full border border-white/10 bg-surface px-5"
+          hitSlop={{ top: 4, bottom: 4 }}
+          className="h-10 flex-row items-center gap-2 overflow-hidden rounded-full border border-white/10 bg-surface px-4"
         >
           <View className="absolute inset-y-0 left-0 bg-accent/20" style={{ width: fill }} />
-          <Eyebrow className="text-xs text-accent">Rest</Eyebrow>
-          <Display testID={testIds.workout.rest} accessibilityRole="timer" className="text-3xl tabular-nums">
+          <Eyebrow className="text-[11px] text-accent">Rest</Eyebrow>
+          <Display testID={testIds.workout.rest} accessibilityRole="timer" className="text-xl tabular-nums">
             {formatClock(left)}
           </Display>
           <View className="ml-auto">
-            <ChevronUpIcon size={20} color={colors.muted} />
+            <ChevronUpIcon size={16} color={colors.muted} />
           </View>
         </Pressable>
       ) : (
