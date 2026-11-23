@@ -388,9 +388,11 @@ function ExerciseCard({ exercise, position, state, unit, workoutId, taken, onLog
 
     if (set === null) return
 
+    // The form stays open until the workout has reloaded, so the old numbers never flash back.
     void act(async () => {
       await updateSet({ data: { setId, set } })
-      stopEditing()
+    }).then((saved) => {
+      if (saved) stopEditing()
     })
   }
 
