@@ -53,6 +53,34 @@ describe("a tour of the main screens", { serial: true, requires: ["device"] }, (
     await app.screenshot("02-today")
   })
 
+  test("sets a mini workout target, logs a set toward it, and goes back", async ({ app, device, screen }) => {
+    await screen.getByTestId(testIds.today.miniCard).tap()
+    await expect(screen.getByTestId(testIds.minis.save)).toBeVisible()
+
+    // The tour account keeps its target from an earlier run on the same server.
+    if ((await screen.getByTestId(testIds.minis.target("Push-Up")).count()) === 0) {
+      await screen.getByTestId(testIds.minis.addTarget).tap()
+      await screen.getByTestId(testIds.exercisePicker.search).fill("Push-Up")
+      await device.dismissKeyboard()
+      await screen.getByTestId(testIds.exercisePicker.option("Push-Up")).tap()
+      await expect(screen.getByTestId(testIds.minis.target("Push-Up"))).toBeVisible()
+      await screen.getByTestId(testIds.minis.save).tap()
+    }
+
+    const progress = screen.getByTestId(testIds.minis.progress("Push-Up"))
+
+    await expect(progress).toBeVisible()
+
+    const logged = await screen.getByTestId(testIds.minis.deleteEntry).count()
+
+    await progress.getByTestId(testIds.minis.log).tap()
+    await expect.poll(() => screen.getByTestId(testIds.minis.deleteEntry).count(), { timeout: 30_000 }).toBe(logged + 1)
+    await app.screenshot("02b-mini-workouts")
+
+    await screen.getByTestId(testIds.minis.back).tap()
+    await expect(screen.getByTestId(testIds.today.mini("Push-Up"))).toBeVisible()
+  })
+
   test("opens the plan", async ({ app, screen }) => {
     await screen.getByTestId(testIds.nav.tab("plan")).tap()
 

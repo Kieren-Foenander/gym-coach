@@ -9,9 +9,11 @@ import { HEALTH_METRIC_INFO, HEALTH_METRICS } from "~/domain/health"
 import { daysAround, shiftDay } from "~/domain/days"
 import { groupByDay, isTotalsEmpty, NUTRIENT_INFO, TARGET_LIMITS } from "~/domain/nutrition"
 import { DELOAD_FACTOR, MISSES_BEFORE_DELOAD } from "~/domain/progression"
+import { formatMinute, WEEKDAY_SHORT } from "~/domain/minis"
 import { describeGoal } from "~/domain/streaks"
 import {
   describedDay,
+  MiniSettingsInput,
   ExercisePrescription,
   FoodInput,
   Id,
@@ -24,6 +26,7 @@ import {
 } from "~/domain/schema"
 import { Invalid, type DomainError } from "./errors"
 import * as Health from "./health"
+import * as Minis from "./minis"
 import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser, type User } from "./repo"
@@ -47,7 +50,8 @@ How the app works:
 - Cardio (search_exercise_library with muscle "Cardio") is logged by time, not load: a cardio set has weight 0, reps 0, a durationSeconds and optionally a distance, in km when the unit is kg and miles when it is lb. In a plan, a cardio exercise's sets are rounds; put the target time or pace in its notes. The progression rule skips cardio.
 - The app has a built-in exercise library. Before adding an exercise to a plan, find it with search_exercise_library and use that exact name. A name the library does not have still works, but shows no muscles or demonstration.
 - create_plan replaces the active plan (the old one is archived). Ask before replacing a plan the user is in the middle of.
-- Streak goals decide what the app's calendar and streak count: each goal is an activity ("training" is any workout except walks, "walking" is walks only, "any" is both) and how often (every day, or a number of days a week). There are one or two, the first leading. A walk is a workout whose only exercise is "Walk". When the user says what they want to keep up, such as walking daily or lifting three times a week, set it with update_profile streakGoals.
+- Mini workouts are small sets the user does at home through the day, such as 25 push-ups at a time toward 100 a day. The app sends nudges to their phone at random times inside a window they set, each asking for what keeps them on course. Read them with get_mini_workouts, change the targets or the window with update_mini_workouts, and record a set the user tells you about with log_mini_workout. They are kept apart from workouts: they never appear in the training history and do not count toward training streaks.
+- Streak goals decide what the app's calendar and streak count: each goal is an activity ("training" is any workout except walks, "walking" is walks only, "any" is both, "minis" is days every mini workout target was met) and how often (every day, or a number of days a week). There are one to three, the first leading. A walk is a workout whose only exercise is "Walk". When the user says what they want to keep up, such as walking daily or lifting three times a week, set it with update_profile streakGoals.
 - Use add_coach_note for a short message the user should see on the app's home screen, such as the focus for the coming week.
 - Base advice on the logged data. If there is little history, say so and ask about goals, schedule, equipment and injuries, then save what you learn with update_profile.`
 
@@ -243,7 +247,50 @@ const GetHealthMetrics = Tool.make("get_health_metrics", {
   ...options,
 }).annotate(Tool.Readonly, true)
 
+const GetMiniWorkouts = Tool.make("get_mini_workouts", {
+  description:
+    "Mini workouts: small sets done at home through the day toward daily targets (such as 100 push-ups), with nudges sent to the user's phone. Returns the settings (targets, nudge days and window in the user's time zone, the least gap between nudges), and for each day with anything done the progress against that day's targets and whether all were met, newest first, with the nudges sent and whether each was done or skipped.",
+  parameters: Schema.Struct({
+    days: Schema.optional(describe(Schema.Int, "How many days back to look, today included. Default 14, at most 90.")),
+    today: Schema.optional(describedDay("The user's own calendar day today, as YYYY-MM-DD, when you know it.")),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Readonly, true)
+
+const UpdateMiniWorkouts = Tool.make("update_mini_workouts", {
+  description:
+    "Change the mini workout settings. Only the fields given change. targets replaces every target: give the full list, each with the exercise (use the library name from search_exercise_library), unit (reps, or seconds for a hold), daily amount, the usual amount per nudge (chunk), and growBy (how much the daily target rises after a week with it met on every nudge day; 0 keeps it fixed). Today's targets change at once. The user sees the change in the app.",
+  parameters: Schema.Struct({
+    today: describedDay("The user's own calendar day today, as YYYY-MM-DD. Ask if you are not sure of it."),
+    targets: Schema.optional(MiniSettingsInput.fields.targets),
+    nudges: Schema.optional(MiniSettingsInput.fields.nudges),
+    days: Schema.optional(MiniSettingsInput.fields.days),
+    startMinute: Schema.optional(MiniSettingsInput.fields.startMinute),
+    endMinute: Schema.optional(MiniSettingsInput.fields.endMinute),
+    gapMinutes: Schema.optional(MiniSettingsInput.fields.gapMinutes),
+    pausedUntil: Schema.optional(MiniSettingsInput.fields.pausedUntil),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, false)
+
+const LogMiniWorkout = Tool.make("log_mini_workout", {
+  description:
+    "Record a mini workout set the user says they did, such as 30 push-ups, on their own calendar day. It counts toward that day's target for the exercise.",
+  parameters: Schema.Struct({
+    day: describedDay("The user's own calendar day it was done on, as YYYY-MM-DD."),
+    exercise: describe(Schema.String, "The exercise, named as in the user's targets."),
+    amount: describe(Schema.Int, "Reps, or seconds for a hold."),
+  }),
+  success: Schema.Unknown,
+  ...options,
+}).annotate(Tool.Destructive, false)
+
 export const GymToolkit = Toolkit.make(
+  GetMiniWorkouts,
+  UpdateMiniWorkouts,
+  LogMiniWorkout,
   GetNutrition,
   LogFood,
   DeleteFood,
@@ -457,6 +504,52 @@ export const GymHandlers = GymToolkit.toLayer(
                     })),
                 })),
             }
+          }),
+        ),
+      get_mini_workouts: ({ days, today }) =>
+        run(
+          Effect.gen(function* () {
+            const span = clamp(days, 14, 90)
+            const around = daysAround(yield* Clock.currentTimeMillis)
+            const range = today === undefined ? { from: shiftDay(around.from, 1 - span), to: around.to } : { from: shiftDay(today, 1 - span), to: today }
+            const history = yield* Minis.miniHistory(range.from, range.to)
+            const { settings } = history
+
+            return {
+              settings: {
+                ...settings,
+                window: `${formatMinute(settings.startMinute)} to ${formatMinute(settings.endMinute)}`,
+                nudgeDays: settings.days.map((day) => WEEKDAY_SHORT[day]),
+              },
+              days: history.days,
+              nudges: history.nudges,
+            }
+          }),
+        ),
+      update_mini_workouts: ({ today, ...patch }) =>
+        run(
+          Effect.gen(function* () {
+            // The patch goes on the settings as saved when the write goes in, worked out again if
+            // they changed meanwhile, so a change made on a phone at the same time is never undone.
+            const settings = yield* Minis.changeMinis(today, (saved) => {
+              const merged = Object.fromEntries(Object.entries({ ...saved, ...patch }).filter(([, value]) => value !== undefined))
+
+              return Schema.decodeUnknownEffect(MiniSettingsInput)(merged).pipe(
+                Effect.mapError((error) => new Invalid({ reason: error.message })),
+              )
+            })
+
+            return { settings }
+          }),
+        ),
+      log_mini_workout: ({ day, exercise, amount }) =>
+        run(
+          Effect.gen(function* () {
+            if (!Number.isInteger(amount) || amount < 1) return yield* new Invalid({ reason: "The amount has to be a whole number above 0" })
+
+            const entry = yield* Minis.logMini({ day, exercise, amount })
+
+            return { saved: true, id: entry.id }
           }),
         ),
       log_food: ({ day, ...food }) =>

@@ -66,11 +66,25 @@ describe("streak goals", () => {
     expect(server.readText(`SELECT streak_goals FROM users WHERE email = 'default@example.com'`)).toBe("")
   })
 
-  it("refuse no goals, three goals, or one it does not know", async () => {
+  it("save a third goal for mini workouts", async () => {
+    const me = await server.signUp()
+
+    const goals = [
+      { activity: "training", period: "week", target: 3 },
+      { activity: "walking", period: "day", target: 1 },
+      { activity: "minis", period: "day", target: 1 },
+    ] as const
+
+    await me.call("updateProfile", { streakGoals: goals })
+
+    expect((await me.call("getSession", {})).streakGoals).toEqual(goals)
+  })
+
+  it("refuse no goals, four goals, or one it does not know", async () => {
     const me = await server.signUp()
     const goal = { activity: "training", period: "week", target: 1 }
 
-    for (const streakGoals of [[], [goal, goal, goal], [{ ...goal, activity: "swimming" }], [{ ...goal, target: 9 }]]) {
+    for (const streakGoals of [[], [goal, goal, goal, goal], [{ ...goal, activity: "swimming" }], [{ ...goal, target: 9 }]]) {
       expect((await server.request("call/updateProfile", { token: me.token, body: { streakGoals } })).status).toBe(400)
     }
   })

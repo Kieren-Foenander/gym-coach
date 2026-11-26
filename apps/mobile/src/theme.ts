@@ -12,6 +12,8 @@ export const colors = {
   accentInk: "#0b0d05",
   muted: "#9299a5",
   faint: "#737a86",
+  walk: "#ff6fb5",
+  mini: "#4cc2ff",
   white: "#f5f6f7",
   danger: "#f87171",
   warning: "#fcd34d",

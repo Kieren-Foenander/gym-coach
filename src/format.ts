@@ -59,10 +59,11 @@ const longDayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", day:
 export const formatLongDay = (timestamp: number) => longDayFormat.format(timestamp)
 
 /** A calendar day and how many workouts it had, as a screen reader should say it. */
-export const describeTrainingDay = (day: number, workouts: number, walks = 0) => {
+export const describeTrainingDay = (day: number, workouts: number, walks = 0, minis = false) => {
   const parts = [
     workouts > 0 ? `${workouts} ${workouts === 1 ? "workout" : "workouts"}` : null,
     walks > 0 ? `${walks} ${walks === 1 ? "walk" : "walks"}` : null,
+    minis ? "mini workout targets met" : null,
   ].filter((part) => part !== null)
 
   return parts.length === 0 ? formatLongDay(day) : `${formatLongDay(day)}, ${parts.join(" and ")}`

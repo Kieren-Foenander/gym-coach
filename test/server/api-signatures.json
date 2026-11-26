@@ -34,6 +34,11 @@
       "null"
     ]
   },
+  "deleteMini": {
+    "kinds": [
+      "null"
+    ]
+  },
   "deleteSet": {
     "kinds": [
       "null"
@@ -443,6 +448,264 @@
                 }
               }
             }
+          }
+        }
+      }
+    }
+  },
+  "getMinis": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "fields": {
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "met": {
+              "kinds": [
+                "boolean"
+              ]
+            },
+            "progress": {
+              "array": true,
+              "items": {
+                "fields": {
+                  "done": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "exercise": {
+                    "kinds": [
+                      "string"
+                    ]
+                  },
+                  "target": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "unit": {
+                    "kinds": [
+                      "string"
+                    ]
+                  }
+                }
+              }
+            },
+            "targets": {
+              "array": true,
+              "items": {
+                "fields": {
+                  "chunk": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "daily": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "exercise": {
+                    "kinds": [
+                      "string"
+                    ]
+                  },
+                  "growBy": {
+                    "kinds": [
+                      "number"
+                    ]
+                  },
+                  "unit": {
+                    "kinds": [
+                      "string"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "entries": {
+        "array": true,
+        "items": {
+          "fields": {
+            "amount": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "createdAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "nudgeId": {
+              "kinds": [
+                "null"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "metDays": {
+        "array": true
+      },
+      "nudges": {
+        "array": true,
+        "items": {
+          "fields": {
+            "amount": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "day": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "id": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "sentAt": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "status": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "push": {
+        "fields": {
+          "devices": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "endpoints": {
+            "array": true
+          },
+          "publicKey": {
+            "kinds": [
+              "string"
+            ]
+          }
+        }
+      },
+      "settings": {
+        "fields": {
+          "days": {
+            "array": true,
+            "items": {
+              "kinds": [
+                "number"
+              ]
+            }
+          },
+          "endMinute": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "gapMinutes": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "nudges": {
+            "kinds": [
+              "boolean"
+            ]
+          },
+          "pausedUntil": {
+            "kinds": [
+              "null"
+            ]
+          },
+          "startMinute": {
+            "kinds": [
+              "number"
+            ]
+          },
+          "targets": {
+            "array": true,
+            "items": {
+              "fields": {
+                "chunk": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "daily": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "exercise": {
+                  "kinds": [
+                    "string"
+                  ]
+                },
+                "growBy": {
+                  "kinds": [
+                    "number"
+                  ]
+                },
+                "unit": {
+                  "kinds": [
+                    "string"
+                  ]
+                }
+              }
+            }
+          },
+          "timeZone": {
+            "kinds": [
+              "string"
+            ]
           }
         }
       }
@@ -1484,10 +1747,123 @@
       "null"
     ]
   },
+  "logMini": {
+    "fields": {
+      "amount": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "createdAt": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "day": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "exercise": {
+        "kinds": [
+          "string"
+        ]
+      },
+      "id": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "nudgeId": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "unit": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
   "logSet": {
     "kinds": [
       "number"
     ]
+  },
+  "moveMinisZone": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "endMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "gapMinutes": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "nudges": {
+        "kinds": [
+          "boolean"
+        ]
+      },
+      "pausedUntil": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "startMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "targets": {
+        "array": true,
+        "items": {
+          "fields": {
+            "chunk": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "daily": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "growBy": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "timeZone": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
   },
   "movePlanDay": {
     "kinds": [
@@ -1498,6 +1874,81 @@
     "kinds": [
       "null"
     ]
+  },
+  "pauseMinis": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "endMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "gapMinutes": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "nudges": {
+        "kinds": [
+          "boolean"
+        ]
+      },
+      "pausedUntil": {
+        "kinds": [
+          "null",
+          "string"
+        ]
+      },
+      "startMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "targets": {
+        "array": true,
+        "items": {
+          "fields": {
+            "chunk": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "daily": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "growBy": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "timeZone": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
   },
   "removePlanDay": {
     "kinds": [
@@ -1519,6 +1970,11 @@
       "null"
     ]
   },
+  "skipNudge": {
+    "kinds": [
+      "null"
+    ]
+  },
   "startOpenWorkout": {
     "kinds": [
       "number"
@@ -1529,7 +1985,31 @@
       "number"
     ]
   },
+  "subscribePush": {
+    "kinds": [
+      "null"
+    ]
+  },
   "swapExercise": {
+    "kinds": [
+      "null"
+    ]
+  },
+  "testPush": {
+    "fields": {
+      "failed": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "sent": {
+        "kinds": [
+          "number"
+        ]
+      }
+    }
+  },
+  "unsubscribePush": {
     "kinds": [
       "null"
     ]
@@ -1577,6 +2057,80 @@
         ]
       },
       "source": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
+  "updateMinis": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "endMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "gapMinutes": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "nudges": {
+        "kinds": [
+          "boolean"
+        ]
+      },
+      "pausedUntil": {
+        "kinds": [
+          "null"
+        ]
+      },
+      "startMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "targets": {
+        "array": true,
+        "items": {
+          "fields": {
+            "chunk": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "daily": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "growBy": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "timeZone": {
         "kinds": [
           "string"
         ]

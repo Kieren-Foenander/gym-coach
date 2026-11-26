@@ -1,5 +1,7 @@
 import { Schema } from "effect"
+import { MINI_LIMITS, MINI_UNITS } from "./minis"
 import {
+  AppOrigin,
   Day,
   Direction,
   ExercisePrescription,
@@ -7,8 +9,11 @@ import {
   HealthImport,
   Id,
   MeasurementInput,
+  MiniSettingsInput,
+  MiniTargetInput,
   PlanExercisePatch,
   ProfilePatch,
+  PushSubscriptionInput,
   SetInput,
 } from "./schema"
 
@@ -86,6 +91,53 @@ export const CallInputs = {
   // Apple Health, from the iPhone app
   importHealth: HealthImport,
   getHealth: Nothing,
+
+  // mini workouts
+  /** Mini workouts from one day to another (a phone asks for the days around its today), with the settings. */
+  getMinis: Schema.Struct({ from: Day, to: Day }),
+  /**
+   * Saves the settings. `day` is the phone's today, which takes the new targets at once. `base` is
+   * the targets the form was loaded with, so a target sent unchanged keeps one that grew meanwhile.
+   */
+  updateMinis: Schema.Struct({
+    day: Day,
+    settings: MiniSettingsInput,
+    base: Schema.optional(Schema.Array(MiniTargetInput).check(Schema.isMaxLength(MINI_LIMITS.targets))),
+    /**
+     * The settings the form was loaded with. A field sent as it was loaded is one the user left
+     * alone, so it keeps what is saved now, which another device may have changed since.
+     */
+    loaded: Schema.optional(MiniSettingsInput),
+  }),
+  /**
+   * Pauses nudges for the rest of today where the account is (true), or ends a pause (false),
+   * changing nothing else that is saved. `day` is the phone's today, used only before the account has a time zone.
+   */
+  pauseMinis: Schema.Struct({ day: Day, pause: Schema.Boolean }),
+  /** Moves nudges to another time zone, such as the phone's after a flight, changing nothing else that is saved. */
+  moveMinisZone: Schema.Struct({ day: Day, timeZone: MiniSettingsInput.fields.timeZone }),
+  logMini: Schema.Struct({
+    day: Day,
+    exercise: ExerciseName,
+    amount: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MINI_LIMITS.daily })),
+    /** The unit the screen showed when the set was logged, which it is kept in. Without it, the day's target's. */
+    unit: Schema.optional(Schema.Literals(MINI_UNITS)),
+    /** The nudge this answers, when it was logged from one. */
+    nudgeId: Schema.optional(Id),
+    clientKey: Schema.optional(Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(64))),
+    /** The account the screen logged it under: a set tried again after a switch of account is refused, not logged to the new one. */
+    account: Schema.optional(Schema.String.check(Schema.isMaxLength(64))),
+  }),
+  deleteMini: Schema.Struct({ entryId: Id }),
+  skipNudge: Schema.Struct({ nudgeId: Id }),
+  /**
+   * Turns nudges on in this browser. `origin` is filled in by the server from the address the
+   * request came to; whatever a client sends there is replaced.
+   */
+  subscribePush: Schema.Struct({ subscription: PushSubscriptionInput, origin: AppOrigin }),
+  unsubscribePush: Schema.Struct({ endpoint: Schema.String.check(Schema.isMaxLength(1000)) }),
+  /** Sends a notification to every browser with nudges on, to check they arrive. */
+  testPush: Nothing,
 } as const
 
 export type CallName = keyof typeof CallInputs

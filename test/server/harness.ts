@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { SqliteClient } from "@effect/sql-sqlite-node"
 import { Effect, Layer, ManagedRuntime, Schema, String as Str } from "effect"
+import type { SqlClient } from "effect/sql"
 import type { CallName } from "~/domain/calls"
 import type { CallInput, CallOutput } from "~/server/calls"
 import { userById } from "~/server/auth"
@@ -51,6 +52,8 @@ export interface TestServer {
   readonly exec: (sql: string) => void
   /** Reads one text value straight from the database, for checking what is stored rather than what a call shows. */
   readonly readText: (sql: string) => string
+  /** Runs server code straight on the database, for what no request starts, such as the cron's nudges. */
+  readonly run: <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => Promise<A>
   /** Every finished workout of an account as the AI coach reads it (get_training_history). */
   readonly coachHistory: (email: string) => Promise<ReadonlyArray<HistoryWorkout>>
   readonly close: () => Promise<void>
@@ -117,6 +120,7 @@ export const makeServer = (): TestServer => {
     },
     exec: (sql) => direct.exec(sql),
     readText: (sql) => Schema.decodeUnknownSync(Schema.String)(Object.values(direct.prepare(sql).get() ?? {})[0]),
+    run: (effect) => runtime.runPromise(effect),
     coachHistory: async (email) => {
       const id = Schema.decodeUnknownSync(Schema.String)(direct.prepare("SELECT id FROM users WHERE email = ?").get(email)?.id)
 

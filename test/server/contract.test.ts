@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { CallName } from "~/domain/calls"
 import { CallInputs } from "~/domain/calls"
+import { shiftDay } from "~/domain/days"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import type { CallInput, CallOutput } from "~/server/calls"
 import { makeServer, type Account, type TestServer } from "./harness"
@@ -54,6 +55,7 @@ const STEPS = {
       streakGoals: [
         { activity: "training", period: "week", target: 3 },
         { activity: "walking", period: "day", target: 1 },
+        { activity: "minis", period: "week", target: 5 },
       ],
     }),
   getToday: () => record("getToday", {}),
@@ -172,6 +174,56 @@ const STEPS = {
       ],
     }),
   getHealth: () => record("getHealth", {}),
+
+  updateMinis: () =>
+    record("updateMinis", {
+      day: DAY,
+      settings: {
+        targets: [
+          { exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 5 },
+          { exercise: "Plank", unit: "seconds", daily: 180, chunk: 60, growBy: 0 },
+        ],
+        nudges: true,
+        days: [0, 1, 2, 3, 4],
+        startMinute: 540,
+        endMinute: 1050,
+        gapMinutes: 45,
+        timeZone: "Australia/Brisbane",
+        pausedUntil: null,
+      },
+    }),
+  pauseMinis: async () => {
+    await record("pauseMinis", { day: DAY, pause: true })
+
+    return record("pauseMinis", { day: DAY, pause: false })
+  },
+  moveMinisZone: async () => {
+    await record("moveMinisZone", { day: DAY, timeZone: "Australia/Sydney" })
+
+    return record("moveMinisZone", { day: DAY, timeZone: "Australia/Brisbane" })
+  },
+  logMini: () => record("logMini", { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "contract-mini-1" }),
+  skipNudge: async () => {
+    server.exec(`INSERT INTO mini_nudges (user_id, day, exercise, unit, amount, sent_at)
+      SELECT id, '${DAY}', 'Plank', 'seconds', 60, 1795000000000 FROM users WHERE email = '${me.email}'`)
+    const nudge = (await record("getMinis", { from: DAY, to: DAY })).nudges[0]!
+
+    return record("skipNudge", { nudgeId: nudge.id })
+  },
+  deleteMini: async () => {
+    const entry = await record("logMini", { day: DAY, exercise: "Plank", amount: 60 })
+
+    return record("deleteMini", { entryId: entry.id })
+  },
+  getMinis: () => record("getMinis", { from: shiftDay(DAY, -1), to: shiftDay(DAY, 1) }),
+  // A key that is not a real one: the push fails before anything is sent, so the test never reaches the network.
+  subscribePush: () =>
+    record("subscribePush", {
+      subscription: { endpoint: "https://web.push.apple.com/contract", keys: { p256dh: "bm90LWEta2V5", auth: "bm90LWEtc2VjcmV0" } },
+      origin: "https://gym.example.com",
+    }),
+  testPush: () => record("testPush", {}),
+  unsubscribePush: () => record("unsubscribePush", { endpoint: "https://web.push.apple.com/contract" }),
 } satisfies { readonly [K in CallName]: () => Promise<void | CallOutput<CallName>> }
 
 const plan = async () => {
@@ -250,6 +302,18 @@ const ORDER: ReadonlyArray<CallName> = [
   "importHealth",
   "getHealth",
   "getHistory",
+  "updateMinis",
+  "pauseMinis",
+  "moveMinisZone",
+  "logMini",
+  "skipNudge",
+  "deleteMini",
+  "getMinis",
+  "subscribePush",
+  "testPush",
+  "unsubscribePush",
+  "getMinis",
+  "getToday",
 ]
 
 beforeAll(async () => {

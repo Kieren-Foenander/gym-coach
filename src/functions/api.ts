@@ -1,6 +1,6 @@
 import { redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { deleteCookie, getCookie, getRequestProtocol, setCookie } from "@tanstack/react-start/server"
+import { deleteCookie, getCookie, getRequestProtocol, getRequestUrl, setCookie } from "@tanstack/react-start/server"
 import { Effect, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
@@ -237,3 +237,44 @@ export const updateFood = createServerFn({ method: "POST" })
 export const deleteFood = createServerFn({ method: "POST" })
   .validator(input(CallInputs.deleteFood))
   .handler(({ data }) => authed(Calls.deleteFood.run(data)))
+
+// ---------------------------------------------------------------- mini workouts
+
+export const getMinis = createServerFn({ method: "GET" })
+  .validator(input(CallInputs.getMinis))
+  .handler(({ data }) => authed(Calls.getMinis.run(data)))
+
+export const updateMinis = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.updateMinis))
+  .handler(({ data }) => authed(Calls.updateMinis.run(data)))
+
+export const pauseMinis = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.pauseMinis))
+  .handler(({ data }) => authed(Calls.pauseMinis.run(data)))
+
+export const moveMinisZone = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.moveMinisZone))
+  .handler(({ data }) => authed(Calls.moveMinisZone.run(data)))
+
+export const logMini = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.logMini))
+  .handler(({ data }) => authed(Calls.logMini.run(data)))
+
+export const deleteMini = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.deleteMini))
+  .handler(({ data }) => authed(Calls.deleteMini.run(data)))
+
+export const skipNudge = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.skipNudge))
+  .handler(({ data }) => authed(Calls.skipNudge.run(data)))
+
+// The origin is the address this request came to, whatever the browser sent.
+export const subscribePush = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.subscribePush))
+  .handler(({ data }) => authed(Calls.subscribePush.run({ ...data, origin: getRequestUrl().origin })))
+
+export const unsubscribePush = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.unsubscribePush))
+  .handler(({ data }) => authed(Calls.unsubscribePush.run(data)))
+
+export const testPush = createServerFn({ method: "POST" }).handler(() => authed(Calls.testPush.run({})))

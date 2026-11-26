@@ -13,6 +13,9 @@
   --color-muted: #9299a5;
   --color-faint: #737a86;
   --color-chalk: #f5f6f7;
+  /* The streak rings beside the accent: walks and mini workouts (src/domain/streaks.ts RING_COLORS). */
+  --color-walk: #ff6fb5;
+  --color-mini: #4cc2ff;
 
   /* Native text takes one family name per weight. These are loaded in src/App.tsx. */
   --font-display: "BarlowCondensed_700Bold";

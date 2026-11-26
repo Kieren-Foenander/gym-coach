@@ -44,10 +44,15 @@ import {
   isFrequency,
   MAX_STREAK_GOALS,
   normaliseGoal,
+  RING_COLORS,
+  ringFor,
   STREAK_ACTIVITIES,
-  suggestSecondGoal,
+  suggestNextGoal,
   type StreakGoal,
 } from "~/domain/streaks"
+import { GOAL_SLOTS, testIds } from "~/domain/test-ids"
+
+const SLOT_NAMES = ["Main goal", "Second goal", "Third goal"] as const
 
 export function SettingsScreen() {
   const user = useUser()
@@ -159,13 +164,15 @@ function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> 
   return (
     <Card className="gap-5">
       <Text className="text-muted">
-        Your streak counts what you set here. A walk on its own only counts toward a goal for walks or for anything.
+        Your streak counts what you set here. A walk on its own only counts toward a goal for walks or for anything. Each goal
+        rings the days it counts on the calendar in its own colour.
       </Text>
       {goals.map((goal, index) => (
-        <View key={index} className="gap-3">
+        <View key={index} testID={testIds.settings.streakGoal(GOAL_SLOTS[index] ?? "third")} className="gap-3">
           <View className="flex-row items-center justify-between gap-3">
+            <View className="size-6 rounded-full" style={{ borderWidth: 3, borderColor: RING_COLORS[ringFor(goal.activity)] }} />
             <View className="flex-1">
-              <Eyebrow className="text-xs text-faint">{index === 0 ? "Main goal" : "Second goal"}</Eyebrow>
+              <Eyebrow className="text-xs text-faint">{SLOT_NAMES[index] ?? "Goal"}</Eyebrow>
               <Display className="text-2xl">{describeGoal(goal)}</Display>
             </View>
             {index > 0 ? (
@@ -202,7 +209,9 @@ function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> 
         </View>
       ))}
       {goals.length < MAX_STREAK_GOALS && first ? (
-        <Button onPress={() => edit([...goals, suggestSecondGoal(first)])}>Add a second goal</Button>
+        <Button testID={testIds.settings.addStreakGoal} onPress={() => edit([...goals, suggestNextGoal(goals)])}>
+          {goals.length === 1 ? "Add a second goal" : "Add a third goal"}
+        </Button>
       ) : null}
       <ErrorNote message={error} />
       <Button variant="primary" disabled={pending} onPress={save}>

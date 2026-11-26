@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
 import { isDay } from "./days"
+import { exerciseKey, isPushEndpoint, isTimeZone, MINI_LIMITS, MINI_UNITS } from "./minis"
 import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
 import { MAX_STREAK_GOALS, MAX_WEEKLY_TARGET, STREAK_ACTIVITIES, STREAK_PERIODS } from "./streaks"
 import { MEASUREMENT_KINDS } from "./units"
@@ -31,7 +32,8 @@ export const SignUpInput = Schema.Struct({
 /** One streak goal: what counts and how often. A daily goal's target is always 1. */
 export const StreakGoal = Schema.Struct({
   activity: Schema.Literals(STREAK_ACTIVITIES).annotate({
-    description: "training: any workout except walks. walking: walks only. any: anything logged, walks included.",
+    description:
+      "training: any workout except walks. walking: walks only. any: anything logged, walks included. minis: days every mini workout target was met.",
   }),
   period: Schema.Literals(STREAK_PERIODS),
   target: Int(1, MAX_WEEKLY_TARGET).annotate({ description: "Days a week with a session that counts. Use 1 for a daily goal." }),
@@ -197,3 +199,78 @@ export const HealthImport = Schema.Struct({
 })
 
 export type HealthImport = typeof HealthImport.Type
+
+// ---------------------------------------------------------------- mini workouts
+
+/** A minute of the day, 0 for midnight through 1440 for the midnight after. */
+const MinuteOfDay = Int(0, 1440)
+
+/** One daily mini workout target, such as 100 push-ups in nudges of about 25. */
+export const MiniTargetInput = Schema.Struct({
+  exercise: Name,
+  unit: Schema.Literals(MINI_UNITS).annotate({ description: "reps, or seconds for a hold such as a plank." }),
+  daily: Int(1, MINI_LIMITS.daily).annotate({ description: "How many to do in a day." }),
+  chunk: Int(1, MINI_LIMITS.chunk).annotate({ description: "About how many one nudge asks for." }),
+  growBy: Int(0, MINI_LIMITS.growBy).annotate({
+    description: "Added to the daily target after a week with it met on every nudge day. 0 keeps it fixed.",
+  }),
+})
+
+export type MiniTargetInput = typeof MiniTargetInput.Type
+
+const TimeZone = Schema.String.check(
+  Schema.isMaxLength(64),
+  Schema.makeFilter((zone: string) => zone === "" || isTimeZone(zone) || "Expected a time zone such as Australia/Brisbane"),
+)
+
+interface WindowAndTargets {
+  readonly startMinute: number
+  readonly endMinute: number
+  readonly targets: ReadonlyArray<{ readonly exercise: string }>
+}
+
+const SETTINGS_RULES = Schema.makeFilter((settings: WindowAndTargets) => {
+  if (settings.endMinute - settings.startMinute < MINI_LIMITS.window) {
+    return `Nudges need a window of at least ${MINI_LIMITS.window} minutes, ending after it starts`
+  }
+
+  const names = settings.targets.map((target) => exerciseKey(target.exercise))
+
+  return new Set(names).size === names.length || "Each exercise can have one target"
+})
+
+/** Everything about mini workouts the user sets: the targets, and when nudges may come. */
+export const MiniSettingsInput = Schema.Struct({
+  targets: Schema.Array(MiniTargetInput).check(Schema.isMaxLength(MINI_LIMITS.targets)),
+  nudges: Schema.Boolean.annotate({ description: "Whether nudges are sent. Targets count toward the day either way." }),
+  days: Schema.Array(Int(0, 6))
+    .check(Schema.isMaxLength(7), Schema.isUnique())
+    .annotate({ description: "The days nudges come on, 0 for Monday through 6 for Sunday." }),
+  startMinute: MinuteOfDay.annotate({ description: "When nudges may start, in minutes after midnight in the user's time zone." }),
+  endMinute: MinuteOfDay.annotate({ description: "When nudges stop, in minutes after midnight." }),
+  gapMinutes: Int(MINI_LIMITS.minGap, MINI_LIMITS.maxGap).annotate({ description: "The least time between two nudges, in minutes." }),
+  timeZone: TimeZone.annotate({ description: "The user's IANA time zone, such as Australia/Brisbane." }),
+  pausedUntil: Schema.NullOr(Day).annotate({ description: "No nudges before this day (YYYY-MM-DD). Null when not paused." }),
+}).check(SETTINGS_RULES)
+
+export type MiniSettingsInput = typeof MiniSettingsInput.Type
+
+const Base64Url = (max: number) =>
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(max), Schema.isPattern(/^[A-Za-z0-9_-]+=*$/))
+
+/** A browser's push subscription, as PushSubscription.toJSON() gives it. Only a known push service's address. */
+export const PushSubscriptionInput = Schema.Struct({
+  endpoint: Schema.String.check(
+    Schema.isMaxLength(1000),
+    Schema.makeFilter((endpoint: string) => isPushEndpoint(endpoint) || "Expected the address of a browser's push service"),
+  ),
+  keys: Schema.Struct({ p256dh: Base64Url(200), auth: Base64Url(100) }),
+})
+
+export type PushSubscriptionInput = typeof PushSubscriptionInput.Type
+
+/**
+ * Where the app is served from. The server takes it from the request, never from what a client
+ * says, and names it to push services as who sends the nudges (src/server/push.ts vapidSubject).
+ */
+export const AppOrigin = Schema.String.check(Schema.isMaxLength(200), Schema.isPattern(/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?$/))
