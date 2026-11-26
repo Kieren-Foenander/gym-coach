@@ -338,9 +338,11 @@ describe("nudges", () => {
     await setUp(me, { days: [0, 1, 2] })
     expect((await tick(TEN_AM)).sent).toBe(0)
 
-    await setUp(me, { pausedUntil: shiftDay(DAY, 1) })
+    await setUp(me)
+    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
     expect((await tick(TEN_AM)).sent).toBe(0)
 
+    await me.call("pauseMinis", { day: DAY, until: null })
     await setUp(me, { nudges: false })
     expect((await tick(TEN_AM)).sent).toBe(0)
 
@@ -444,12 +446,47 @@ describe("nudges", () => {
     await setUp(me)
     await subscribe(me)
     await tick(TEN_AM)
-    await setUp(me, { pausedUntil: shiftDay(DAY, 1) })
-    await setUp(me)
+    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+    await me.call("pauseMinis", { day: DAY, until: null })
 
     expect((await tick(TEN_AM + 5 * 60_000)).sent).toBe(0)
     expect((await tick(TEN_AM + 40 * 60_000)).sent).toBe(0)
     expect((await tick(TEN_AM + 45 * 60_000)).sent).toBe(1)
+  })
+
+  it("keeps a pause when a settings form opened before it is saved", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+
+    // Another device's form, opened before the pause, changes only the gap.
+    const saved = await setUp(me, { gapMinutes: 60, pausedUntil: null })
+
+    expect(saved.pausedUntil).toBe(shiftDay(DAY, 1))
+    expect((await tick(TEN_AM)).sent).toBe(0)
+  })
+
+  it("takes a set back all at once or not at all", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Push-Up", unit: "reps", daily: 25, chunk: 25, growBy: 0 }] })
+
+    const entry = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25 })
+
+    // Working out the day again fails once, after the set itself was deleted in the same step.
+    server.exec(`CREATE TRIGGER refuse_once BEFORE UPDATE OF met ON mini_days BEGIN SELECT RAISE(ABORT, 'refused'); END`)
+    expect((await server.request("call/deleteMini", { token: me.token, body: { entryId: entry.id } })).status).toBe(500)
+    expect((await today(me)).progress[0]!.done).toBe(25)
+
+    server.exec(`DROP TRIGGER refuse_once`)
+    await me.call("deleteMini", { entryId: entry.id })
+
+    const minis = await me.call("getMinis", { from: DAY, to: DAY })
+
+    expect(minis.days[0]!.progress[0]!.done).toBe(0)
+    expect(minis.metDays).toEqual([])
   })
 
   it("lets only the pause change when pausing from a screen that shows older settings", async () => {
@@ -1008,6 +1045,34 @@ describe("growing targets", () => {
     })
 
     expect(saved.targets[0]!.daily).toBe(110)
+  })
+
+  it("work a save out for one moment, even when it lands just after midnight", async () => {
+    const me = await server.signUp()
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 0 }] as const
+
+    await setUp(me, { targets }, "2026-11-22")
+    await me.call("logMini", { day: "2026-11-22", exercise: "Push-Up", amount: 50 })
+
+    // The save starts at 23:59:59 on Sunday; its write lands at 00:00:01 on Monday.
+    clockAt(Date.parse("2026-11-22T23:59:59Z"))
+
+    const randomUUID = crypto.randomUUID.bind(crypto)
+
+    vi.spyOn(crypto, "randomUUID").mockImplementation(() => {
+      clockAt(Date.parse("2026-11-23T00:00:01Z"))
+
+      return randomUUID()
+    })
+
+    await me.call("updateMinis", { day: "2026-11-22", settings: { ...SETTINGS, targets: [{ ...targets[0], daily: 50 }] }, base: targets })
+    vi.restoreAllMocks()
+
+    // Made on Sunday, the save is Sunday's: Sunday takes its target, and is done against it.
+    const sunday = await me.call("getMinis", { from: "2026-11-22", to: "2026-11-22" })
+
+    expect(sunday.days[0]).toMatchObject({ met: true, progress: [{ target: 50, done: 50 }] })
+    expect(sunday.metDays).toEqual(["2026-11-22"])
   })
 
   it("let a target the user changes on that day be what they set", async () => {

@@ -173,6 +173,11 @@ interface SettingsWrite {
   readonly reviewedWeek: string | null
   /** The day the write is for, which plans its nudges again. */
   readonly day: string
+  /**
+   * The moment the whole change is worked out for: the week it reviews, its day and which days
+   * have ended all follow from this one time, even if the write lands a moment later, past midnight.
+   */
+  readonly time: number
 }
 
 /**
@@ -184,7 +189,7 @@ interface SettingsWrite {
  */
 const writeSettings = Effect.fn("minis.writeSettings")(function* (userId: string, stored: Stored, settings: MiniSettings, write: SettingsWrite) {
   const sql = yield* SqlClient.SqlClient
-  const time = yield* Clock.currentTimeMillis
+  const { time } = write
   const json = JSON.stringify(settings)
   const revision = stored.revision + 1
   const targets = snapshotOf(settings.targets)
@@ -195,8 +200,12 @@ const writeSettings = Effect.fn("minis.writeSettings")(function* (userId: string
   const won = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_write_token = ${token})`
   const openFrom = sql`(SELECT mini_open_from FROM users WHERE id = ${userId})`
 
-  // Keys kept before 0012 could make them are put right first, so the open days are judged as the app judges them.
-  for (const row of yield* dayRows(userId, later(before, stored.openFrom), "9999-12-31")) yield* repairKeys(userId, row.day)
+  // Keys kept before 0012 could make them are put right first, so the days this write judges are
+  // judged as the app judges them. Only those days: from where the open days will start, which is
+  // today at the earliest, so a day or two, however long the account's history.
+  const opensFrom = later(stored.openFrom, later(before, after))
+
+  for (const row of yield* dayRows(userId, opensFrom, "9999-12-31")) yield* repairKeys(userId, row.day)
 
   const results = yield* atomically([
     sql<Won>`
@@ -335,7 +344,7 @@ const reviewWeek = Effect.fn("minis.reviewWeek")(function* (userId: string) {
 
     const next = yield* grow(userId, stored.settings, today)
 
-    if ((yield* writeSettings(userId, stored, next, { reviewedWeek: mondayOf(today), day: today })) !== null) {
+    if ((yield* writeSettings(userId, stored, next, { reviewedWeek: mondayOf(today), day: today, time })) !== null) {
       return yield* settingsOf(userId)
     }
   }
@@ -527,18 +536,22 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
     const reviewedWeek = week ?? (first === null ? null : mondayOf(first))
     const day = accountToday(settings, time) ?? deviceDay
 
-    if ((yield* writeSettings(user.id, stored, settings, { reviewedWeek, day })) !== null) return settings
+    if ((yield* writeSettings(user.id, stored, settings, { reviewedWeek, day, time })) !== null) return settings
   }
 
   return yield* new Invalid({ reason: "The settings were changing at the same time. Try again." })
 })
 
-/** Saves settings as a screen sends them, whole. */
+/**
+ * Saves settings as a screen's form sends them, whole, except the pause: that is kept as saved,
+ * since a form opened before a pause (on another device, say) still holds the old one. Pausing
+ * and resuming go through pauseMinis.
+ */
 export const updateMinis = (
   deviceDay: string,
   submitted: MiniSettings,
   base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
-) => changeMinis(deviceDay, () => Effect.succeed(submitted), base)
+) => changeMinis(deviceDay, (saved) => Effect.succeed({ ...submitted, pausedUntil: saved.pausedUntil }), base)
 
 /** Pauses nudges until a day, or ends a pause with null, changing nothing else that is saved. */
 export const pauseMinis = (deviceDay: string, until: string | null) =>
@@ -634,20 +647,34 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   return yield* finish(entry)
 })
 
+/**
+ * Takes a set back. The set goes, its nudge is open again and its day's done flag is worked out
+ * again in one atomic batch, so a failure part of the way leaves nothing changed, and a retry finds the set still there.
+ */
 export const deleteMini = Effect.fn("deleteMini")(function* (entryId: number) {
   const sql = yield* SqlClient.SqlClient
   const user = yield* CurrentUser
 
-  const rows = yield* sql<{ day: string; nudgeId: number | null }>`
-    DELETE FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} RETURNING day, nudge_id`
-
-  const removed = rows[0]
+  const removed = (yield* sql<{ day: string; nudgeId: number | null }>`
+    SELECT day, nudge_id FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id}`)[0]
 
   if (!removed) return yield* new NotFound({ what: `Mini workout set ${entryId}` })
 
-  if (removed.nudgeId !== null) yield* sql`UPDATE mini_nudges SET status = 'sent' WHERE id = ${removed.nudgeId} AND user_id = ${user.id}`
+  // So the day is judged as the app judges it once the set is gone.
+  yield* repairKeys(user.id, removed.day)
 
-  yield* refreshDay(user.id, removed.day)
+  const [deleted] = yield* atomically([
+    sql<Won>`DELETE FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} RETURNING 0 AS mini_revision`,
+    sql<Won>`UPDATE mini_nudges SET status = 'sent' WHERE id = ${removed.nudgeId} AND user_id = ${user.id}`,
+    sql<Won>`
+      UPDATE mini_days SET
+        met = ${sql.unsafe(MET_NOW)},
+        next_nudge_at = CASE WHEN next_nudge_at = 0 AND ${sql.unsafe(MET_NOW)} = 0 THEN NULL ELSE next_nudge_at END
+      WHERE user_id = ${user.id} AND day = ${removed.day}`,
+  ])
+
+  // Taken back by another request in the moment between: it is gone either way.
+  if (!deleted || deleted.length === 0) return yield* new NotFound({ what: `Mini workout set ${entryId}` })
 })
 
 /** Marks a nudge as passed over, so its page stops asking. */
