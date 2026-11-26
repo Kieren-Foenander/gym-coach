@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Predicate, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
 import { Credentials, SignUpInput } from "~/domain/schema"
@@ -108,7 +108,13 @@ const route = (request: Request, path: string, { signupCode, stage }: ApiDeploym
 
   return Effect.gen(function* () {
     const user = yield* Auth.userFromSession(bearerToken(request))
-    const call = Effect.flatMap(body, (input) => Calls[name].handle(input))
+
+    // What a call takes from the request rather than the client: the address it came to.
+    const input = Effect.map(body, (json) =>
+      name === "subscribePush" && Predicate.isObject(json) ? { ...json, origin: new URL(request.url).origin } : json,
+    )
+
+    const call = Effect.flatMap(input, (json) => Calls[name].handle(json))
 
     return ok(yield* Effect.provideService(call, CurrentUser, user))
   })

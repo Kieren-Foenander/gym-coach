@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Pressable, View } from "react-native"
 import { CATALOG, MUSCLES, mergeLibrary, searchLibrary, type Muscle } from "~/domain/catalog"
+import { testIds } from "~/domain/test-ids"
 import { Button, Divider, Eyebrow, SearchField, Text } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import { ExerciseLine } from "./ExerciseLine"
@@ -42,7 +43,7 @@ export function ExercisePicker({ taken, group = "", disabled, onPick }: Exercise
 
   return (
     <View className="gap-3">
-      <SearchField value={text} placeholder={`Search ${CATALOG.length} exercises`} onChange={setText} />
+      <SearchField testID={testIds.exercisePicker.search} value={text} placeholder={`Search ${CATALOG.length} exercises`} onChange={setText} />
 
       {heading !== null && shown.length > 0 ? <Eyebrow className="pt-1">{heading}</Eyebrow> : null}
 
@@ -52,6 +53,7 @@ export function ExercisePicker({ taken, group = "", disabled, onPick }: Exercise
             <View key={item.name}>
               {index > 0 ? <Divider /> : null}
               <Pressable
+                testID={testIds.exercisePicker.option(item.name)}
                 accessibilityRole="button"
                 accessibilityLabel={`Add ${item.name}`}
                 disabled={disabled}

@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
 import { isDay } from "./days"
-import { isTimeZone, MINI_LIMITS, MINI_UNITS } from "./minis"
+import { isPushEndpoint, isTimeZone, MINI_LIMITS, MINI_UNITS } from "./minis"
 import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
 import { MAX_STREAK_GOALS, MAX_WEEKLY_TARGET, STREAK_ACTIVITIES, STREAK_PERIODS } from "./streaks"
 import { MEASUREMENT_KINDS } from "./units"
@@ -258,16 +258,19 @@ export type MiniSettingsInput = typeof MiniSettingsInput.Type
 const Base64Url = (max: number) =>
   Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(max), Schema.isPattern(/^[A-Za-z0-9_-]+=*$/))
 
-/** A browser's push subscription, as PushSubscription.toJSON() gives it. */
+/** A browser's push subscription, as PushSubscription.toJSON() gives it. Only a known push service's address. */
 export const PushSubscriptionInput = Schema.Struct({
-  endpoint: Schema.String.check(Schema.isMaxLength(1000), Schema.isPattern(/^https:\/\/\S+$/)),
+  endpoint: Schema.String.check(
+    Schema.isMaxLength(1000),
+    Schema.makeFilter((endpoint: string) => isPushEndpoint(endpoint) || "Expected the address of a browser's push service"),
+  ),
   keys: Schema.Struct({ p256dh: Base64Url(200), auth: Base64Url(100) }),
 })
 
 export type PushSubscriptionInput = typeof PushSubscriptionInput.Type
 
-/** Where the app is served from, which a notification opens. Plain http only for the machine's own address. */
-export const AppOrigin = Schema.String.check(
-  Schema.isMaxLength(200),
-  Schema.isPattern(/^(https:\/\/[A-Za-z0-9.-]+(:\d+)?|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/),
-)
+/**
+ * Where the app is served from. The server takes it from the request, never from what a client
+ * says, and names it to push services as who sends the nudges (src/server/push.ts vapidSubject).
+ */
+export const AppOrigin = Schema.String.check(Schema.isMaxLength(200), Schema.isPattern(/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?$/))

@@ -146,9 +146,9 @@ export const middayOf = (day: string): number => {
   return new Date(year ?? 1970, (month ?? 1) - 1, date ?? 1, 12).getTime()
 }
 
-/** "9:00", "17:30": a minute of the day on a 24-hour clock. */
+/** "9:00", "17:30": a minute of the day on a 24-hour clock. The midnight that ends the day is "24:00". */
 export const formatMinute = (minute: number): string =>
-  `${Math.floor(minute / 60) % 24}:${String(minute % 60).padStart(2, "0")}`
+  minute >= 1440 ? "24:00" : `${Math.floor(minute / 60)}:${String(minute % 60).padStart(2, "0")}`
 
 /** Reads "9:00" or "17:30" back as a minute of the day, or null. */
 export const parseMinute = (text: string): number | null => {
@@ -266,7 +266,7 @@ export const chooseNudge = (
   const share = total <= slots ? wanted(picked) : Math.max(1, Math.floor((slots * wanted(picked)) / total))
   const left = remainingOf(picked)
   const chunk = chunkOf(targets, picked)
-  const amount = friendly(Math.min(Math.ceil(left / share), chunk * 2), left)
+  const amount = Math.min(friendly(Math.ceil(left / share), left), chunk * 2)
 
   return { exercise: picked.exercise, unit: picked.unit, amount, left, target: picked.target }
 }
@@ -275,21 +275,54 @@ export const chooseNudge = (
 export const afterAsk = (progress: ReadonlyArray<MiniProgress>, ask: NudgeAsk): ReadonlyArray<MiniProgress> =>
   progress.map((item) => (sameExercise(item.exercise, ask.exercise) ? { ...item, done: item.done + ask.amount } : item))
 
+/** How often the server looks for nudges that are due (the cron in alchemy.run.ts). */
+export const CRON_MINUTES = 5
+
 /**
  * Minutes until the next nudge, spreading what is still needed over the time left with some
- * randomness, never sooner than the gap. Null when nothing is needed or no gap fits before the end.
+ * randomness, never sooner than the gap and early enough for a cron run to catch before the window
+ * closes. Null when nothing is needed or no such time is left.
  */
 export const nextNudgeDelay = (needed: number, minutesLeft: number, gapMinutes: number, random: () => number): number | null => {
-  if (needed <= 0 || minutesLeft < gapMinutes) return null
+  const latest = minutesLeft - CRON_MINUTES
+
+  if (needed <= 0 || latest < gapMinutes) return null
 
   const mean = minutesLeft / (needed + 0.5)
 
-  return Math.round(Math.min(Math.max(gapMinutes, mean * (0.7 + 0.6 * random())), minutesLeft - 1))
+  return Math.round(Math.min(Math.max(gapMinutes, mean * (0.7 + 0.6 * random())), latest))
 }
 
 /** Minutes from the window opening to the first nudge of the day: soon, but not on the dot. */
 export const firstNudgeDelay = (needed: number, windowMinutes: number, random: () => number): number =>
   Math.round(random() * Math.min(windowMinutes / (needed + 1), 90))
+
+/**
+ * The push services browsers subscribe through: Apple's for Safari and home-screen web apps on
+ * iPhone, Google's for Chrome, Mozilla's for Firefox, Microsoft's for Edge. The server only ever
+ * posts to these, so a made-up subscription cannot point it anywhere else.
+ */
+const PUSH_HOSTS: ReadonlyArray<string> = ["push.apple.com", "fcm.googleapis.com", "push.services.mozilla.com", "notify.windows.com"]
+
+/** Whether an address is an https endpoint of a known push service. */
+export const isPushEndpoint = (endpoint: string): boolean => {
+  let url: URL
+
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return false
+  }
+
+  const host = url.hostname.toLowerCase()
+
+  return (
+    url.protocol === "https:" &&
+    url.port === "" &&
+    url.username === "" &&
+    PUSH_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`))
+  )
+}
 
 /** An exercise as a count says it: "25 push-ups", "1 pull-up". */
 export const describeAmount = (exercise: string, unit: MiniUnit, amount: number): string => {

@@ -209,11 +209,11 @@ const STEPS = {
   // A key that is not a real one: the push fails before anything is sent, so the test never reaches the network.
   subscribePush: () =>
     record("subscribePush", {
-      subscription: { endpoint: "https://push.example.com/contract", keys: { p256dh: "bm90LWEta2V5", auth: "bm90LWEtc2VjcmV0" } },
+      subscription: { endpoint: "https://web.push.apple.com/contract", keys: { p256dh: "bm90LWEta2V5", auth: "bm90LWEtc2VjcmV0" } },
       origin: "https://gym.example.com",
     }),
   testPush: () => record("testPush", {}),
-  unsubscribePush: () => record("unsubscribePush", { endpoint: "https://push.example.com/contract" }),
+  unsubscribePush: () => record("unsubscribePush", { endpoint: "https://web.push.apple.com/contract" }),
 } satisfies { readonly [K in CallName]: () => Promise<void | CallOutput<CallName>> }
 
 const plan = async () => {

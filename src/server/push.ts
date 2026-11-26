@@ -5,6 +5,8 @@
  * runs the same on Workers and in the tests.
  */
 
+import { isPushEndpoint } from "~/domain/minis"
+
 const encoder = new TextEncoder()
 
 export const toBase64Url = (bytes: Uint8Array): string => {
@@ -76,6 +78,25 @@ export const vapidAuthorization = async (endpoint: string, keys: VapidKeys, subj
   return `vapid t=${header}.${claims}.${toBase64Url(signature)}, k=${keys.publicKey}`
 }
 
+/** How long a signed token is used before a new one is made. Apple asks for no more than one an hour. */
+const TOKEN_REUSE_MS = 60 * 60_000
+
+const tokens = new Map<string, { readonly header: string; readonly until: number }>()
+
+/** The Authorization header for a push service, reusing the token made for it within the last hour. */
+const cachedAuthorization = async (endpoint: string, keys: VapidKeys, subject: string, now: number): Promise<string> => {
+  const key = `${new URL(endpoint).origin} ${keys.publicKey} ${subject}`
+  const kept = tokens.get(key)
+
+  if (kept && kept.until > now) return kept.header
+
+  const header = await vapidAuthorization(endpoint, keys, subject, now)
+
+  tokens.set(key, { header, until: now + TOKEN_REUSE_MS })
+
+  return header
+}
+
 // ---------------------------------------------------------------- the message
 
 const AGREEMENT = { name: "ECDH", namedCurve: "P-256" } as const
@@ -132,17 +153,17 @@ export const encryptPayload = async (
 export interface PushMessage {
   readonly title: string
   readonly body: string
-  /** The page a tap opens. */
+  /** The page a tap opens, as a path on the app's own address, such as /minis?nudge=12. */
   readonly url: string
   /** A newer notification with the same tag replaces the older one. */
   readonly tag: string
 }
 
-/** sent: the push service took it. gone: the subscription no longer exists and should be forgotten. */
+/** sent: the push service took it. gone: the subscription no longer exists, or never pointed at a push service, and should be forgotten. */
 export type PushOutcome = "sent" | "gone" | "failed"
 
-/** How long the push service keeps trying a phone that is off: a nudge an hour late is no use. */
-const TIME_TO_LIVE_SECONDS = 30 * 60
+/** The longest a push service keeps trying a phone that is off: a nudge much later than that is no use. */
+export const MAX_TIME_TO_LIVE_SECONDS = 30 * 60
 
 export const sendPush = async (
   subscription: Subscription,
@@ -150,19 +171,25 @@ export const sendPush = async (
   keys: VapidKeys,
   subject: string,
   now: number,
+  timeToLiveSeconds: number = MAX_TIME_TO_LIVE_SECONDS,
 ): Promise<PushOutcome> => {
+  if (!isPushEndpoint(subscription.endpoint)) return "gone"
+
   const body = await encryptPayload(JSON.stringify(message), subscription)
+  const ttl = Math.max(0, Math.min(MAX_TIME_TO_LIVE_SECONDS, Math.floor(timeToLiveSeconds)))
 
   const response = await fetch(subscription.endpoint, {
     method: "POST",
     headers: {
-      authorization: await vapidAuthorization(subscription.endpoint, keys, subject, now),
+      authorization: await cachedAuthorization(subscription.endpoint, keys, subject, now),
       "content-encoding": "aes128gcm",
       "content-type": "application/octet-stream",
-      ttl: String(TIME_TO_LIVE_SECONDS),
+      ttl: String(ttl),
       urgency: "normal",
     },
     body,
+    // A push service answers itself; a redirect would send the push somewhere this did not check.
+    redirect: "manual",
   }).catch(() => null)
 
   if (response === null) return "failed"

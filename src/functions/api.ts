@@ -1,6 +1,6 @@
 import { redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { deleteCookie, getCookie, getRequestProtocol, setCookie } from "@tanstack/react-start/server"
+import { deleteCookie, getCookie, getRequestProtocol, getRequestUrl, setCookie } from "@tanstack/react-start/server"
 import { Effect, Schema } from "effect"
 import type { SqlClient } from "effect/sql"
 import type { SqlError } from "effect/sql/SqlError"
@@ -260,9 +260,10 @@ export const skipNudge = createServerFn({ method: "POST" })
   .validator(input(CallInputs.skipNudge))
   .handler(({ data }) => authed(Calls.skipNudge.run(data)))
 
+// The origin is the address this request came to, whatever the browser sent.
 export const subscribePush = createServerFn({ method: "POST" })
   .validator(input(CallInputs.subscribePush))
-  .handler(({ data }) => authed(Calls.subscribePush.run(data)))
+  .handler(({ data }) => authed(Calls.subscribePush.run({ ...data, origin: getRequestUrl().origin })))
 
 export const unsubscribePush = createServerFn({ method: "POST" })
   .validator(input(CallInputs.unsubscribePush))

@@ -495,26 +495,34 @@ const PUSH_NOTES = {
 
 interface PushCardProps {
   readonly publicKey: string
-  /** How many devices have nudges on, this one or others. */
-  readonly devices: number
+  /** The push addresses this account has nudges going to, this browser's or others'. */
+  readonly endpoints: ReadonlyArray<string>
 }
 
-/** Turns nudges on or off on this device, and sends a test. */
-export function PushCard({ publicKey, devices }: PushCardProps) {
+/**
+ * Turns nudges on or off on this device, and sends a test. Nudges are on here only when this
+ * browser's subscription is one the server holds for this account; a subscription it holds for
+ * no one, or for someone else, shows as off, and turning nudges on sends it again.
+ */
+export function PushCard({ publicKey, endpoints }: PushCardProps) {
   const { act, pending, error } = useAction()
   const [state, setState] = useState<PushState | null>(null)
   const [tested, setTested] = useState<string | null>(null)
-
-  const refresh = async () => {
-    const support = pushSupport()
-
-    if (support !== "ready") setState(support)
-    else setState((await currentSubscription()) ? "on" : "off")
-  }
+  const known = endpoints.join(" ")
 
   useEffect(() => {
-    void refresh()
-  }, [])
+    const support = pushSupport()
+
+    if (support !== "ready") {
+      setState(support)
+
+      return
+    }
+
+    void currentSubscription().then((subscription) => setState(subscription && known.split(" ").includes(subscription.endpoint) ? "on" : "off"))
+  }, [known])
+
+  const devices = endpoints.length
 
   const enable = () =>
     void act(async () => {
@@ -547,6 +555,7 @@ export function PushCard({ publicKey, devices }: PushCardProps) {
       <p data-testid={testIds.minis.push} data-state={state === null ? undefined : PUSH_STATES[state]} className="text-muted">
         {state === null ? "Checking this device…" : PUSH_NOTES[state]}
         {devices > 0 && state !== "on" ? ` ${devices} other ${devices === 1 ? "device gets" : "devices get"} them.` : ""}
+        {state === "on" && devices > 1 ? ` So ${devices === 2 ? "does 1 other device" : `do ${devices - 1} other devices`}.` : ""}
       </p>
       <ErrorNote message={error} />
       {state === "off" ? (

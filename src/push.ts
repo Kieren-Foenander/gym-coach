@@ -85,5 +85,22 @@ export const unsubscribe = async (): Promise<string | null> => {
   return subscription.endpoint
 }
 
+/**
+ * Stops nudges in this browser before signing out, so the next person to sign in here does not
+ * get the last one's. Tells the server first, while still signed in. Never fails the sign-out.
+ */
+export const forgetThisBrowser = async (tellServer: (endpoint: string) => Promise<void>): Promise<void> => {
+  try {
+    const subscription = await currentSubscription()
+
+    if (!subscription) return
+
+    await tellServer(subscription.endpoint).catch(() => undefined)
+    await subscription.unsubscribe()
+  } catch {
+    // Push is not available here, or the browser refused: there is nothing to undo.
+  }
+}
+
 /** The device's time zone, which the nudge window is read in. */
 export const deviceTimeZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""

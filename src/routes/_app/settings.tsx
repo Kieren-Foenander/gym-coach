@@ -41,7 +41,8 @@ import {
   suggestNextGoal,
   type StreakGoal,
 } from "~/domain/streaks"
-import { getDeployment, signOut, updateProfile } from "~/functions/api"
+import { getDeployment, signOut, unsubscribePush, updateProfile } from "~/functions/api"
+import { forgetThisBrowser } from "~/push"
 
 const SLOT_NAMES = ["Main goal", "Second goal", "Third goal"] as const
 
@@ -70,6 +71,9 @@ function SettingsPage() {
   }
 
   const leave = async () => {
+    await forgetThisBrowser(async (endpoint) => {
+      await unsubscribePush({ data: { endpoint } })
+    })
     await signOut()
     window.location.assign("/login")
   }

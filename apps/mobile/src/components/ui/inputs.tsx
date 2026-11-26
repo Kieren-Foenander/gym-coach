@@ -48,12 +48,15 @@ interface SearchFieldProps {
   readonly value: string
   readonly placeholder: string
   readonly onChange: (value: string) => void
+  /** From src/domain/test-ids.ts, on the field itself. */
+  readonly testID?: string
 }
 
-export function SearchField({ value, placeholder, onChange }: SearchFieldProps) {
+export function SearchField({ value, placeholder, onChange, testID }: SearchFieldProps) {
   return (
     <View className="justify-center">
       <TextInput
+        testID={testID}
         accessibilityLabel="Search exercises"
         className="px-12"
         placeholder={placeholder}

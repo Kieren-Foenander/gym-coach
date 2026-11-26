@@ -90,7 +90,7 @@ function MinisDay({ today }: { readonly today: string }) {
       </div>
 
       <SectionTitle>This device</SectionTitle>
-      <PushCard publicKey={data.push.publicKey} devices={data.push.devices} />
+      <PushCard publicKey={data.push.publicKey} endpoints={data.push.endpoints} />
 
       {nudge ? (
         <button type="button" className="mt-4 min-h-11 w-full text-sm font-semibold text-muted" onClick={() => void navigate({ to: "/minis", search: {} })}>

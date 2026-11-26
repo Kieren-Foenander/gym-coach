@@ -108,7 +108,10 @@ export const CallInputs = {
   }),
   deleteMini: Schema.Struct({ entryId: Id }),
   skipNudge: Schema.Struct({ nudgeId: Id }),
-  /** Turns nudges on in this browser. `origin` is the address the app is open at, which a nudge opens. */
+  /**
+   * Turns nudges on in this browser. `origin` is filled in by the server from the address the
+   * request came to; whatever a client sends there is replaced.
+   */
   subscribePush: Schema.Struct({ subscription: PushSubscriptionInput, origin: AppOrigin }),
   unsubscribePush: Schema.Struct({ endpoint: Schema.String.check(Schema.isMaxLength(1000)) }),
   /** Sends a notification to every browser with nudges on, to check they arrive. */

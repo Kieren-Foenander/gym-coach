@@ -10,19 +10,26 @@ import { makeServer, type Account, type TestServer } from "./harness"
 
 let server: TestServer
 
+// A Thursday, at 10:00 in UTC, which these settings read the window in.
+const DAY = "2026-11-26"
+const TEN_AM = Date.parse(`${DAY}T10:00:00Z`)
+const HOUR = 3_600_000
+
+/** Sets the server's clock, which decides the day a settings save lands on. */
+const clockAt = (time: number) => vi.setSystemTime(time)
+
 beforeEach(() => {
+  // Only the date is faked, so the database and timers run as normal.
+  vi.useFakeTimers({ toFake: ["Date"] })
+  clockAt(TEN_AM)
   server = makeServer()
 })
 
 afterEach(async () => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
   await server.close()
 })
-
-// A Thursday, at 10:00 in UTC, which these settings read the window in.
-const DAY = "2026-11-26"
-const TEN_AM = Date.parse(`${DAY}T10:00:00Z`)
-const HOUR = 3_600_000
 
 const SETTINGS: MiniSettings = {
   targets: [
@@ -43,8 +50,12 @@ const decodeMessage = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Struct({ title: Schema.String, body: Schema.String, url: Schema.String, tag: Schema.String })),
 )
 
-const setUp = async (me: Account, settings: Partial<MiniSettings> = {}, day = DAY) =>
-  me.call("updateMinis", { day, settings: { ...SETTINGS, ...settings } })
+/** Saves settings on `day`, at 10:00 on it: the server reads the day in the saved time zone, not the one sent. */
+const setUp = async (me: Account, settings: Partial<MiniSettings> = {}, day = DAY) => {
+  clockAt(Date.parse(`${day}T10:00:00Z`))
+
+  return me.call("updateMinis", { day, settings: { ...SETTINGS, ...settings } })
+}
 
 const today = async (me: Account, day = DAY) => (await me.call("getMinis", { from: day, to: day })).days[0]!
 
@@ -200,11 +211,12 @@ describe("nudges", () => {
 
     expect(push.url).toBe("https://web.push.apple.com/device-1")
     expect(push.headers.get("content-encoding")).toBe("aes128gcm")
-    expect(await readVapid(push.headers.get("authorization") ?? "")).toMatchObject({ aud: "https://web.push.apple.com", sub: "https://gym.example.com" })
+    // The harness serves plain http, so the server names an address rather than itself.
+    expect(await readVapid(push.headers.get("authorization") ?? "")).toMatchObject({ aud: "https://web.push.apple.com", sub: "mailto:nudges@localhost" })
     expect(await message(0)).toEqual({
       title: "Got time for 25 push-ups?",
       body: "0 of 100 done today. Tap to log it.",
-      url: `https://gym.example.com/minis?nudge=${nudge.id}`,
+      url: `/minis?nudge=${nudge.id}`,
       tag: `mini-${nudge.id}`,
     })
     expect(nudge).toMatchObject({ day: DAY, exercise: "Push-Up", amount: 25, status: "sent" })
@@ -302,13 +314,135 @@ describe("nudges", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!.status).toBe("skipped")
   })
 
-  it("sends a test to every browser of the account", async () => {
+  it("sends a test to every browser of the account, at most every half minute", async () => {
     const me = await server.signUp()
 
     await subscribe(me)
 
     expect(await me.call("testPush", {})).toEqual({ sent: 1, failed: 0 })
     expect((await message(0)).title).toBe("Nudges are on")
+    expect((await server.request("call/testPush", { token: me.token })).status).toBe(400)
+
+    clockAt(TEN_AM + 31_000)
+
+    expect(await me.call("testPush", {})).toEqual({ sent: 1, failed: 0 })
+  })
+
+  it("sends one nudge when two runs look at once", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    const runs = await Promise.all([tick(TEN_AM), tick(TEN_AM), tick(TEN_AM)])
+
+    expect(runs.reduce((total, run) => total + run.sent, 0)).toBe(1)
+    expect(pushes).toHaveLength(1)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toHaveLength(1)
+  })
+
+  it("keeps nudging after the last ask of the day is passed over or only half done", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Push-Up", unit: "reps", daily: 25, chunk: 25, growBy: 0 }] })
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    const first = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+
+    await me.call("skipNudge", { nudgeId: first.id })
+
+    expect((await tick(TEN_AM + 4 * HOUR)).sent).toBe(1)
+
+    await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 10 })
+
+    expect((await tick(TEN_AM + 6 * HOUR)).sent).toBe(1)
+    expect((await message(2)).title).toBe("Got time for 15 push-ups?")
+  })
+
+  it("tries again soon when no push service takes a nudge, and keeps no record of it", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    answer = 503
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toEqual([])
+
+    answer = 201
+
+    expect((await tick(TEN_AM + 5 * 60_000)).sent).toBe(0)
+    expect((await tick(TEN_AM + 10 * 60_000)).sent).toBe(1)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).push.devices).toBe(1)
+  })
+
+  it("never sends sooner than the gap, even when a settings change plans the day again", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+    await setUp(me, { pausedUntil: shiftDay(DAY, 1) })
+    await setUp(me)
+
+    expect((await tick(TEN_AM + 5 * 60_000)).sent).toBe(0)
+    expect((await tick(TEN_AM + 40 * 60_000)).sent).toBe(0)
+    expect((await tick(TEN_AM + 45 * 60_000)).sent).toBe(1)
+  })
+
+  it("logs one set for a nudge, on the nudge's own day, however many times and days it is answered", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    const nudge = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+    const tomorrow = shiftDay(DAY, 1)
+    const first = await me.call("logMini", { day: tomorrow, exercise: "Sit-Up", amount: 25, nudgeId: nudge.id, clientKey: "phone-1234" })
+    const second = await me.call("logMini", { day: tomorrow, exercise: "Push-Up", amount: 25, nudgeId: nudge.id, clientKey: "laptop-1234" })
+
+    expect(first).toMatchObject({ day: DAY, exercise: "Push-Up", nudgeId: nudge.id })
+    expect(second.id).toBe(first.id)
+    expect((await today(me)).progress[0]!.done).toBe(25)
+    expect((await today(me, tomorrow)).progress.map((item) => item.done)).toEqual([0, 0])
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!.status).toBe("done")
+  })
+
+  it("only takes subscriptions to a known push service, and only sends to one", async () => {
+    const me = await server.signUp()
+
+    const refused = await server.request("call/subscribePush", {
+      token: me.token,
+      body: { subscription: { endpoint: "https://internal.example.com/hook", keys: { p256dh: browser.p256dh, auth: browser.auth } }, origin: "https://gym.example.com" },
+    })
+
+    expect(refused.status).toBe(400)
+
+    // One that got in some other way is never posted to, and is forgotten.
+    server.exec(`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, origin, created_at)
+      SELECT id, 'https://internal.example.com/hook', '${browser.p256dh}', '${browser.auth}', 'https://gym.example.com', 0
+      FROM users WHERE email = '${me.email}'`)
+
+    expect(await me.call("testPush", {})).toEqual({ sent: 0, failed: 1 })
+    expect(pushes).toHaveLength(0)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).push.devices).toBe(0)
+  })
+
+  it("keeps the address the request came to, not the one the browser sends, and moves a browser to whoever subscribes it", async () => {
+    const me = await server.signUp()
+    const other = await server.signUp()
+
+    await subscribe(me)
+
+    expect(server.readText("SELECT origin FROM push_subscriptions")).toBe("http://gym.test")
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).push.endpoints).toEqual(["https://web.push.apple.com/device-1"])
+
+    await subscribe(other)
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).push.endpoints).toEqual([])
+    expect((await other.call("getMinis", { from: DAY, to: DAY })).push.endpoints).toEqual(["https://web.push.apple.com/device-1"])
   })
 })
 
@@ -345,5 +479,36 @@ describe("growing targets", () => {
       ["Sit-Up", 50],
     ])
     expect(minis.days[0]!.progress.map((item) => item.target)).toEqual([110, 50])
+  })
+
+  it("keep the growth when settings are saved unchanged on the first day of the new week, today included", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+
+    // Monday: the screen still shows 100 when the user pauses for the day.
+    const saved = await setUp(me, { targets, days: [0, 1, 2, 3, 4], pausedUntil: "2026-11-24" }, "2026-11-23")
+
+    expect(saved.targets[0]!.daily).toBe(110)
+    expect((await today(me, "2026-11-23")).progress[0]!.target).toBe(110)
+    expect((await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })).settings.targets[0]!.daily).toBe(110)
+  })
+
+  it("let a target the user changes on that day be what they set", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+
+    const saved = await setUp(me, { targets: [{ ...targets[0], daily: 80 }], days: [0, 1, 2, 3, 4] }, "2026-11-23")
+
+    expect(saved.targets[0]!.daily).toBe(80)
   })
 })

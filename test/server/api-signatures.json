@@ -625,6 +625,9 @@
               "number"
             ]
           },
+          "endpoints": {
+            "array": true
+          },
           "publicKey": {
             "kinds": [
               "string"

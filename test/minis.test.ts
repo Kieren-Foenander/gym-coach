@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   afterAsk,
   chooseNudge,
+  CRON_MINUTES,
   dayProgress,
   DEFAULT_MINI_SETTINGS,
   describeAmount,
@@ -9,6 +10,7 @@ import {
   formatMinute,
   grownTargets,
   isMet,
+  isPushEndpoint,
   localTime,
   middayOf,
   miniFormFor,
@@ -67,6 +69,13 @@ describe("time in the user's zone", () => {
     expect(parseMinute(" 7:05 ")).toBe(7 * 60 + 5)
     expect(parseMinute("25:00")).toBeNull()
     expect(parseMinute("9am")).toBeNull()
+  })
+
+  it("keeps a window that ends at midnight as 24:00, so saving it again works", () => {
+    const form = miniFormFor({ ...SETTINGS, endMinute: 1440 })
+
+    expect(form.end).toBe("24:00")
+    expect(readMiniForm(form, "UTC", null)).toMatchObject({ ok: true, settings: { endMinute: 1440 } })
   })
 })
 
@@ -154,6 +163,12 @@ describe("what a nudge asks for", () => {
     expect(chooseNudge([PUSH_UPS], dayProgress([PUSH_UPS], []), 0, 45, null, () => 0)?.amount).toBe(50)
   })
 
+  it("keeps to twice the usual after rounding to a friendly number", () => {
+    const odd = { ...PUSH_UPS, chunk: 11 }
+
+    expect(chooseNudge([odd], dayProgress([odd], []), 0, 45, null, () => 0)?.amount).toBe(22)
+  })
+
   it("plans what is left as if the nudge was done", () => {
     const ask = chooseNudge([PUSH_UPS], dayProgress([PUSH_UPS], []), 480, 45, null, () => 0)!
 
@@ -174,10 +189,33 @@ describe("when the next nudge comes", () => {
     expect(nextNudgeDelay(2, 30, 45, () => 0.5)).toBeNull()
   })
 
+  it("plans a nudge only where a cron run will still find the window open, and never inside the gap", () => {
+    // 16 minutes left and a 16 minute gap: the next nudge would land as the window shuts.
+    expect(nextNudgeDelay(3, 16, 16, () => 0)).toBeNull()
+    expect(nextNudgeDelay(3, 21, 16, () => 0)).toBe(16)
+    expect(nextNudgeDelay(1, 30, 20, () => 1)).toBe(30 - CRON_MINUTES)
+  })
+
   it("starts the day soon after the window opens, but not on the dot", () => {
     expect(firstNudgeDelay(9, 510, () => 0)).toBe(0)
     expect(firstNudgeDelay(9, 510, () => 1)).toBe(51)
     expect(firstNudgeDelay(1, 510, () => 1)).toBe(90)
+  })
+})
+
+describe("push services", () => {
+  it("takes the browsers' push services and nothing else", () => {
+    expect(isPushEndpoint("https://web.push.apple.com/QGuQyavXutnMH...")).toBe(true)
+    expect(isPushEndpoint("https://fcm.googleapis.com/fcm/send/abc")).toBe(true)
+    expect(isPushEndpoint("https://updates.push.services.mozilla.com/wpush/v2/abc")).toBe(true)
+    expect(isPushEndpoint("https://wns2-par02p.notify.windows.com/w/?token=abc")).toBe(true)
+    expect(isPushEndpoint("http://web.push.apple.com/abc")).toBe(false)
+    expect(isPushEndpoint("https://web.push.apple.com.evil.example/abc")).toBe(false)
+    expect(isPushEndpoint("https://evilpush.apple.com.example/abc")).toBe(false)
+    expect(isPushEndpoint("https://web.push.apple.com:8443/abc")).toBe(false)
+    expect(isPushEndpoint("https://user@web.push.apple.com/abc")).toBe(false)
+    expect(isPushEndpoint("https://169.254.169.254/latest")).toBe(false)
+    expect(isPushEndpoint("not a url")).toBe(false)
   })
 })
 

@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { test as base } from "@e2e-dev/web"
 import { expect, type App, type Screen } from "e2e"
+import { Schema } from "effect"
+import type { CallName } from "../../src/domain/calls"
 import { testIds } from "../../src/domain/test-ids"
+import type { CallInput } from "../../src/server/calls"
 import { seedStatements, type History } from "../../tools/seed/history"
 import { E2E_DATABASE_FILE, E2E_INVITE_CODE } from "../../tools/e2e/constants"
 
@@ -36,6 +39,32 @@ const makePerson = async (baseUrl: string): Promise<Person> => {
   expect(response.status, `Sign-up for ${email}: ${await response.clone().text()}`).toBe(200)
 
   return { email, password: PASSWORD }
+}
+
+const SignedIn = Schema.Struct({ token: Schema.String })
+
+/**
+ * Runs calls as a person through the JSON API, for setting up what a test is not about, such as
+ * streak goals before a screenshot. The screen under test is still driven by its test ids.
+ */
+export const callsAs = async (baseUrl: string, person: Person) => {
+  const signIn = await fetch(new URL("/api/v1/account/sign-in", baseUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: person.email, password: person.password }),
+  })
+
+  const { token } = Schema.decodeUnknownSync(Schema.Struct({ ok: Schema.Literal(true), value: SignedIn }))(await signIn.json()).value
+
+  return async <K extends CallName>(name: K, input: CallInput<K>): Promise<void> => {
+    const response = await fetch(new URL(`/api/v1/call/${name}`, baseUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(input),
+    })
+
+    expect(response.status, `${name}: ${await response.clone().text()}`).toBe(200)
+  }
 }
 
 /** Signs in through the sign-in screen, and waits for Today. */
