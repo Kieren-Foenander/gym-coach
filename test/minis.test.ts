@@ -12,7 +12,6 @@ import {
   isMet,
   isPushEndpoint,
   localTime,
-  makeMiniOutbox,
   middayOf,
   miniFormFor,
   miniSessions,
@@ -281,58 +280,5 @@ describe("the settings form", () => {
     expect(suggestTarget("Plank")).toMatchObject({ unit: "seconds", daily: 180, chunk: 60 })
     expect(suggestTarget("Pull-Up")).toMatchObject({ unit: "reps", daily: 50, chunk: 10 })
     expect(suggestTarget("Push-Up")).toMatchObject({ unit: "reps", daily: 100, chunk: 25 })
-  })
-})
-
-describe("the outbox of sets waiting to be known to be in", () => {
-  const memory = () => {
-    let text: string | null = null
-
-    return {
-      read: () => text,
-      write: (next: string) => {
-        text = next
-      },
-    }
-  }
-
-  const set = (clientKey: string, amount = 25) => ({ clientKey, day: "2026-11-26", exercise: "Push-Up", amount })
-
-  it("keeps each set under its own key until it is known to be in, the same amount twice as two", () => {
-    const store = memory()
-    const outbox = makeMiniOutbox(store, "u1")
-
-    outbox.add(set("a"))
-    outbox.add(set("b"))
-
-    expect(outbox.list().map((item) => item.clientKey)).toEqual(["a", "b"])
-
-    outbox.remove("a")
-
-    // A screen opened again finds what is still waiting.
-    expect(makeMiniOutbox(store, "u1").list()).toEqual([set("b")])
-  })
-
-  it("never offers one account's sets to another, and starts empty from text it cannot read", () => {
-    const store = memory()
-
-    makeMiniOutbox(store, "u1").add(set("a"))
-
-    expect(makeMiniOutbox(store, "u2").list()).toEqual([])
-
-    store.write("{not json")
-
-    expect(makeMiniOutbox(store, "u1").list()).toEqual([])
-  })
-
-  it("still works when storage refuses to keep anything", () => {
-    const refuse = () => {
-      throw new Error("no storage")
-    }
-
-    const outbox = makeMiniOutbox({ read: refuse, write: refuse }, "u1")
-
-    expect(() => outbox.add(set("a"))).not.toThrow()
-    expect(outbox.list()).toEqual([])
   })
 })

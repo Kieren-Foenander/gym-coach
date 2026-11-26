@@ -139,6 +139,7 @@ export const Calls = {
   getMinis: define(CallInputs.getMinis, (data) => Minis.getMinis(data.from, data.to)),
   updateMinis: define(CallInputs.updateMinis, (data) => Minis.updateMinis(data.day, data.settings, data.base, data.loaded)),
   pauseMinis: define(CallInputs.pauseMinis, (data) => Minis.pauseMinis(data.day, data.pause)),
+  moveMinisZone: define(CallInputs.moveMinisZone, (data) => Minis.moveMinisZone(data.day, data.timeZone)),
   logMini: define(CallInputs.logMini, (data) => Minis.logMini(data)),
   deleteMini: define(CallInputs.deleteMini, (data) => Minis.deleteMini(data.entryId)),
   skipNudge: define(CallInputs.skipNudge, (data) => Minis.skipNudge(data.nudgeId)),

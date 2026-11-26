@@ -114,15 +114,19 @@ export const CallInputs = {
    * changing nothing else that is saved. `day` is the phone's today, used only before the account has a time zone.
    */
   pauseMinis: Schema.Struct({ day: Day, pause: Schema.Boolean }),
+  /** Moves nudges to another time zone, such as the phone's after a flight, changing nothing else that is saved. */
+  moveMinisZone: Schema.Struct({ day: Day, timeZone: MiniSettingsInput.fields.timeZone }),
   logMini: Schema.Struct({
     day: Day,
     exercise: ExerciseName,
     amount: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MINI_LIMITS.daily })),
-    /** Only needed for an exercise with no target that day. */
+    /** The unit the screen showed when the set was logged, which it is kept in. Without it, the day's target's. */
     unit: Schema.optional(Schema.Literals(MINI_UNITS)),
     /** The nudge this answers, when it was logged from one. */
     nudgeId: Schema.optional(Id),
     clientKey: Schema.optional(Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(64))),
+    /** The account the screen logged it under: a set tried again after a switch of account is refused, not logged to the new one. */
+    account: Schema.optional(Schema.String.check(Schema.isMaxLength(64))),
   }),
   deleteMini: Schema.Struct({ entryId: Id }),
   skipNudge: Schema.Struct({ nudgeId: Id }),

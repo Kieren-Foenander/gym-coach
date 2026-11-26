@@ -22,9 +22,11 @@ import {
   type MiniProgress,
   type MiniSettings,
   type MiniTargetForm,
+  type MiniUnit,
+  type UnconfirmedMiniSet,
 } from "~/domain/minis"
 import { CHOICE_STATES, MINI_DAY_STATES, PUSH_STATES, SAVE_STATES, testIds, TOGGLE_STATES, type PushState } from "~/domain/test-ids"
-import { deleteMini, pauseMinis, subscribePush, testPush, unsubscribePush, updateMinis } from "~/functions/api"
+import { deleteMini, moveMinisZone, pauseMinis, subscribePush, testPush, unsubscribePush, updateMinis } from "~/functions/api"
 import { currentSubscription, deviceTimeZone, pushSupport, subscribe, unsubscribe } from "~/push"
 import type { MiniDay, MiniNudge } from "~/server/minis"
 
@@ -95,7 +97,7 @@ export function MiniCard({ day }: MiniCardProps) {
 
 interface DayProgressProps {
   readonly day: MiniDay
-  readonly onLog: (exercise: string, amount: number) => Promise<boolean>
+  readonly onLog: (exercise: string, unit: MiniUnit, amount: number) => Promise<boolean>
   readonly pending: boolean
   readonly chunks: ReadonlyMap<string, number>
 }
@@ -127,7 +129,7 @@ interface ProgressRowProps {
   readonly item: MiniProgress
   readonly chunk: number
   readonly pending: boolean
-  readonly onLog: (exercise: string, amount: number) => Promise<boolean>
+  readonly onLog: (exercise: string, unit: MiniUnit, amount: number) => Promise<boolean>
 }
 
 function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
@@ -157,7 +159,7 @@ function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
           className="h-14 shrink-0"
           disabled={pending || !valid}
           data-testid={testIds.minis.log}
-          onClick={() => void (value === null ? null : onLog(item.exercise, value))}
+          onClick={() => void (value === null ? null : onLog(item.exercise, item.unit, value))}
         >
           Log
         </Button>
@@ -213,6 +215,40 @@ export function NudgeCard({ nudge, pending, onDone, onSkip }: NudgeCardProps) {
 }
 
 // ---------------------------------------------------------------- what was done
+
+interface UnconfirmedProps {
+  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
+  readonly pending: boolean
+  readonly onRetry: (set: UnconfirmedMiniSet) => void
+  readonly onDismiss: (set: UnconfirmedMiniSet) => void
+}
+
+/**
+ * Sets whose answer never came back: perhaps in, perhaps not. Retry sends one again under its
+ * own key, so it cannot go in twice; Dismiss puts it aside. Log again only for another set.
+ */
+export function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: UnconfirmedProps) {
+  if (sets.length === 0) return null
+
+  return (
+    <Card className="mt-3 border-amber-400/30">
+      <p className="pb-2 text-sm text-amber-300">Not confirmed yet. Try again rather than logging these a second time.</p>
+      <ul className="space-y-2">
+        {sets.map((set) => (
+          <li key={set.clientKey} className="flex items-center gap-2" data-testid={testIds.minis.unconfirmed(set.clientKey)}>
+            <span className="min-w-0 flex-1 truncate font-semibold">{describeAmount(set.exercise, set.unit, set.amount)}</span>
+            <Button className="shrink-0" disabled={pending} data-testid={testIds.minis.retry} onClick={() => onRetry(set)}>
+              Retry
+            </Button>
+            <Button variant="ghost" className="shrink-0" disabled={pending} data-testid={testIds.minis.dismiss} onClick={() => onDismiss(set)}>
+              Dismiss
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
 
 interface EntryListProps {
   readonly entries: ReadonlyArray<MiniEntry>
@@ -507,7 +543,7 @@ export function ZoneNotice({ settings, today }: PauseProps) {
 
   const move = () =>
     void act(async () => {
-      await updateMinis({ data: { day: today, settings: { ...settings, timeZone: device }, base: settings.targets, loaded: settings } })
+      await moveMinisZone({ data: { day: today, timeZone: device } })
     })
 
   return (

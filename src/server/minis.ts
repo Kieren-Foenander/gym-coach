@@ -571,6 +571,8 @@ const mergeItems = <A>(
   loaded: ReadonlyArray<A>,
   saved: ReadonlyArray<A>,
   keyOf: (item: A) => string,
+  /** An item both kept: what the form changed in it, on what is saved now. */
+  mergeOne: (was: A, is: A, now: A) => A = (_, is) => is,
 ): ReadonlyArray<A> => {
   const before = new Map(loaded.map((item) => [keyOf(item), item]))
   const after = new Map(submitted.map((item) => [keyOf(item), item]))
@@ -583,10 +585,23 @@ const mergeItems = <A>(
 
     if (was !== undefined && is === undefined) return []
 
-    return [was !== undefined && is !== undefined && !sameValue(was, is) ? is : item]
+    return [was !== undefined && is !== undefined && !sameValue(was, is) ? mergeOne(was, is, item) : item]
   })
 
   return [...kept, ...submitted.filter((item) => !before.has(keyOf(item)) && !now.has(keyOf(item)))]
+}
+
+/**
+ * One target both a form and what is saved still have: each field the form changed replaces the
+ * saved one, and the rest stay as saved, so two devices editing different fields both keep theirs.
+ * A change of unit brings its amounts with it, which mean nothing in the other unit.
+ */
+const mergeTarget = (was: MiniTarget, is: MiniTarget, now: MiniTarget): MiniTarget => {
+  if (is.unit !== was.unit) return { ...is, exercise: now.exercise }
+
+  const field = <K extends "daily" | "chunk" | "growBy">(key: K) => (is[key] === was[key] ? now[key] : is[key])
+
+  return { ...now, daily: field("daily"), chunk: field("chunk"), growBy: field("growBy") }
 }
 
 /**
@@ -605,13 +620,14 @@ const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, sa
   const windowKept = submitted.startMinute === loaded.startMinute && submitted.endMinute === loaded.endMinute
 
   return {
-    targets: mergeItems(submitted.targets, loaded.targets, saved.targets, (target) => exerciseKey(target.exercise)),
+    targets: mergeItems(submitted.targets, loaded.targets, saved.targets, (target) => exerciseKey(target.exercise), mergeTarget),
     nudges: keep("nudges"),
     days: mergeItems(submitted.days, loaded.days, saved.days, String).toSorted((a, b) => a - b),
     startMinute: windowKept ? saved.startMinute : submitted.startMinute,
     endMinute: windowKept ? saved.endMinute : submitted.endMinute,
     gapMinutes: keep("gapMinutes"),
-    timeZone: keep("timeZone"),
+    // A form only sets the time zone while none is saved; after that it moves through moveMinisZone alone.
+    timeZone: saved.timeZone === "" ? submitted.timeZone : saved.timeZone,
     pausedUntil: saved.pausedUntil,
   }
 }
@@ -628,7 +644,25 @@ const keepPause = (before: MiniSettings, after: MiniSettings, time: number): Min
     return after
   }
 
-  return { ...after, pausedUntil: later(after.pausedUntil ?? before.pausedUntil, later(before.pausedUntil, shiftDay(now, 1))) }
+  // The moment the pause would have ended, at midnight starting its last day in the old zone, read
+  // in the new one: the pause runs through the new zone's day that moment falls in, and through today.
+  const ends = startOfDayIn(before.timeZone, before.pausedUntil)
+  const through = shiftDay(localTime(after.timeZone, ends - 1).day, 1)
+
+  return { ...after, pausedUntil: later(after.pausedUntil ?? through, later(through, shiftDay(now, 1))) }
+}
+
+/** The moment a day begins in a time zone. Worked out twice over, so a daylight saving change on the day is allowed for. */
+const startOfDayIn = (timeZone: string, day: string): number => {
+  let guess = Date.parse(`${day}T00:00:00Z`)
+
+  for (let pass = 0; pass < 3; pass++) {
+    const there = localTime(timeZone, guess)
+
+    guess -= (daysBetween(day, there.day) * 1440 + there.minute) * 60_000
+  }
+
+  return guess
 }
 
 const decodeMerged = Schema.decodeUnknownEffect(MiniSettingsInput)
@@ -666,6 +700,13 @@ export const pauseMinis = (deviceDay: string, pause: boolean) =>
     })),
   )
 
+/**
+ * Moves the nudges to another time zone, as asked on a screen whose device is in it, changing
+ * nothing else that is saved. A pause running in the old zone keeps running (keepPause).
+ */
+export const moveMinisZone = (deviceDay: string, timeZone: string) =>
+  changeMinis(deviceDay, (saved) => Effect.succeed({ ...saved, timeZone }))
+
 export interface MiniSetInput {
   readonly day: string
   readonly exercise: string
@@ -673,6 +714,8 @@ export interface MiniSetInput {
   readonly unit?: MiniUnit | undefined
   readonly nudgeId?: number | undefined
   readonly clientKey?: string | undefined
+  /** The account the screen logged it under, when it says. */
+  readonly account?: string | undefined
 }
 
 /** Where a set goes: the day and exercise it counts toward, and the nudge it answers. */
@@ -708,11 +751,22 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
     return entry
   })
 
+  // A screen still open on another account (signed out and in again elsewhere) cannot log to this one.
+  if (input.account !== undefined && input.account !== user.id) {
+    return yield* new Invalid({ reason: "You are signed in as someone else now. Open mini workouts again to log for this account." })
+  }
+
   if (input.clientKey !== undefined) {
     const again = yield* sql<MiniEntry>`
       SELECT ${sql.unsafe(ENTRY_COLUMNS)} FROM mini_sets WHERE user_id = ${user.id} AND client_key = ${input.clientKey}`
 
     if (again[0]) return yield* finish(again[0])
+
+    // Taken back since, on this device or another: it stays taken back.
+    const removed = yield* sql<{ clientKey: string }>`
+      SELECT client_key FROM mini_removed_keys WHERE user_id = ${user.id} AND client_key = ${input.clientKey}`
+
+    if (removed.length > 0) return yield* new Invalid({ reason: "That set was taken back since, so it was not logged again." })
   }
 
   let set: SetPlace = { day: input.day, exercise: input.exercise, unit: input.unit, nudgeId: null }
@@ -736,7 +790,9 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   // A nudge's answer is what the nudge asked for, even if the day's targets have changed since.
   // Anything else takes the day's target for the exercise, for its unit and the way its name is written.
   const exercise = set.nudgeId !== null ? set.exercise : (target?.exercise ?? set.exercise)
-  const unit = set.nudgeId !== null ? (set.unit ?? "reps") : (target?.unit ?? set.unit ?? "reps")
+  // A set is kept in the unit it was logged in: the one the screen showed, which a target
+  // changed on another device since does not change. Without one, the day's target's.
+  const unit = set.unit ?? target?.unit ?? "reps"
 
   // So the day is judged as the app judges it once the set is in.
   yield* repairKeys(user.id, set.day)
@@ -785,7 +841,11 @@ export const deleteMini = Effect.fn("deleteMini")(function* (entryId: number) {
   // So the day is judged as the app judges it once the set is gone.
   yield* repairKeys(user.id, removed.day)
 
-  const [deleted] = yield* atomically([
+  const [, deleted] = yield* atomically([
+    // Its key is kept, so a device trying it again under that key is told it was taken back.
+    sql<Won>`
+      INSERT OR IGNORE INTO mini_removed_keys (user_id, client_key)
+      SELECT user_id, client_key FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} AND client_key IS NOT NULL`,
     sql<Won>`DELETE FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} RETURNING 0 AS mini_revision`,
     sql<Won>`UPDATE mini_nudges SET status = 'sent' WHERE id = ${removed.nudgeId} AND user_id = ${user.id}`,
     sql<Won>`

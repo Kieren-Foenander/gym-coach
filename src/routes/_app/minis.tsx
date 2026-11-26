@@ -1,22 +1,24 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Schema } from "effect"
-import { useEffect, useState } from "react"
-import { makeMiniOutbox, type PendingMiniSet, type TextStore } from "~/domain/minis"
-import { DayProgress, EntryList, MiniSettingsForm, NudgeCard, PauseNudges, PushCard, SetupLink, ZoneNotice } from "~/components/minis"
+import { useState } from "react"
+import type { MiniUnit, UnconfirmedMiniSet } from "~/domain/minis"
+import {
+  DayProgress,
+  EntryList,
+  MiniSettingsForm,
+  NudgeCard,
+  PauseNudges,
+  PushCard,
+  SetupLink,
+  UnconfirmedSets,
+  ZoneNotice,
+} from "~/components/minis"
 import { BackButton, ErrorNote, SectionTitle, useAction, useNow } from "~/components/ui"
 import { daysAround } from "~/domain/days"
 import { localDay } from "~/domain/health"
 import { describeGoal } from "~/domain/streaks"
 import { Id } from "~/domain/schema"
 import { getMinis, logMini, skipNudge } from "~/functions/api"
-
-const OUTBOX_KEY = "gym.minis.outbox"
-
-/** A little text kept in this browser. Private windows can refuse it; the outbox copes. */
-const browserStore = (key: string): TextStore => ({
-  read: () => window.localStorage.getItem(key),
-  write: (text) => window.localStorage.setItem(key, text),
-})
 
 /** The nudge a notification opened, when it opened one. The router reads `?nudge=12` as the number 12. */
 const Search = Schema.Struct({ nudge: Schema.optional(Id) })
@@ -54,32 +56,27 @@ function MinisDay({ today }: { readonly today: string }) {
   const chunks = new Map(day.targets.map((target) => [target.exercise, target.chunk]))
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
-  // Sets logged and not yet known to be in, kept across reloads and sent again under their own keys.
-  const [outbox] = useState(() => makeMiniOutbox(browserStore(OUTBOX_KEY), user.id))
+  // Sets whose answer never came back, shown until tried again or put aside.
+  const [unconfirmed, setUnconfirmed] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
+  const forget = (set: UnconfirmedMiniSet) => setUnconfirmed((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
 
-  const send = async (set: PendingMiniSet) => {
-    await logMini({ data: set })
-    outbox.remove(set.clientKey)
+  // Logged under the account this screen is for, so it never lands in another one signed in since.
+  const send = async (set: UnconfirmedMiniSet) => {
+    await logMini({ data: { ...set, account: user.id } })
+    forget(set)
   }
 
-  // Anything left from a visit whose answer never came is sent again first.
-  useEffect(() => {
-    const waiting = outbox.list()
-
-    if (waiting.length > 0) {
-      void act(async () => {
-        for (const set of waiting) await send(set)
-      })
-    }
-  }, [])
-
-  // Each tap is a new set, with a key of its own.
-  const log = (exercise: string, amount: number, nudgeId?: number) =>
+  // Each tap is a new set, with a key of its own. One whose answer never comes is kept to try again under that key.
+  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number) =>
     act(async () => {
-      const set = { clientKey: crypto.randomUUID(), day: today, exercise, amount, nudgeId }
+      const set = { clientKey: crypto.randomUUID(), day: today, exercise, unit, amount, nudgeId }
 
-      outbox.add(set)
-      await send(set)
+      try {
+        await send(set)
+      } catch (cause) {
+        setUnconfirmed((sets) => [...sets, set])
+        throw cause
+      }
     })
 
   return (
@@ -90,14 +87,15 @@ function MinisDay({ today }: { readonly today: string }) {
           key={nudge.id}
           nudge={nudge}
           pending={pending}
-          onDone={(amount) => void log(nudge.exercise, amount, nudge.id)}
+          onDone={(amount) => void log(nudge.exercise, nudge.unit, amount, nudge.id)}
           onSkip={() => void act(() => skipNudge({ data: { nudgeId: nudge.id } }))}
         />
       ) : null}
 
       {day.progress.length > 0 ? (
         <>
-          <DayProgress day={day} chunks={chunks} pending={pending} onLog={(exercise, amount) => log(exercise, amount)} />
+          <DayProgress day={day} chunks={chunks} pending={pending} onLog={(exercise, unit, amount) => log(exercise, unit, amount)} />
+          <UnconfirmedSets sets={unconfirmed} pending={pending} onRetry={(set) => void act(() => send(set))} onDismiss={forget} />
           <PauseNudges settings={data.settings} today={today} />
           <ZoneNotice settings={data.settings} today={today} />
           <p className="pt-3 text-sm text-faint">

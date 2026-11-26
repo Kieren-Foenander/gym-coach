@@ -212,57 +212,21 @@ export const remainingOf = (progress: MiniProgress): number => Math.max(0, progr
 export const miniSessions = (metDays: ReadonlyArray<string>): ReadonlyArray<StreakSession & { readonly volume: number }> =>
   metDays.map((day) => ({ startedAt: middayOf(day), kind: "minis", volume: 0 }))
 
-/** A set logged on a screen, waiting to be known to be in. Its client key is its own, made when it was logged. */
-export interface PendingMiniSet {
+/**
+ * A set logged on a screen whose answer has not come back: perhaps in, perhaps not. The screen
+ * shows it with Retry, which sends it again under the same key (the server answers a key it has
+ * with the set it already has, and one taken back since with a refusal), and Dismiss. A new tap of
+ * Log is always a new set with a new key. It lives only as long as the screen: once reloaded, the
+ * screen shows what the server has.
+ */
+export interface UnconfirmedMiniSet {
   readonly clientKey: string
   readonly day: string
   readonly exercise: string
+  /** The unit the screen showed, which the set is kept in. */
+  readonly unit: MiniUnit
   readonly amount: number
   readonly nudgeId?: number | undefined
-}
-
-/** Somewhere a screen keeps a little text between visits: the browser's localStorage, the phone's store. */
-export interface TextStore {
-  readonly read: () => string | null
-  readonly write: (text: string) => void
-}
-
-interface SavedSets {
-  readonly userId: string
-  readonly sets: ReadonlyArray<PendingMiniSet>
-}
-
-/**
- * The sets a screen has logged and not yet heard are in, kept across reloads. Each tap of Log is
- * a new set with a new key; one whose answer never came back is sent again under its own key,
- * which the server answers with the set it already has, so nothing is lost or logged twice.
- * Sets kept for another account are never sent as this one's.
- */
-export const makeMiniOutbox = (store: TextStore, userId: string) => {
-  const list = (): ReadonlyArray<PendingMiniSet> => {
-    try {
-      const text = store.read()
-      const saved: SavedSets | null = text === null ? null : JSON.parse(text)
-
-      return saved !== null && saved.userId === userId && Array.isArray(saved.sets) ? saved.sets : []
-    } catch {
-      return []
-    }
-  }
-
-  const save = (sets: ReadonlyArray<PendingMiniSet>) => {
-    try {
-      store.write(JSON.stringify({ userId, sets } satisfies SavedSets))
-    } catch {
-      // Storage refused (a private window, say): the set is still sent, it just is not kept for a retry.
-    }
-  }
-
-  return {
-    list,
-    add: (set: PendingMiniSet) => save([...list().filter((item) => item.clientKey !== set.clientKey), set]),
-    remove: (clientKey: string) => save(list().filter((item) => item.clientKey !== clientKey)),
-  }
 }
 
 // ---------------------------------------------------------------- nudges

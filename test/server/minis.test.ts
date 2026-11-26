@@ -548,11 +548,105 @@ describe("nudges", () => {
     expect(kept.timeZone).toBe("America/Los_Angeles")
 
     // Asked to move to Brisbane, the pause still runs through Brisbane's Friday.
-    const moved = await me.call("updateMinis", { day: shiftDay(DAY, 1), settings: { ...kept, timeZone: "Australia/Brisbane" }, loaded: kept })
+    const moved = await me.call("moveMinisZone", { day: shiftDay(DAY, 1), timeZone: "Australia/Brisbane" })
 
     expect(moved.timeZone).toBe("Australia/Brisbane")
     expect(moved.pausedUntil).toBe(shiftDay(DAY, 2))
     expect((await tick(fridayInBrisbane)).sent).toBe(0)
+  })
+
+  it("refuses a set tried again for an account other than the one signed in", async () => {
+    const me = await server.signUp()
+    const other = await server.signUp()
+
+    await setUp(other)
+
+    // A screen opened for `me`, sending with `other`'s session after a switch of account.
+    const sent = await server.request("call/logMini", {
+      token: other.token,
+      body: { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "stale-tab-1", account: (await me.call("getSession", {})).id },
+    })
+
+    expect(sent.status).toBe(400)
+    expect((await today(other)).progress[0]!.done).toBe(0)
+  })
+
+  it("keeps a set taken back on another device taken back when the first tries it again", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+
+    const entry = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "lost-answer-1" })
+
+    await me.call("deleteMini", { entryId: entry.id })
+
+    const again = await server.request("call/logMini", {
+      token: me.token,
+      body: { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "lost-answer-1" },
+    })
+
+    expect(again.status).toBe(400)
+    expect((await today(me)).progress[0]!.done).toBe(0)
+  })
+
+  it("keeps a set in the unit the screen showed, even after the target changed unit on another device", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, unit: "seconds" }, SETTINGS.targets[1]!] })
+
+    const entry = await me.call("logMini", { day: DAY, exercise: "Push-Up", unit: "reps", amount: 25 })
+
+    expect(entry.unit).toBe("reps")
+  })
+
+  it("lets a form set the time zone only while none is saved", async () => {
+    const me = await server.signUp()
+
+    // Two forms opened before any time zone was saved; one saves Los Angeles first.
+    const fresh = (await me.call("getMinis", { from: DAY, to: DAY })).settings
+    const first = { ...SETTINGS, timeZone: "America/Los_Angeles" }
+
+    await me.call("updateMinis", { day: DAY, settings: first, loaded: fresh })
+
+    const second = await me.call("updateMinis", { day: DAY, settings: { ...first, timeZone: "UTC", gapMinutes: 60 }, loaded: fresh })
+
+    expect(second).toMatchObject({ timeZone: "America/Los_Angeles", gapMinutes: 60 })
+  })
+
+  it("keeps a pause running to the moment it would have ended, when the time zone moves on the same date", async () => {
+    const me = await server.signUp()
+
+    // Thursday in Los Angeles, paused: it ends at midnight there, 08:00 Friday in UTC.
+    const thursdayInLosAngeles = Date.parse(`${DAY}T20:00:00Z`)
+
+    await setUp(me, { timeZone: "America/Los_Angeles", startMinute: 0, endMinute: 1440 })
+    await subscribe(me)
+    clockAt(thursdayInLosAngeles)
+    await me.call("pauseMinis", { day: DAY, pause: true })
+    await me.call("moveMinisZone", { day: DAY, timeZone: "UTC" })
+
+    // 01:00 on Friday in UTC is still Thursday evening in Los Angeles: still paused.
+    const fridayEarly = Date.parse(`${shiftDay(DAY, 1)}T01:00:00Z`)
+
+    clockAt(fridayEarly)
+    expect((await tick(fridayEarly)).sent).toBe(0)
+  })
+
+  it("merges two devices' edits to different fields of one target", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+
+    // Another device makes push-ups 35 a nudge; this one, loaded before, sets them to grow.
+    await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, chunk: 35 }, SETTINGS.targets[1]!] })
+
+    const saved = await me.call("updateMinis", {
+      day: DAY,
+      settings: { ...loaded, targets: [{ ...loaded.targets[0]!, growBy: 5 }, loaded.targets[1]!] },
+      loaded,
+    })
+
+    expect(saved.targets[0]).toMatchObject({ chunk: 35, growBy: 5 })
   })
 
   it("keeps nudges off when a form opened before they were turned off is saved", async () => {

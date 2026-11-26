@@ -7,7 +7,7 @@ import {
   describeAmount,
   formatMiniAmount,
   isPaused,
-  makeMiniOutbox,
+
   MINI_LIMITS,
   MINI_UNITS,
   miniFormFor,
@@ -19,8 +19,8 @@ import {
   WEEKDAY_LETTERS,
   WEEKDAY_SHORT,
   type MiniEntry,
-  type PendingMiniSet,
-  type TextStore,
+  type MiniUnit,
+  type UnconfirmedMiniSet,
   type MiniForm,
   type MiniProgress,
   type MiniSettings,
@@ -34,7 +34,6 @@ import { call } from "@/api/session"
 import { CloseIcon } from "@/components/icons"
 import { BackLink, Button, Card, Display, ErrorNote, Eyebrow, Field, Loading, parseNumber, Screen, SectionTitle, Stepper, Text, TextInput } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
-import { storage } from "@/data/storage"
 import { ExercisePicker } from "@/features/exercises/ExercisePicker"
 import { useUser } from "@/features/user"
 import { cn } from "@/lib/cn"
@@ -50,10 +49,40 @@ const UNIT_LABELS = { reps: "Reps", seconds: "Seconds" } as const
 /** The phone's time zone, which the nudge window is read in. */
 const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
 
-/** Where unconfirmed sets wait on the phone (makeMiniOutbox). */
-const PHONE_STORE: TextStore = {
-  read: () => storage.get("gym.minis.outbox"),
-  write: (text) => storage.set("gym.minis.outbox", text),
+interface UnconfirmedProps {
+  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
+  readonly pending: boolean
+  readonly onRetry: (set: UnconfirmedMiniSet) => void
+  readonly onDismiss: (set: UnconfirmedMiniSet) => void
+}
+
+/**
+ * Sets whose answer never came back: perhaps in, perhaps not. Retry sends one again under its
+ * own key, so it cannot go in twice; Dismiss puts it aside. Log again only for another set.
+ */
+function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: UnconfirmedProps) {
+  if (sets.length === 0) return null
+
+  return (
+    <Card className="mt-3 border-amber-400/30">
+      <Text className="pb-2 text-sm text-amber-300">Not confirmed yet. Try again rather than logging these a second time.</Text>
+      <View className="gap-2">
+        {sets.map((set) => (
+          <View key={set.clientKey} testID={testIds.minis.unconfirmed(set.clientKey)} className="flex-row items-center gap-2">
+            <Text numberOfLines={1} className="flex-1 font-semibold">
+              {describeAmount(set.exercise, set.unit, set.amount)}
+            </Text>
+            <Button testID={testIds.minis.retry} disabled={pending} onPress={() => onRetry(set)}>
+              Retry
+            </Button>
+            <Button testID={testIds.minis.dismiss} variant="ghost" disabled={pending} onPress={() => onDismiss(set)}>
+              Dismiss
+            </Button>
+          </View>
+        ))}
+      </View>
+    </Card>
+  )
 }
 
 /** Mini workouts: today's targets and what is done, a nudge to answer, and the settings. */
@@ -62,24 +91,15 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const { data, error } = useCall("getMinis", miniRange(today))
   const user = useUser()
   const { act, pending, error: actionError } = useAction()
-  // Sets logged and not yet known to be in, kept across launches and sent again under their own keys.
-  const [outbox] = useState(() => makeMiniOutbox(PHONE_STORE, user.id))
+  // Sets whose answer never came back, shown until tried again or put aside.
+  const [unconfirmed, setUnconfirmed] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
+  const forget = (set: UnconfirmedMiniSet) => setUnconfirmed((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
 
-  const send = async (set: PendingMiniSet) => {
-    await call("logMini", set)
-    outbox.remove(set.clientKey)
+  // Logged under the account this screen is for, so it never lands in another one signed in since.
+  const send = async (set: UnconfirmedMiniSet) => {
+    await call("logMini", { ...set, account: user.id })
+    forget(set)
   }
-
-  // Anything left from a visit whose answer never came is sent again first.
-  useEffect(() => {
-    const waiting = outbox.list()
-
-    if (waiting.length > 0) {
-      void act(async () => {
-        for (const set of waiting) await send(set)
-      })
-    }
-  }, [])
 
   if (!data) {
     return (
@@ -98,13 +118,17 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const nudge = route.params.nudgeId === undefined ? undefined : data.nudges.find((item) => item.id === route.params.nudgeId)
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
-  // Each tap is a new set, with a key of its own.
-  const log = (exercise: string, amount: number, nudgeId?: number) =>
+  // Each tap is a new set, with a key of its own. One whose answer never comes is kept to try again under that key.
+  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number) =>
     act(async () => {
-      const set = { clientKey: Crypto.randomUUID(), day: today, exercise, amount, nudgeId }
+      const set = { clientKey: Crypto.randomUUID(), day: today, exercise, unit, amount, nudgeId }
 
-      outbox.add(set)
-      await send(set)
+      try {
+        await send(set)
+      } catch (cause) {
+        setUnconfirmed((sets) => [...sets, set])
+        throw cause
+      }
     })
 
   return (
@@ -121,7 +145,7 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
           key={nudge.id}
           nudge={nudge}
           pending={pending}
-          onDone={(amount) => void log(nudge.exercise, amount, nudge.id)}
+          onDone={(amount) => void log(nudge.exercise, nudge.unit, amount, nudge.id)}
           onSkip={() => void act(() => call("skipNudge", { nudgeId: nudge.id }))}
         />
       ) : null}
@@ -140,11 +164,12 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
                   item={item}
                   chunk={day.targets.find((target) => target.exercise === item.exercise)?.chunk ?? 10}
                   pending={pending}
-                  onLog={(amount) => void log(item.exercise, amount)}
+                  onLog={(amount) => void log(item.exercise, item.unit, amount)}
                 />
               ))}
             </View>
           </View>
+          <UnconfirmedSets sets={unconfirmed} pending={pending} onRetry={(set) => void act(() => send(set))} onDismiss={forget} />
           <PauseNudges settings={data.settings} today={today} />
           <ZoneNotice settings={data.settings} today={today} />
           <Text className="pt-3 text-sm text-faint">
@@ -527,7 +552,7 @@ function ZoneNotice({ settings, today }: { readonly settings: MiniSettings; read
 
   const move = () =>
     void act(async () => {
-      await call("updateMinis", { day: today, settings: { ...settings, timeZone: device }, base: settings.targets, loaded: settings })
+      await call("moveMinisZone", { day: today, timeZone: device })
     })
 
   return (

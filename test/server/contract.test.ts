@@ -197,6 +197,11 @@ const STEPS = {
 
     return record("pauseMinis", { day: DAY, pause: false })
   },
+  moveMinisZone: async () => {
+    await record("moveMinisZone", { day: DAY, timeZone: "Australia/Sydney" })
+
+    return record("moveMinisZone", { day: DAY, timeZone: "Australia/Brisbane" })
+  },
   logMini: () => record("logMini", { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "contract-mini-1" }),
   skipNudge: async () => {
     server.exec(`INSERT INTO mini_nudges (user_id, day, exercise, unit, amount, sent_at)
@@ -299,6 +304,7 @@ const ORDER: ReadonlyArray<CallName> = [
   "getHistory",
   "updateMinis",
   "pauseMinis",
+  "moveMinisZone",
   "logMini",
   "skipNudge",
   "deleteMini",
