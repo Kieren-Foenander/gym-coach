@@ -533,6 +533,8 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
   deviceDay: string,
   change: SettingsChange,
   base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
+  /** Why the settings as they would be saved, growth kept and all, cannot be. Null when they can. */
+  check: (settings: MiniSettings) => string | null = () => null,
 ) {
   const user = yield* CurrentUser
   const time = yield* Clock.currentTimeMillis
@@ -548,6 +550,9 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
     const saved = week !== null && today !== null ? yield* grow(user.id, stored.settings, today) : stored.settings
     const submitted = yield* change(saved)
     const settings = keepPause(stored.settings, keepGrowth(submitted, base ?? stored.settings.targets, saved), time)
+    const refusal = check(settings)
+
+    if (refusal !== null) return yield* new Invalid({ reason: refusal })
     // The first save with a time zone starts the weeks: there is no week before it to review.
     const first = before === null ? accountToday(settings, time) : null
     const reviewedWeek = week ?? (first === null ? null : mondayOf(first))
@@ -640,9 +645,10 @@ const keepPause = (before: MiniSettings, after: MiniSettings, time: number): Min
   const was = accountToday(before, time)
   const now = accountToday(after, time)
 
-  if (before.timeZone === after.timeZone || before.pausedUntil === null || was === null || before.pausedUntil <= was || now === null) {
-    return after
-  }
+  if (before.timeZone === after.timeZone || before.pausedUntil === null || was === null || now === null) return after
+
+  // Over already in the old zone: a move west, to a zone still on the date it ended, cannot bring it back.
+  if (before.pausedUntil <= was) return { ...after, pausedUntil: null }
 
   // The moment the pause would have ended, at midnight starting its last day in the old zone, read
   // in the new one: the pause runs through the new zone's day that moment falls in, and through today.
@@ -696,20 +702,17 @@ export const updateMinis = (
 
       return decodeMerged(mergeForm(submitted, loaded, saved)).pipe(
         Effect.mapError((error) => new Invalid({ reason: `These changes and another device's do not fit together. ${error.message}` })),
-        Effect.flatMap((merged) => {
-          const over = merged.targets.find((target) => target.chunk > target.daily)
-
-          return over === undefined
-            ? Effect.succeed(merged)
-            : Effect.fail(
-                new Invalid({
-                  reason: `With another device's change, ${over.exercise} would ask for more a nudge than in a day. Check it and save again.`,
-                }),
-              )
-        }),
       )
     },
     base ?? loaded?.targets,
+    // Checked on what would be saved, once a daily amount grown or changed elsewhere is kept.
+    (settings) => {
+      const over = settings.targets.find((target) => target.chunk > target.daily)
+
+      return over === undefined
+        ? null
+        : `${over.exercise} would ask for more a nudge (${over.chunk}) than in a day (${over.daily}), with another device's change. Check it and save again.`
+    },
   )
 
 /**
@@ -723,6 +726,15 @@ const mergeConflict = (submitted: MiniSettings, loaded: MiniSettings | undefined
   for (const target of submitted.targets) {
     const was = loaded.targets.find((item) => sameExercise(item.exercise, target.exercise))
     const now = saved.targets.find((item) => sameExercise(item.exercise, target.exercise))
+
+    // Added here and on another device since: unless both added the same, one would be lost.
+    if (!was && now) {
+      const same = now.unit === target.unit && now.daily === target.daily && now.chunk === target.chunk && now.growBy === target.growBy
+
+      if (same) continue
+
+      return `${now.exercise} was added on another device too. Check it and save again.`
+    }
 
     if (!was || !now || now.unit === was.unit) continue
 
@@ -791,7 +803,12 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   const time = yield* Clock.currentTimeMillis
 
   const finish = Effect.fn("minis.finishSet")(function* (entry: MiniEntry) {
-    if (entry.nudgeId !== null) yield* sql`UPDATE mini_nudges SET status = 'done' WHERE id = ${entry.nudgeId} AND user_id = ${user.id}`
+    // Only while the set is still there: one taken back since leaves its nudge open to answer or skip.
+    if (entry.nudgeId !== null) {
+      yield* sql`
+        UPDATE mini_nudges SET status = 'done' WHERE id = ${entry.nudgeId} AND user_id = ${user.id}
+          AND EXISTS (SELECT 1 FROM mini_sets WHERE id = ${entry.id} AND user_id = ${user.id})`
+    }
 
     yield* refreshDay(user.id, entry.day)
 
@@ -868,7 +885,10 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
         AND (client_key = ${input.clientKey ?? null} OR nudge_id = ${set.nudgeId})
       LIMIT 1`,
     sql<MiniEntry>`SELECT 1 AS id WHERE ${removedKey}`,
-    sql<MiniEntry>`UPDATE mini_nudges SET status = 'done' WHERE id = ${set.nudgeId} AND user_id = ${user.id}`,
+    // Answered only when a set for it is in: a refused retry leaves the nudge as it was.
+    sql<MiniEntry>`
+      UPDATE mini_nudges SET status = 'done' WHERE id = ${set.nudgeId} AND user_id = ${user.id}
+        AND EXISTS (SELECT 1 FROM mini_sets WHERE nudge_id = ${set.nudgeId} AND user_id = ${user.id})`,
     sql<MiniEntry>`
       UPDATE mini_days SET
         met = ${sql.unsafe(MET_NOW)},
@@ -930,7 +950,9 @@ export const skipNudge = Effect.fn("skipNudge")(function* (nudgeId: number) {
   const user = yield* CurrentUser
 
   const rows = yield* sql<{ id: number }>`
-    UPDATE mini_nudges SET status = 'skipped' WHERE id = ${nudgeId} AND user_id = ${user.id} AND status = 'sent' RETURNING id`
+    UPDATE mini_nudges SET status = 'skipped' WHERE id = ${nudgeId} AND user_id = ${user.id}
+      AND (status = 'sent' OR (status = 'done' AND NOT EXISTS (SELECT 1 FROM mini_sets WHERE nudge_id = ${nudgeId} AND user_id = ${user.id})))
+    RETURNING id`
 
   if (rows.length === 0) {
     const known = yield* sql<{ id: number }>`SELECT id FROM mini_nudges WHERE id = ${nudgeId} AND user_id = ${user.id}`

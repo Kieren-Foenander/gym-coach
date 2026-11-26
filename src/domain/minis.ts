@@ -238,17 +238,25 @@ export const unconfirmedFor = (sets: ReadonlyArray<UnconfirmedMiniSet>, account:
 
 /**
  * The unconfirmed set a tap on Log (or a nudge's Done) would repeat: the same account, day,
- * exercise and nudge. A tap that finds one retries it under its key instead of logging a new set.
+ * exercise, nudge and amount. A tap that finds one retries it under its key instead of logging a
+ * new set. A tap for another amount is a new set: what the button shows is what is logged.
  */
 export const repeatedTap = (
   sets: ReadonlyArray<UnconfirmedMiniSet>,
-  tap: { readonly account: string; readonly day: string; readonly exercise: string; readonly nudgeId?: number | undefined },
+  tap: {
+    readonly account: string
+    readonly day: string
+    readonly exercise: string
+    readonly amount: number
+    readonly nudgeId?: number | undefined
+  },
 ): UnconfirmedMiniSet | undefined =>
   sets.find(
     (set) =>
       set.account === tap.account &&
       set.day === tap.day &&
       exerciseKey(set.exercise) === exerciseKey(tap.exercise) &&
+      set.amount === tap.amount &&
       set.nudgeId === tap.nudgeId,
   )
 

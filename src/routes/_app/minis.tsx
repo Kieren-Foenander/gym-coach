@@ -72,12 +72,12 @@ function MinisDay({ today }: { readonly today: string }) {
   // then it is that set again. One whose answer never comes is kept to try again under its key.
   const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number, another = false) =>
     act(async () => {
-      const tap = { account: user.id, day: today, exercise, nudgeId }
+      const tap = { account: user.id, day: today, exercise, amount, nudgeId }
       const repeated = another ? undefined : repeatedTap(unconfirmed, tap)
 
       if (repeated) return send(repeated)
 
-      const set = { ...tap, clientKey: crypto.randomUUID(), unit, amount }
+      const set = { ...tap, clientKey: crypto.randomUUID(), unit }
 
       try {
         await send(set)

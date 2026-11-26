@@ -294,13 +294,15 @@ describe("sets whose answer never came back", () => {
   })
 
   it("are sent again by another tap of the button they came from, not logged twice", () => {
-    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "push-up " })).toBe(set)
-    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "Push-Up", nudgeId: 7 })).toBe(fromNudge)
+    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "push-up ", amount: 25 })).toBe(set)
+    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "Push-Up", amount: 25, nudgeId: 7 })).toBe(fromNudge)
   })
 
-  it("leave a tap for another exercise, day or account a new set", () => {
-    expect(repeatedTap([set], { account: "me", day: set.day, exercise: "Sit-Up" })).toBeUndefined()
-    expect(repeatedTap([set], { account: "me", day: "2026-11-27", exercise: "Push-Up" })).toBeUndefined()
-    expect(repeatedTap([set], { account: "someone else", day: set.day, exercise: "Push-Up" })).toBeUndefined()
+  it("leave a tap for another exercise, day, account or amount a new set", () => {
+    expect(repeatedTap([set], { account: "me", day: set.day, exercise: "Sit-Up", amount: 25 })).toBeUndefined()
+    expect(repeatedTap([set], { account: "me", day: "2026-11-27", exercise: "Push-Up", amount: 25 })).toBeUndefined()
+    expect(repeatedTap([set], { account: "someone else", day: set.day, exercise: "Push-Up", amount: 25 })).toBeUndefined()
+    // The button shows 20 now: 20 is what is sent, never the 25 that was not confirmed.
+    expect(repeatedTap([fromNudge], { account: "me", day: set.day, exercise: "Push-Up", amount: 20, nudgeId: 7 })).toBeUndefined()
   })
 })

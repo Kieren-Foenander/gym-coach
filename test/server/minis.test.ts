@@ -745,6 +745,106 @@ describe("nudges", () => {
     expect(moved.pausedUntil).toBe(DAY)
   })
 
+  it("does not bring back a pause that is over, moving west to a zone still on its date", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { timeZone: "Pacific/Kiritimati", startMinute: 0, endMinute: 1440 })
+
+    // Paused on Wednesday 25th in Kiritimati, so until Thursday 26th there.
+    clockAt(Date.parse(`${shiftDay(DAY, -2)}T12:00:00Z`))
+    await me.call("pauseMinis", { day: shiftDay(DAY, -1), pause: true })
+
+    // Thursday 26th there now, the pause over; still Wednesday 25th in Pago Pago.
+    clockAt(Date.parse(`${shiftDay(DAY, -1)}T12:00:00Z`))
+
+    const moved = await me.call("moveMinisZone", { day: shiftDay(DAY, -1), timeZone: "Pacific/Pago_Pago" })
+
+    expect(moved.pausedUntil).toBeNull()
+  })
+
+  it("leaves a nudge open when a set for it is taken back while it is being logged", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    const nudge = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+
+    // Another device takes the set back the moment it goes in, before the nudge is marked answered.
+    server.exec(`CREATE TRIGGER take_back AFTER INSERT ON mini_set_keys BEGIN
+      DELETE FROM mini_sets WHERE id = NEW.set_id;
+      INSERT INTO mini_removed_keys (user_id, client_key) VALUES (NEW.user_id, NEW.client_key);
+    END`)
+
+    const sent = await server.request("call/logMini", {
+      token: me.token,
+      body: { day: DAY, exercise: "Push-Up", amount: 25, nudgeId: nudge.id, clientKey: "racing-1" },
+    })
+
+    server.exec(`DROP TRIGGER take_back`)
+
+    expect(sent.status).toBe(400)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!.status).toBe("sent")
+
+    await me.call("skipNudge", { nudgeId: nudge.id })
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!.status).toBe("skipped")
+  })
+
+  it("lets a nudge left answered with no set be skipped", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    const nudge = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+
+    // As an earlier version could leave it.
+    server.exec(`UPDATE mini_nudges SET status = 'done' WHERE id = ${nudge.id}`)
+    await me.call("skipNudge", { nudgeId: nudge.id })
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!.status).toBe("skipped")
+  })
+
+  it("asks again when the nudge size a stale form sets is more than the day another device set", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+    const target = loaded.targets[0]!
+
+    // Another device lowers the day to 20; an older screen, which sends only the targets it
+    // started from, raises each nudge to 30. The day it keeps is the 20.
+    await setUp(me, { targets: [{ ...target, daily: 20, chunk: 10 }, SETTINGS.targets[1]!] })
+
+    const saved = await server.request("call/updateMinis", {
+      token: me.token,
+      body: { day: DAY, settings: { ...loaded, targets: [{ ...target, chunk: 30 }, loaded.targets[1]!] }, base: loaded.targets },
+    })
+
+    expect(saved.status).toBe(400)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).settings.targets[0]).toMatchObject({ daily: 20, chunk: 10 })
+  })
+
+  it("asks again when another device added the same exercise differently meanwhile", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me, { targets: [SETTINGS.targets[1]!] })
+    const pushUps = { exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 0 } as const
+
+    await me.call("updateMinis", { day: DAY, settings: { ...loaded, targets: [...loaded.targets, pushUps] }, loaded })
+
+    const second = await server.request("call/updateMinis", {
+      token: me.token,
+      body: { day: DAY, settings: { ...loaded, targets: [...loaded.targets, { ...pushUps, unit: "seconds", daily: 120, chunk: 30 }] }, loaded },
+    })
+
+    expect(second.status).toBe(400)
+
+    // The same addition from both is no conflict.
+    const same = await me.call("updateMinis", { day: DAY, settings: { ...loaded, targets: [...loaded.targets, pushUps] }, loaded })
+
+    expect(same.targets.map((target) => target.exercise)).toEqual([SETTINGS.targets[1]!.exercise, "Push-Up"])
+  })
+
   it("keeps nudges off when a form opened before they were turned off is saved", async () => {
     const me = await server.signUp()
     const loaded = await setUp(me)

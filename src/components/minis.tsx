@@ -175,8 +175,8 @@ function ProgressRow({ item, chunk, pending, onLog, waiting, recovery }: Progres
           data-testid={testIds.minis.log}
           onClick={() => void (value === null ? null : onLog(item.exercise, item.unit, value))}
         >
-          {/* A tap while a set from here is unconfirmed sends that set again rather than another. */}
-          {waiting.some((set) => set.nudgeId === undefined) ? "Retry" : "Log"}
+          {/* A tap while a set of this amount from here is unconfirmed sends that set again rather than another. */}
+          {waiting.some((set) => set.nudgeId === undefined && set.amount === value) ? "Retry" : "Log"}
         </Button>
       </div>
       <UnconfirmedSets sets={waiting} pending={pending} {...recovery} />

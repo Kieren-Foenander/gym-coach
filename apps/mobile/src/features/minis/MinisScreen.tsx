@@ -133,12 +133,12 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   // then it is that set again. One whose answer never comes is kept to try again under its key.
   const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number, another = false) =>
     act(async () => {
-      const tap = { account: user.id, day: today, exercise, nudgeId }
+      const tap = { account: user.id, day: today, exercise, amount, nudgeId }
       const repeated = another ? undefined : repeatedTap(unconfirmed, tap)
 
       if (repeated) return send(repeated)
 
-      const set = { ...tap, clientKey: Crypto.randomUUID(), unit, amount }
+      const set = { ...tap, clientKey: Crypto.randomUUID(), unit }
 
       try {
         await send(set)
@@ -277,8 +277,8 @@ function ProgressRow({ item, chunk, pending, onLog, waiting, recovery }: Progres
           disabled={pending || !valid}
           onPress={() => value !== null && onLog(value)}
         >
-          {/* A tap while a set from here is unconfirmed sends that set again rather than another. */}
-          {waiting.some((set) => set.nudgeId === undefined) ? "Retry" : "Log"}
+          {/* A tap while a set of this amount from here is unconfirmed sends that set again rather than another. */}
+          {waiting.some((set) => set.nudgeId === undefined && set.amount === value) ? "Retry" : "Log"}
         </Button>
       </View>
       <UnconfirmedSets sets={waiting} pending={pending} {...recovery} />
