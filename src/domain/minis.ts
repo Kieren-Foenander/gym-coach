@@ -83,7 +83,13 @@ export const suggestTarget = (exercise: string): MiniTarget => {
 }
 
 /** The same exercise, whatever the case or the spaces around it. */
-export const sameExercise = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+/**
+ * What two names of an exercise are compared by: trimmed, in one Unicode form, lower case. The
+ * server keeps it beside every set, so the database matches sets to targets the same way (MET_NOW).
+ */
+export const exerciseKey = (name: string): string => name.trim().normalize("NFC").toLowerCase()
+
+export const sameExercise = (a: string, b: string) => exerciseKey(a) === exerciseKey(b)
 
 // ---------------------------------------------------------------- time
 
@@ -283,7 +289,7 @@ export const CRON_MINUTES = 5
  * window closes. Runs come every CRON_MINUTES on the clock, and every time zone is a whole number
  * of quarter hours from UTC, so they land on the same minutes wherever the user is.
  */
-const lastRunWithin = (minutesLeft: number) => Math.floor((minutesLeft - 1) / CRON_MINUTES) * CRON_MINUTES
+export const lastRunWithin = (minutesLeft: number) => Math.floor((minutesLeft - 1) / CRON_MINUTES) * CRON_MINUTES
 
 /** How many nudges still fit in the window from a cron run now, one now and then one a gap apart, each on a run. */
 export const nudgeSlots = (minutesLeft: number, gapMinutes: number): number => {

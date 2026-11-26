@@ -183,14 +183,19 @@ export const sendPush = async (
   if (!isPushEndpoint(subscription.endpoint)) return "gone"
 
   const body = await encryptPayload(JSON.stringify(message), subscription)
-  // Worked out as it goes, so time spent getting here does not stretch it past the expiry.
+  const authorization = await cachedAuthorization(subscription.endpoint, keys, subject, now)
+  // Worked out last, as it goes, so time spent getting here does not stretch it past the expiry.
   const left = expiresAt === undefined ? MAX_TIME_TO_LIVE_SECONDS : Math.floor((expiresAt - Date.now()) / 1000)
-  const ttl = Math.max(0, Math.min(MAX_TIME_TO_LIVE_SECONDS, left))
+
+  // Expired already: a TTL of 0 would still let it through to a phone that is on, so it is not sent.
+  if (left <= 0) return "failed"
+
+  const ttl = Math.min(MAX_TIME_TO_LIVE_SECONDS, left)
 
   const response = await fetch(subscription.endpoint, {
     method: "POST",
     headers: {
-      authorization: await cachedAuthorization(subscription.endpoint, keys, subject, now),
+      authorization,
       "content-encoding": "aes128gcm",
       "content-type": "application/octet-stream",
       ttl: String(ttl),

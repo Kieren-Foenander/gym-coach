@@ -529,14 +529,17 @@ export const GymHandlers = GymToolkit.toLayer(
       update_mini_workouts: ({ today, ...patch }) =>
         run(
           Effect.gen(function* () {
-            const current = (yield* Minis.getMinis(today, today)).settings
-            const merged = Object.fromEntries(Object.entries({ ...current, ...patch }).filter(([, value]) => value !== undefined))
+            // The patch goes on the settings as saved when the write goes in, worked out again if
+            // they changed meanwhile, so a change made on a phone at the same time is never undone.
+            const settings = yield* Minis.changeMinis(today, (saved) => {
+              const merged = Object.fromEntries(Object.entries({ ...saved, ...patch }).filter(([, value]) => value !== undefined))
 
-            const settings = yield* Schema.decodeUnknownEffect(MiniSettingsInput)(merged).pipe(
-              Effect.mapError((error) => new Invalid({ reason: error.message })),
-            )
+              return Schema.decodeUnknownEffect(MiniSettingsInput)(merged).pipe(
+                Effect.mapError((error) => new Invalid({ reason: error.message })),
+              )
+            })
 
-            return { settings: yield* Minis.updateMinis(today, settings) }
+            return { settings }
           }),
         ),
       log_mini_workout: ({ day, exercise, amount }) =>

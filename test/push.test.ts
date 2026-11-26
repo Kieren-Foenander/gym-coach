@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
-import { encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, vapidAuthorization, vapidSubject } from "~/server/push"
+import { describe, expect, it, vi } from "vitest"
+import { encryptPayload, fromBase64Url, generateVapidKeys, sendPush, toBase64Url, vapidAuthorization, vapidSubject } from "~/server/push"
 import { makeTestBrowser, readVapid } from "./push-client"
 
 /** Web Push as the server sends it: encrypted so only the browser can read it, and signed by the server. */
@@ -45,6 +45,27 @@ describe("signing for the push service", () => {
     expect(fromBase64Url(keys.publicKey)).toHaveLength(65)
     expect(header.endsWith(`k=${keys.publicKey}`)).toBe(true)
     expect(claims).toEqual({ aud: "https://web.push.apple.com", exp: now / 1000 + 12 * 3600, sub: "https://gym.example.com" })
+  })
+
+  it("sends nothing once its time is up, since a TTL of 0 would still deliver to a phone that is on", async () => {
+    const browser = await makeTestBrowser()
+    const keys = await generateVapidKeys()
+    let posted = 0
+
+    vi.stubGlobal("fetch", async () => {
+      posted += 1
+
+      return new Response(null, { status: 201 })
+    })
+
+    const subscription = { endpoint: "https://web.push.apple.com/abc", ...browser }
+    const message = { title: "Late", body: "", url: "/minis", tag: "late" }
+
+    expect(await sendPush(subscription, message, keys, "https://gym.example.com", Date.now(), Date.now() - 1000)).toBe("failed")
+    expect(posted).toBe(0)
+    expect(await sendPush(subscription, message, keys, "https://gym.example.com", Date.now(), Date.now() + 120_000)).toBe("sent")
+    expect(posted).toBe(1)
+    vi.unstubAllGlobals()
   })
 
   it("names an https app, or an address when the app runs on this machine", () => {

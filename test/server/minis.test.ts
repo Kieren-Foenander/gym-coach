@@ -168,6 +168,44 @@ describe("logging mini workouts", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
   })
 
+  it("matches sets to targets by the same name whatever its case, beyond ASCII too, in the streak as on screen", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Élévation", unit: "reps", daily: 20, chunk: 10, growBy: 0 }] })
+    await me.call("logMini", { day: DAY, exercise: "Élévation", amount: 20 })
+    await setUp(me, { targets: [{ exercise: "élévation", unit: "reps", daily: 20, chunk: 10, growBy: 0 }] })
+
+    expect((await today(me)).met).toBe(true)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
+  })
+
+  it("keeps a save that turns nudges off when last week's review and it happen together", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
+
+    clockAt(Date.parse("2026-11-23T10:00:00Z"))
+
+    // Monday's first set (which reviews the week) and a save turning nudges off, sent at once.
+    await Promise.all([
+      me.call("logMini", { day: "2026-11-23", exercise: "Push-Up", amount: 10 }),
+      me.call("updateMinis", { day: "2026-11-23", settings: { ...SETTINGS, targets, days: [0, 1, 2, 3, 4], nudges: false }, base: targets }),
+    ])
+
+    const { settings } = await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })
+
+    expect(settings.nudges).toBe(false)
+    expect(settings.targets[0]!.daily).toBe(110)
+    expect((await today(me, "2026-11-23")).progress[0]!.target).toBe(110)
+  })
+
   it("never writes back a planned nudge time when a set is logged", async () => {
     const me = await server.signUp()
 
@@ -485,6 +523,46 @@ describe("nudges", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toEqual([])
   })
 
+  it("sends nothing when the day is finished just as a nudge is claimed", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Push-Up", unit: "reps", daily: 25, chunk: 25, growBy: 0 }] })
+    await subscribe(me)
+
+    // A set that lands the moment the run claims the nudge, finishing the day.
+    server.exec(`CREATE TRIGGER finish_mid_claim AFTER UPDATE OF next_nudge_at ON mini_days WHEN NEW.next_nudge_at > ${TEN_AM}
+      BEGIN INSERT INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, created_at)
+        VALUES (NEW.user_id, NEW.day, 'Push-Up', 'push-up', 'reps', 25, 0); END`)
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+  })
+
+  it("sends nothing when nudges are turned off once the nudge is recorded but before it goes", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    server.exec(`CREATE TRIGGER save_after_record AFTER INSERT ON mini_nudges
+      BEGIN UPDATE users SET mini_revision = mini_revision + 1, mini_settings = json_set(mini_settings, '$.nudges', json('false')); END`)
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toEqual([])
+  })
+
+  it("plans the day's first nudge on a run that still falls inside the window", async () => {
+    const me = await server.signUp()
+
+    // Nudges turned on five minutes before the window closes, at 10:05.
+    await setUp(me, { startMinute: 9 * 60, endMinute: 10 * 60 + 5 })
+    await subscribe(me)
+
+    // However late the random first delay would put it, the only run left inside the window is this one.
+    expect((await server.run(runNudges(TEN_AM, () => 1))).sent).toBe(1)
+  })
+
   it("keeps the gap across midnight", async () => {
     const me = await server.signUp()
 
@@ -608,7 +686,7 @@ describe("growing targets", () => {
     expect((await today(me, "2026-11-23")).progress[0]!.target).toBe(110)
   })
 
-  it("review the account's own week, not one a set logged ahead of time names", async () => {
+  it("refuse a day that has not started, so it cannot keep the next week from being reviewed", async () => {
     const me = await server.signUp()
     const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
     const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
@@ -620,8 +698,10 @@ describe("growing targets", () => {
       await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
     }
 
-    // On the Friday, a set logged for a week later does not mark the coming week as reviewed.
-    await me.call("logMini", { day: "2026-11-30", exercise: "Push-Up", amount: 10 })
+    // On the Friday, neither the coming Monday nor a week later can be logged.
+    for (const day of ["2026-11-23", "2026-11-30"]) {
+      expect((await server.request("call/logMini", { token: me.token, body: { day, exercise: "Push-Up", amount: 10 } })).status).toBe(400)
+    }
 
     clockAt(Date.parse("2026-11-23T10:00:00Z"))
     await me.call("logMini", { day: "2026-11-23", exercise: "Push-Up", amount: 10 })

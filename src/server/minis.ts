@@ -6,10 +6,12 @@ import {
   chooseNudge,
   dayProgress,
   DEFAULT_MINI_SETTINGS,
+  exerciseKey,
   firstNudgeDelay,
   grownTargets,
   isMet,
   isTimeZone,
+  lastRunWithin,
   localTime,
   mondayOf,
   nextNudgeDelay,
@@ -33,6 +35,13 @@ import { CurrentUser } from "./repo"
  * Mini workouts on the server: the settings, what was done each day, and the nudges. The
  * Worker's cron (src/server.ts) runs runNudges every few minutes, which sends whatever nudge is
  * due to each browser the user turned nudges on in. src/domain/minis.ts holds the rules.
+ *
+ * Many things can happen at once here: saves from two devices, the coach, the cron, and the
+ * weekly review of growing targets. So every write that depends on something read first says
+ * so in the write itself, and is refused when that has changed:
+ *   - the settings carry a revision; a write of them names the revision it read (writeSettings);
+ *   - a day's plan (next_nudge_at) is only moved on from the value read, under the revision read;
+ *   - whether a day is done is worked out by the database as it writes (MET_NOW).
  */
 
 const MINUTE = 60_000
@@ -43,6 +52,9 @@ export const MAX_MINI_DAYS = 120
 /** A nudge is held back while a workout started this recently is still open. */
 const WORKOUT_HOLD_MS = 3 * 3_600_000
 const WORKOUT_RETRY_MS = 15 * MINUTE
+
+/** How many times a write refused because something changed meanwhile is worked out again. */
+const ATTEMPTS = 5
 
 // ---------------------------------------------------------------- settings
 
@@ -55,6 +67,16 @@ export const parseSettings = (json: string): MiniSettings =>
 
 const parseTargets = (json: string): ReadonlyArray<MiniTarget> => Option.getOrElse(decodeTargets(json), () => [])
 
+/** A day's targets as kept: each with the key its sets are matched by (exerciseKey), for MET_NOW. */
+const snapshotOf = (targets: ReadonlyArray<MiniTarget>) =>
+  JSON.stringify(targets.map((target) => ({ ...target, key: exerciseKey(target.exercise) })))
+
+interface Stored {
+  readonly settings: MiniSettings
+  readonly reviewedWeek: string
+  readonly revision: number
+}
+
 const settingsOf = Effect.fn("minis.settingsOf")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient
 
@@ -65,20 +87,33 @@ const settingsOf = Effect.fn("minis.settingsOf")(function* (userId: string) {
     settings: parseSettings(rows[0]?.miniSettings ?? ""),
     reviewedWeek: rows[0]?.miniReviewedWeek ?? "",
     revision: rows[0]?.miniRevision ?? 0,
-  }
+  } satisfies Stored
 })
 
 /**
- * The account's own today: the day in its saved time zone, or the day a request names when there
- * is none yet. Never later than that day, so a set logged ahead of time does not move the week on.
+ * Writes the settings, but only if they are still at `revision`. Answers the new revision, or
+ * null when someone else wrote first, for the caller to work its change out again.
  */
-const accountToday = (settings: MiniSettings, day: string, time: number): string => {
-  if (!isTimeZone(settings.timeZone)) return day
+const writeSettings = Effect.fn("minis.writeSettings")(function* (
+  userId: string,
+  revision: number,
+  settings: MiniSettings,
+  reviewedWeek: string | null,
+) {
+  const sql = yield* SqlClient.SqlClient
 
-  const today = localTime(settings.timeZone, time).day
+  const rows = yield* sql<{ miniRevision: number }>`
+    UPDATE users SET mini_settings = ${JSON.stringify(settings)}, mini_revision = mini_revision + 1,
+      mini_reviewed_week = COALESCE(${reviewedWeek}, mini_reviewed_week)
+    WHERE id = ${userId} AND mini_revision = ${revision}
+    RETURNING mini_revision`
 
-  return day < today ? day : today
-}
+  return rows[0]?.miniRevision ?? null
+})
+
+/** The account's own today: the day in its saved time zone, or null before it has one. */
+const accountToday = (settings: MiniSettings, time: number): string | null =>
+  isTimeZone(settings.timeZone) ? localTime(settings.timeZone, time).day : null
 
 // ---------------------------------------------------------------- days
 
@@ -116,40 +151,44 @@ const dayRows = Effect.fn("minis.dayRows")(function* (userId: string, from: stri
 })
 
 /**
- * Checks last week's targets once a week, before the first day of the new week is kept: a
- * target set to grow goes up when it was met on every nudge day. The week is the account's own
- * (accountToday), so a day logged ahead of time cannot skip one.
+ * Last week's targets grown as earned: a target set to grow goes up when it was met on every
+ * nudge day of the week before `today`'s. Judged by the settings that held during that week.
  */
-const reviewWeek = Effect.fn("minis.reviewWeek")(function* (userId: string, requested: string) {
-  const sql = yield* SqlClient.SqlClient
+const grow = Effect.fn("minis.grow")(function* (userId: string, settings: MiniSettings, today: string) {
+  if (!settings.targets.some((target) => target.growBy > 0)) return settings
+
+  const week = weekBefore(today)
+  const [rows, entries] = yield* Effect.all([dayRows(userId, week[0]!, week[6]!), entriesOn(userId, week[0]!, week[6]!)])
+
+  const past = week.map((date) => {
+    const row = rows.find((item) => item.day === date)
+
+    return { day: date, progress: row ? dayProgress(parseTargets(row.targets), entries.filter((entry) => entry.day === date)) : [] }
+  })
+
+  return { ...settings, targets: grownTargets(settings.targets, settings.days, past) }
+})
+
+/**
+ * Reviews last week once, in the account's own week (accountToday), before the first day of the
+ * new week is kept. A write refused because the settings changed meanwhile is worked out again
+ * from the new ones, so a save made at the same time (nudges turned off, say) is never undone.
+ */
+const reviewWeek = Effect.fn("minis.reviewWeek")(function* (userId: string) {
   const time = yield* Clock.currentTimeMillis
-  const { settings, reviewedWeek } = yield* settingsOf(userId)
-  const day = accountToday(settings, requested, time)
-  const monday = mondayOf(day)
 
-  if (reviewedWeek >= monday) return settings
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const stored = yield* settingsOf(userId)
+    const today = accountToday(stored.settings, time)
 
-  let next = settings
+    if (today === null || stored.reviewedWeek >= mondayOf(today)) return stored.settings
 
-  if (settings.targets.some((target) => target.growBy > 0)) {
-    const week = weekBefore(day)
-    const [rows, entries] = yield* Effect.all([dayRows(userId, week[0]!, week[6]!), entriesOn(userId, week[0]!, week[6]!)])
+    const next = yield* grow(userId, stored.settings, today)
 
-    const past = week.map((date) => {
-      const row = rows.find((item) => item.day === date)
-
-      return { day: date, progress: row ? dayProgress(parseTargets(row.targets), entries.filter((entry) => entry.day === date)) : [] }
-    })
-
-    next = { ...settings, targets: grownTargets(settings.targets, settings.days, past) }
+    if ((yield* writeSettings(userId, stored.revision, next, mondayOf(today))) !== null) return next
   }
 
-  // Only if no other request has reviewed the week meanwhile; if one has, its settings stand.
-  const saved = yield* sql<{ id: string }>`
-    UPDATE users SET mini_settings = ${JSON.stringify(next)}, mini_reviewed_week = ${monday}
-    WHERE id = ${userId} AND mini_reviewed_week = ${reviewedWeek} RETURNING id`
-
-  return saved.length > 0 ? next : (yield* settingsOf(userId)).settings
+  return (yield* settingsOf(userId)).settings
 })
 
 /** The kept row for a day, made with the targets as they are now if there is none yet. */
@@ -159,10 +198,10 @@ const ensureDay = Effect.fn("minis.ensureDay")(function* (userId: string, day: s
 
   if (existing[0]) return existing[0]
 
-  const settings = yield* reviewWeek(userId, day)
+  const settings = yield* reviewWeek(userId)
 
   yield* sql`
-    INSERT INTO mini_days (user_id, day, targets) VALUES (${userId}, ${day}, ${JSON.stringify(settings.targets)})
+    INSERT INTO mini_days (user_id, day, targets) VALUES (${userId}, ${day}, ${snapshotOf(settings.targets)})
     ON CONFLICT (user_id, day) DO NOTHING`
 
   return (yield* dayRows(userId, day, day))[0]!
@@ -170,14 +209,16 @@ const ensureDay = Effect.fn("minis.ensureDay")(function* (userId: string, day: s
 
 /**
  * Whether every target of the day is done, worked out by the database from the sets there are
- * at the moment it runs, the same rule as isMet in src/domain/minis.ts.
+ * at the moment it runs: the same rule as isMet in src/domain/minis.ts, matching names by the
+ * key JavaScript made (exerciseKey) rather than SQLite's own lower(), which only knows ASCII.
+ * It reads the mini_days row being written or looked at.
  */
 const MET_NOW = `(
   SELECT CASE WHEN COUNT(*) > 0 AND SUM(
     CASE WHEN COALESCE((
       SELECT SUM(s.amount) FROM mini_sets s
       WHERE s.user_id = mini_days.user_id AND s.day = mini_days.day AND s.unit = json_extract(t.value, '$.unit')
-        AND lower(trim(s.exercise)) = lower(trim(json_extract(t.value, '$.exercise')))
+        AND s.exercise_key = COALESCE(json_extract(t.value, '$.key'), lower(trim(json_extract(t.value, '$.exercise'))))
     ), 0) >= json_extract(t.value, '$.daily') THEN 0 ELSE 1 END
   ) = 0 THEN 1 ELSE 0 END
   FROM json_each(mini_days.targets) t
@@ -278,8 +319,7 @@ const sameTarget = (a: Pick<MiniTarget, "exercise" | "unit">) => (b: Pick<MiniTa
 /**
  * Only what the user changed overrides what is saved. A target sent with the daily amount the
  * form started from (`base`) keeps the saved one, which may have grown since the form was loaded,
- * on this device or another. Without a base (the coach, or an older client) the saved settings
- * from before this save stand in for it.
+ * on this device or another.
  */
 const keepGrowth = (
   submitted: MiniSettings,
@@ -295,37 +335,60 @@ const keepGrowth = (
   }),
 })
 
+/** How the settings change: from what is saved now to what to save. */
+type SettingsChange = (saved: MiniSettings) => Effect.Effect<MiniSettings, Invalid>
+
 /**
- * Saves the settings. The day the user is on takes the new targets straight away, and plans its
- * nudges again, so a change shows and counts at once. That day is read in the saved time zone,
- * which is the device's; `day` (the device's own) is only used when there is no time zone. `base`
- * is the targets the form was loaded with (keepGrowth). Answers the settings as saved.
+ * Changes the settings. `change` is worked out from the settings as saved when the write goes
+ * in, and worked out again if they changed meanwhile, so two saves, the coach and the weekly
+ * review never undo one another. Last week is reviewed first, by the settings that held then.
+ * The day the user is on takes the new targets straight away, and plans its nudges again; that
+ * day is read in the new time zone, which is the device's, or is `deviceDay` without one. `base`
+ * is the targets the change started from (keepGrowth); without it, what was saved stands in.
+ * Answers the settings as saved.
  */
-export const updateMinis = Effect.fn("updateMinis")(function* (
+export const changeMinis = Effect.fn("changeMinis")(function* (
   deviceDay: string,
-  submitted: MiniSettings,
+  change: SettingsChange,
   base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
 ) {
   const sql = yield* SqlClient.SqlClient
   const user = yield* CurrentUser
   const time = yield* Clock.currentTimeMillis
-  const day = isTimeZone(submitted.timeZone) ? localTime(submitted.timeZone, time).day : deviceDay
 
-  // Last week is judged by the settings that held during it, before these are saved.
-  const before = (yield* settingsOf(user.id)).settings
-  const reviewed = yield* reviewWeek(user.id, day)
-  const settings = keepGrowth(submitted, base ?? before.targets, reviewed)
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const stored = yield* settingsOf(user.id)
+    const today = accountToday(stored.settings, time)
+    const week = today !== null && stored.reviewedWeek < mondayOf(today) ? mondayOf(today) : null
+    const saved = week !== null && today !== null ? yield* grow(user.id, stored.settings, today) : stored.settings
+    const submitted = yield* change(saved)
+    const settings = keepGrowth(submitted, base ?? stored.settings.targets, saved)
+    const revision = yield* writeSettings(user.id, stored.revision, settings, week)
 
-  // The revision tells a cron run that planned under the old settings not to send.
-  yield* sql`UPDATE users SET mini_settings = ${JSON.stringify(settings)}, mini_revision = mini_revision + 1 WHERE id = ${user.id}`
-  yield* ensureDay(user.id, day)
-  yield* sql`
-    UPDATE mini_days SET targets = ${JSON.stringify(settings.targets)}, next_nudge_at = NULL
-    WHERE user_id = ${user.id} AND day = ${day}`
-  yield* refreshDay(user.id, day)
+    if (revision === null) continue
 
-  return settings
+    const day = accountToday(settings, time) ?? deviceDay
+
+    // Only while these are still the saved settings: a later save sets the day itself.
+    yield* ensureDay(user.id, day)
+    yield* sql`
+      UPDATE mini_days SET targets = ${snapshotOf(settings.targets)}, next_nudge_at = NULL
+      WHERE user_id = ${user.id} AND day = ${day}
+        AND EXISTS (SELECT 1 FROM users WHERE id = ${user.id} AND mini_revision = ${revision})`
+    yield* refreshDay(user.id, day)
+
+    return settings
+  }
+
+  return yield* new Invalid({ reason: "The settings were changing at the same time. Try again." })
 })
+
+/** Saves settings as a screen sends them, whole. */
+export const updateMinis = (
+  deviceDay: string,
+  submitted: MiniSettings,
+  base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
+) => changeMinis(deviceDay, () => Effect.succeed(submitted), base)
 
 export interface MiniSetInput {
   readonly day: string
@@ -347,10 +410,13 @@ interface SetPlace {
 /**
  * Logs what was done. Its unit is the day's target for the exercise, when there is one.
  *
- * A set that answers a nudge is the nudge's own exercise on the nudge's own day, whenever and on
+ * A set that answers a nudge is what the nudge asked for, on the nudge's own day, whenever and on
  * whichever device it is answered, and a nudge takes one set: answering it again answers with
  * that set. Each step can be repeated, so a retry after a failure part of the way through (with
  * the same client key, or for the same nudge) finishes the job rather than logging twice.
+ *
+ * A day that has not started yet where the account is cannot be logged: its targets are not
+ * known until it does, and last week's review may still change them.
  */
 export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   const sql = yield* SqlClient.SqlClient
@@ -381,6 +447,10 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
     if (!nudge) return yield* new NotFound({ what: `Nudge ${input.nudgeId}` })
 
     set = { day: nudge.day, exercise: nudge.exercise, unit: nudge.unit, nudgeId: nudge.id }
+  } else {
+    const today = accountToday((yield* settingsOf(user.id)).settings, time)
+
+    if (today !== null && set.day > today) return yield* new Invalid({ reason: "That day has not started yet" })
   }
 
   const row = yield* ensureDay(user.id, set.day)
@@ -393,8 +463,9 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
 
   // A second answer to the same nudge is left out by its unique index, and answered with the first.
   const rows = yield* sql<MiniEntry>`
-    INSERT OR IGNORE INTO mini_sets (user_id, day, exercise, unit, amount, nudge_id, client_key, created_at)
-    VALUES (${user.id}, ${set.day}, ${exercise}, ${unit}, ${input.amount}, ${set.nudgeId}, ${input.clientKey ?? null}, ${time})
+    INSERT OR IGNORE INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, nudge_id, client_key, created_at)
+    VALUES (${user.id}, ${set.day}, ${exercise}, ${exerciseKey(exercise)}, ${unit}, ${input.amount}, ${set.nudgeId},
+      ${input.clientKey ?? null}, ${time})
     RETURNING ${sql.unsafe(ENTRY_COLUMNS)}`
 
   const entry =
@@ -583,6 +654,9 @@ export const runNudges = Effect.fn("runNudges")(function* (time: number, random:
 /** How soon to try again when no push service took a nudge. */
 const FAILED_RETRY_MS = 10 * MINUTE
 
+/** What a plan change needs the day to be, as the database sees it when it writes. */
+type DayIs = "any" | "met" | "open"
+
 /**
  * Sends the nudge due for one user, if there is one. Answers whether one was sent.
  *
@@ -590,10 +664,11 @@ const FAILED_RETRY_MS = 10 * MINUTE
  * done, or no time left for one), or when the next one is due. A run claims a due nudge by moving
  * that time on before it sends, and only a run holding the claim may plan the next one, so two
  * runs at once send one nudge, and a settings change made meanwhile (which plans the day again)
- * is never overwritten. Every one of those changes also needs the settings to be the ones this run
- * read (`revision`), so a run that read settings since changed, such as nudges turned off, sends
- * nothing. However it was planned, no nudge goes sooner than the gap after the last one that
- * reached the user, on whatever day that was.
+ * is never overwritten. Every one of those changes also needs the settings to be the ones this
+ * run read (`revision`), and closing the day or recording a nudge needs the day to be as the
+ * database finds it then (done, or not), so a run that read something since changed sends
+ * nothing. The last check is made just before the push goes. However it was planned, no nudge
+ * goes sooner than the gap after the last one that reached the user, on whatever day that was.
  */
 const nudgeUser = Effect.fn("minis.nudgeUser")(function* (
   userId: string,
@@ -615,15 +690,17 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (
   const progress = dayProgress(targets, yield* entriesOn(userId, now.day, now.day))
   const minutesLeft = settings.endMinute - now.minute
   const gap = settings.gapMinutes * MINUTE
-
+  const lastRun = time + lastRunWithin(minutesLeft) * MINUTE
   const current = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_revision = ${revision})`
+  const dayIs = (state: DayIs) => sql.unsafe(state === "any" ? "1 = 1" : `${MET_NOW} = ${state === "met" ? 1 : 0}`)
 
-  /** Moves the plan on from what this run read, unless someone else already has or the settings changed. Answers whether it did. */
-  const replace = (from: number | null, to: number) =>
+  /** Moves the plan on from what this run read, unless someone else already has, the settings changed, or the day is not `state`. */
+  const replace = (from: number | null, to: number | null, state: DayIs = "any") =>
     Effect.map(
       sql<{ day: string }>`
         UPDATE mini_days SET next_nudge_at = ${to}
-        WHERE user_id = ${userId} AND day = ${now.day} AND next_nudge_at IS ${from} AND ${current} RETURNING day`,
+        WHERE user_id = ${userId} AND day = ${now.day} AND next_nudge_at IS ${from} AND ${current} AND ${dayIs(state)}
+        RETURNING day`,
       (rows) => rows.length > 0,
     )
 
@@ -634,14 +711,21 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (
   const earliest = last ? last.sentAt + gap : time
 
   if (isMet(progress)) {
-    yield* replace(row.nextNudgeAt, 0)
+    yield* replace(row.nextNudgeAt, 0, "met")
 
     return false
   }
 
   if (row.nextNudgeAt === null) {
+    // Soon after the window opens, and never past the last run that can still send it.
     const delay = firstNudgeDelay(nudgesNeeded(targets, progress), minutesLeft, random)
-    const due = Math.max(time + delay * MINUTE, earliest)
+    const due = Math.max(Math.min(time + delay * MINUTE, lastRun), earliest)
+
+    if (due > lastRun) {
+      yield* replace(null, 0)
+
+      return false
+    }
 
     if (due > time) {
       yield* replace(null, due)
@@ -649,7 +733,7 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (
       return false
     }
   } else if (earliest > time) {
-    yield* replace(row.nextNudgeAt, earliest)
+    yield* replace(row.nextNudgeAt, earliest > lastRun ? 0 : earliest)
 
     return false
   }
@@ -672,19 +756,35 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (
   const ask = chooseNudge(targets, progress, minutesLeft, settings.gapMinutes, last?.exercise ?? null, random)
 
   if (ask === null) {
-    yield* replace(claim, 0)
+    // Done, as far as this run saw. If a set was taken back meanwhile, plan the day again instead.
+    if (!(yield* replace(claim, 0, "met"))) yield* replace(claim, null)
 
     return false
   }
 
-  // Recorded only while this run still holds the claim under the same settings, checked in the same statement.
+  /** Whether this run still holds the claim, under the same settings, on a day with something left to do. */
+  const holds = sql`
+    EXISTS (SELECT 1 FROM mini_days WHERE user_id = ${userId} AND day = ${now.day} AND next_nudge_at = ${claim}
+      AND ${sql.unsafe(`${MET_NOW} = 0`)}) AND ${current}`
+
   const nudge = (yield* sql<{ id: number }>`
     INSERT INTO mini_nudges (user_id, day, exercise, unit, amount, sent_at)
-    SELECT ${userId}, ${now.day}, ${ask.exercise}, ${ask.unit}, ${ask.amount}, ${time}
-    WHERE EXISTS (SELECT 1 FROM mini_days WHERE user_id = ${userId} AND day = ${now.day} AND next_nudge_at = ${claim}) AND ${current}
+    SELECT ${userId}, ${now.day}, ${ask.exercise}, ${ask.unit}, ${ask.amount}, ${time} WHERE ${holds}
     RETURNING id`)[0]
 
-  if (!nudge) return false
+  if (!nudge) {
+    yield* replace(claim, null)
+
+    return false
+  }
+
+  // The last look before the push goes, so a change made since it was recorded still stops it.
+  if ((yield* sql<{ ok: number }>`SELECT 1 AS ok WHERE ${holds}`).length === 0) {
+    yield* sql`DELETE FROM mini_nudges WHERE id = ${nudge.id}`
+    yield* replace(claim, null)
+
+    return false
+  }
 
   const message = nudgeMessage(ask, random)
 
