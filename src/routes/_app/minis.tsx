@@ -1,14 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Schema } from "effect"
-import { useState } from "react"
-import { attemptOf, makeAttemptKeys } from "~/domain/minis"
-import { DayProgress, EntryList, MiniSettingsForm, NudgeCard, PauseNudges, PushCard, SetupLink } from "~/components/minis"
+import { useEffect, useState } from "react"
+import { makeMiniOutbox, type PendingMiniSet, type TextStore } from "~/domain/minis"
+import { DayProgress, EntryList, MiniSettingsForm, NudgeCard, PauseNudges, PushCard, SetupLink, ZoneNotice } from "~/components/minis"
 import { BackButton, ErrorNote, SectionTitle, useAction, useNow } from "~/components/ui"
 import { daysAround } from "~/domain/days"
 import { localDay } from "~/domain/health"
 import { describeGoal } from "~/domain/streaks"
 import { Id } from "~/domain/schema"
 import { getMinis, logMini, skipNudge } from "~/functions/api"
+
+const OUTBOX_KEY = "gym.minis.outbox"
+
+/** A little text kept in this browser. Private windows can refuse it; the outbox copes. */
+const browserStore = (key: string): TextStore => ({
+  read: () => window.localStorage.getItem(key),
+  write: (text) => window.localStorage.setItem(key, text),
+})
 
 /** The nudge a notification opened, when it opened one. The router reads `?nudge=12` as the number 12. */
 const Search = Schema.Struct({ nudge: Schema.optional(Id) })
@@ -46,15 +54,32 @@ function MinisDay({ today }: { readonly today: string }) {
   const chunks = new Map(day.targets.map((target) => [target.exercise, target.chunk]))
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
-  // A set tried again after an answer that never came keeps its key, so it is logged once.
-  const [keys] = useState(() => makeAttemptKeys(() => crypto.randomUUID()))
+  // Sets logged and not yet known to be in, kept across reloads and sent again under their own keys.
+  const [outbox] = useState(() => makeMiniOutbox(browserStore(OUTBOX_KEY), user.id))
 
+  const send = async (set: PendingMiniSet) => {
+    await logMini({ data: set })
+    outbox.remove(set.clientKey)
+  }
+
+  // Anything left from a visit whose answer never came is sent again first.
+  useEffect(() => {
+    const waiting = outbox.list()
+
+    if (waiting.length > 0) {
+      void act(async () => {
+        for (const set of waiting) await send(set)
+      })
+    }
+  }, [])
+
+  // Each tap is a new set, with a key of its own.
   const log = (exercise: string, amount: number, nudgeId?: number) =>
     act(async () => {
-      const attempt = attemptOf(today, exercise, amount, nudgeId)
+      const set = { clientKey: crypto.randomUUID(), day: today, exercise, amount, nudgeId }
 
-      await logMini({ data: { day: today, exercise, amount, nudgeId, clientKey: keys.keyFor(attempt) } })
-      keys.settled(attempt)
+      outbox.add(set)
+      await send(set)
     })
 
   return (
@@ -74,6 +99,7 @@ function MinisDay({ today }: { readonly today: string }) {
         <>
           <DayProgress day={day} chunks={chunks} pending={pending} onLog={(exercise, amount) => log(exercise, amount)} />
           <PauseNudges settings={data.settings} today={today} />
+          <ZoneNotice settings={data.settings} today={today} />
           <p className="pt-3 text-sm text-faint">
             {minisGoal
               ? `Your streak goal: ${describeGoal(minisGoal)}. Days with every target done get a blue ring on the calendar.`

@@ -504,6 +504,57 @@ describe("nudges", () => {
     expect((await today(me)).progress[0]!.done).toBe(10)
   })
 
+  it("merges targets one by one: a stale form adding one does not bring back one another device took out", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+
+    // Another device takes Sit-Up out.
+    await setUp(me, { targets: [SETTINGS.targets[0]!] })
+
+    const pullUps = { exercise: "Pull-Up", unit: "reps", daily: 50, chunk: 10, growBy: 0 } as const
+    const saved = await me.call("updateMinis", { day: DAY, settings: { ...loaded, targets: [...loaded.targets, pullUps] }, loaded })
+
+    expect(saved.targets.map((target) => target.exercise)).toEqual(["Push-Up", "Pull-Up"])
+  })
+
+  it("merges nudge days one by one, whatever order they were kept in", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me, { days: [4, 0] })
+
+    // Another device makes it Tuesdays only; this one, loaded with Friday and Monday, changes only the gap.
+    await setUp(me, { days: [1] })
+
+    const saved = await me.call("updateMinis", { day: DAY, settings: { ...loaded, days: [0, 4], gapMinutes: 60 }, loaded })
+
+    expect(saved).toMatchObject({ days: [1], gapMinutes: 60 })
+  })
+
+  it("keeps the saved time zone on an ordinary save, and keeps a pause running when the zone is moved", async () => {
+    const me = await server.signUp()
+
+    // Thursday afternoon in Los Angeles, paused for the rest of it; Friday 09:00 in Brisbane.
+    const fridayInBrisbane = Date.parse(`${DAY}T23:00:00Z`)
+
+    await setUp(me, { timeZone: "America/Los_Angeles" })
+    await subscribe(me)
+    clockAt(fridayInBrisbane)
+    await me.call("pauseMinis", { day: DAY, pause: true })
+
+    const loaded = (await me.call("getMinis", { from: DAY, to: DAY })).settings
+
+    // A gap change sent from a phone in Brisbane keeps the account in Los Angeles.
+    const kept = await me.call("updateMinis", { day: shiftDay(DAY, 1), settings: { ...loaded, gapMinutes: 60, timeZone: "Australia/Brisbane" }, loaded: { ...loaded, timeZone: "Australia/Brisbane" } })
+
+    expect(kept.timeZone).toBe("America/Los_Angeles")
+
+    // Asked to move to Brisbane, the pause still runs through Brisbane's Friday.
+    const moved = await me.call("updateMinis", { day: shiftDay(DAY, 1), settings: { ...kept, timeZone: "Australia/Brisbane" }, loaded: kept })
+
+    expect(moved.timeZone).toBe("Australia/Brisbane")
+    expect(moved.pausedUntil).toBe(shiftDay(DAY, 2))
+    expect((await tick(fridayInBrisbane)).sent).toBe(0)
+  })
+
   it("keeps nudges off when a form opened before they were turned off is saved", async () => {
     const me = await server.signUp()
     const loaded = await setUp(me)

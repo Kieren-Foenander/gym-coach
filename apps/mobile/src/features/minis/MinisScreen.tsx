@@ -1,13 +1,13 @@
+import * as Crypto from "expo-crypto"
 import { useEffect, useState } from "react"
 import { Pressable, Switch, View } from "react-native"
 import { localDay } from "~/domain/health"
 import {
-  attemptOf,
   dayFraction,
   describeAmount,
   formatMiniAmount,
   isPaused,
-  makeAttemptKeys,
+  makeMiniOutbox,
   MINI_LIMITS,
   MINI_UNITS,
   miniFormFor,
@@ -19,6 +19,8 @@ import {
   WEEKDAY_LETTERS,
   WEEKDAY_SHORT,
   type MiniEntry,
+  type PendingMiniSet,
+  type TextStore,
   type MiniForm,
   type MiniProgress,
   type MiniSettings,
@@ -32,6 +34,7 @@ import { call } from "@/api/session"
 import { CloseIcon } from "@/components/icons"
 import { BackLink, Button, Card, Display, ErrorNote, Eyebrow, Field, Loading, parseNumber, Screen, SectionTitle, Stepper, Text, TextInput } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
+import { storage } from "@/data/storage"
 import { ExercisePicker } from "@/features/exercises/ExercisePicker"
 import { useUser } from "@/features/user"
 import { cn } from "@/lib/cn"
@@ -47,7 +50,11 @@ const UNIT_LABELS = { reps: "Reps", seconds: "Seconds" } as const
 /** The phone's time zone, which the nudge window is read in. */
 const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
 
-const clientKey = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+/** Where unconfirmed sets wait on the phone (makeMiniOutbox). */
+const PHONE_STORE: TextStore = {
+  read: () => storage.get("gym.minis.outbox"),
+  write: (text) => storage.set("gym.minis.outbox", text),
+}
 
 /** Mini workouts: today's targets and what is done, a nudge to answer, and the settings. */
 export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
@@ -55,8 +62,24 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const { data, error } = useCall("getMinis", miniRange(today))
   const user = useUser()
   const { act, pending, error: actionError } = useAction()
-  // A set tried again after an answer that never came keeps its key, so it is logged once.
-  const [keys] = useState(() => makeAttemptKeys(clientKey))
+  // Sets logged and not yet known to be in, kept across launches and sent again under their own keys.
+  const [outbox] = useState(() => makeMiniOutbox(PHONE_STORE, user.id))
+
+  const send = async (set: PendingMiniSet) => {
+    await call("logMini", set)
+    outbox.remove(set.clientKey)
+  }
+
+  // Anything left from a visit whose answer never came is sent again first.
+  useEffect(() => {
+    const waiting = outbox.list()
+
+    if (waiting.length > 0) {
+      void act(async () => {
+        for (const set of waiting) await send(set)
+      })
+    }
+  }, [])
 
   if (!data) {
     return (
@@ -75,12 +98,13 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const nudge = route.params.nudgeId === undefined ? undefined : data.nudges.find((item) => item.id === route.params.nudgeId)
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
+  // Each tap is a new set, with a key of its own.
   const log = (exercise: string, amount: number, nudgeId?: number) =>
     act(async () => {
-      const attempt = attemptOf(today, exercise, amount, nudgeId)
+      const set = { clientKey: Crypto.randomUUID(), day: today, exercise, amount, nudgeId }
 
-      await call("logMini", { day: today, exercise, amount, nudgeId, clientKey: keys.keyFor(attempt) })
-      keys.settled(attempt)
+      outbox.add(set)
+      await send(set)
     })
 
   return (
@@ -122,6 +146,7 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
             </View>
           </View>
           <PauseNudges settings={data.settings} today={today} />
+          <ZoneNotice settings={data.settings} today={today} />
           <Text className="pt-3 text-sm text-faint">
             {minisGoal
               ? `Your streak goal: ${describeGoal(minisGoal)}. Days with every target done get a blue ring on the calendar.`
@@ -318,7 +343,8 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
     edit({ ...form, days: form.days.includes(day) ? form.days.filter((item) => item !== day) : [...form.days, day] })
 
   const save = () => {
-    const next = readMiniForm(form, deviceTimeZone(), settings.pausedUntil)
+    // The saved time zone stays: a phone that has travelled moves it only when asked to (ZoneNotice).
+    const next = readMiniForm(form, loaded.timeZone || deviceTimeZone(), settings.pausedUntil)
 
     if (!next.ok) {
       setProblem(next.problem)
@@ -486,5 +512,33 @@ function PauseNudges({ settings, today }: { readonly settings: MiniSettings; rea
         </Button>
       )}
     </View>
+  )
+}
+
+/**
+ * Shown when this phone is in another time zone from the one nudges follow (after a flight, say),
+ * with the way to move them to it. Nothing else moves them, so an ordinary save never does.
+ */
+function ZoneNotice({ settings, today }: { readonly settings: MiniSettings; readonly today: string }) {
+  const { act, pending, error } = useAction()
+  const device = deviceTimeZone()
+
+  if (settings.timeZone === "" || device === "" || device === settings.timeZone) return null
+
+  const move = () =>
+    void act(async () => {
+      await call("updateMinis", { day: today, settings: { ...settings, timeZone: device }, base: settings.targets, loaded: settings })
+    })
+
+  return (
+    <Card className="mt-3">
+      <Text className="text-muted">
+        Nudges follow {settings.timeZone.replaceAll("_", " ")}. This phone is in {device.replaceAll("_", " ")}.
+      </Text>
+      <ErrorNote message={error} />
+      <Button testID={testIds.minis.useDeviceZone} className="mt-3" disabled={pending} onPress={move}>
+        Use this time zone
+      </Button>
+    </Card>
   )
 }

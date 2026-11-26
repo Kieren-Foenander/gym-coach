@@ -547,7 +547,7 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
     const week = today !== null && stored.reviewedWeek < mondayOf(today) ? mondayOf(today) : null
     const saved = week !== null && today !== null ? yield* grow(user.id, stored.settings, today) : stored.settings
     const submitted = yield* change(saved)
-    const settings = keepGrowth(submitted, base ?? stored.settings.targets, saved)
+    const settings = keepPause(stored.settings, keepGrowth(submitted, base ?? stored.settings.targets, saved), time)
     // The first save with a time zone starts the weeks: there is no week before it to review.
     const first = before === null ? accountToday(settings, time) : null
     const reviewedWeek = week ?? (first === null ? null : mondayOf(first))
@@ -562,11 +562,41 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
 const sameValue = <A>(a: A, b: A) => JSON.stringify(a) === JSON.stringify(b)
 
 /**
+ * A list merged item by item: what is saved now, less what the form took out of what it loaded,
+ * with what the form changed in place and what it added on the end. So two devices editing
+ * different items (one removing Sit-Up, the other adding Pull-Up) both keep their edit.
+ */
+const mergeItems = <A>(
+  submitted: ReadonlyArray<A>,
+  loaded: ReadonlyArray<A>,
+  saved: ReadonlyArray<A>,
+  keyOf: (item: A) => string,
+): ReadonlyArray<A> => {
+  const before = new Map(loaded.map((item) => [keyOf(item), item]))
+  const after = new Map(submitted.map((item) => [keyOf(item), item]))
+  const now = new Set(saved.map(keyOf))
+
+  const kept = saved.flatMap((item) => {
+    const key = keyOf(item)
+    const was = before.get(key)
+    const is = after.get(key)
+
+    if (was !== undefined && is === undefined) return []
+
+    return [was !== undefined && is !== undefined && !sameValue(was, is) ? is : item]
+  })
+
+  return [...kept, ...submitted.filter((item) => !before.has(keyOf(item)) && !now.has(keyOf(item)))]
+}
+
+/**
  * What a form's save means, given the settings it was loaded with: only what the user changed in
- * it replaces what is saved now, which another device may have changed since. The targets go
- * together, and so do the window's start and end, so the two halves of one change never mix with
- * another's. The pause is never the form's to change. Without `loaded` (an older screen) the
- * form is taken whole, but for the pause.
+ * it replaces what is saved now, which another device may have changed since. Targets and days
+ * merge item by item (mergeItems); the window's start and end go together, so the two halves of
+ * one change never mix with another's. The time zone and the pause are never the form's to change:
+ * the time zone changes only when the user says to use the device's (useDeviceZone on the
+ * screens), and the pause through pauseMinis. Without `loaded` (an older screen) the form is
+ * taken whole, but for the pause.
  */
 const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, saved: MiniSettings): MiniSettings => {
   if (loaded === undefined) return { ...submitted, pausedUntil: saved.pausedUntil }
@@ -575,9 +605,9 @@ const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, sa
   const windowKept = submitted.startMinute === loaded.startMinute && submitted.endMinute === loaded.endMinute
 
   return {
-    targets: keep("targets"),
+    targets: mergeItems(submitted.targets, loaded.targets, saved.targets, (target) => exerciseKey(target.exercise)),
     nudges: keep("nudges"),
-    days: keep("days"),
+    days: mergeItems(submitted.days, loaded.days, saved.days, String).toSorted((a, b) => a - b),
     startMinute: windowKept ? saved.startMinute : submitted.startMinute,
     endMinute: windowKept ? saved.endMinute : submitted.endMinute,
     gapMinutes: keep("gapMinutes"),
@@ -585,6 +615,23 @@ const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, sa
     pausedUntil: saved.pausedUntil,
   }
 }
+
+/**
+ * A pause running in the old time zone keeps running when the time zone changes: until the day
+ * it would have ended, and at least through today in the new zone, so a move cannot end it early.
+ */
+const keepPause = (before: MiniSettings, after: MiniSettings, time: number): MiniSettings => {
+  const was = accountToday(before, time)
+  const now = accountToday(after, time)
+
+  if (before.timeZone === after.timeZone || before.pausedUntil === null || was === null || before.pausedUntil <= was || now === null) {
+    return after
+  }
+
+  return { ...after, pausedUntil: later(after.pausedUntil ?? before.pausedUntil, later(before.pausedUntil, shiftDay(now, 1))) }
+}
+
+const decodeMerged = Schema.decodeUnknownEffect(MiniSettingsInput)
 
 /**
  * Saves settings as a screen's form sends them: a three-way merge of what it was loaded with,
@@ -595,7 +642,16 @@ export const updateMinis = (
   submitted: MiniSettings,
   base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
   loaded?: MiniSettings,
-) => changeMinis(deviceDay, (saved) => Effect.succeed(mergeForm(submitted, loaded, saved)), base ?? loaded?.targets)
+) =>
+  changeMinis(
+    deviceDay,
+    // What the merge makes is checked like anything sent: two devices' targets together may be too many, say.
+    (saved) =>
+      decodeMerged(mergeForm(submitted, loaded, saved)).pipe(
+        Effect.mapError((error) => new Invalid({ reason: `These changes and another device's do not fit together. ${error.message}` })),
+      ),
+    base ?? loaded?.targets,
+  )
 
 /**
  * Pauses nudges for the rest of the account's today (true), or ends a pause (false), changing

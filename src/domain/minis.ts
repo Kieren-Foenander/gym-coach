@@ -212,35 +212,58 @@ export const remainingOf = (progress: MiniProgress): number => Math.max(0, progr
 export const miniSessions = (metDays: ReadonlyArray<string>): ReadonlyArray<StreakSession & { readonly volume: number }> =>
   metDays.map((day) => ({ startedAt: middayOf(day), kind: "minis", volume: 0 }))
 
-/**
- * Client keys for logging sets. Trying the same set again (the same day, exercise, amount and
- * nudge) keeps its key until the server has said it is in, so a retry after an answer that never
- * came back logs it once. Once it is in, the same amount again is a new set with a new key.
- */
-export const makeAttemptKeys = (newKey: () => string) => {
-  const keys = new Map<string, string>()
-
-  return {
-    keyFor: (attempt: string): string => {
-      const kept = keys.get(attempt)
-
-      if (kept !== undefined) return kept
-
-      const key = newKey()
-
-      keys.set(attempt, key)
-
-      return key
-    },
-    settled: (attempt: string): void => {
-      keys.delete(attempt)
-    },
-  }
+/** A set logged on a screen, waiting to be known to be in. Its client key is its own, made when it was logged. */
+export interface PendingMiniSet {
+  readonly clientKey: string
+  readonly day: string
+  readonly exercise: string
+  readonly amount: number
+  readonly nudgeId?: number | undefined
 }
 
-/** What makes two tries at logging the same set: its day, exercise, amount and nudge. */
-export const attemptOf = (day: string, exercise: string, amount: number, nudgeId?: number): string =>
-  [day, exerciseKey(exercise), amount, nudgeId ?? ""].join("|")
+/** Somewhere a screen keeps a little text between visits: the browser's localStorage, the phone's store. */
+export interface TextStore {
+  readonly read: () => string | null
+  readonly write: (text: string) => void
+}
+
+interface SavedSets {
+  readonly userId: string
+  readonly sets: ReadonlyArray<PendingMiniSet>
+}
+
+/**
+ * The sets a screen has logged and not yet heard are in, kept across reloads. Each tap of Log is
+ * a new set with a new key; one whose answer never came back is sent again under its own key,
+ * which the server answers with the set it already has, so nothing is lost or logged twice.
+ * Sets kept for another account are never sent as this one's.
+ */
+export const makeMiniOutbox = (store: TextStore, userId: string) => {
+  const list = (): ReadonlyArray<PendingMiniSet> => {
+    try {
+      const text = store.read()
+      const saved: SavedSets | null = text === null ? null : JSON.parse(text)
+
+      return saved !== null && saved.userId === userId && Array.isArray(saved.sets) ? saved.sets : []
+    } catch {
+      return []
+    }
+  }
+
+  const save = (sets: ReadonlyArray<PendingMiniSet>) => {
+    try {
+      store.write(JSON.stringify({ userId, sets } satisfies SavedSets))
+    } catch {
+      // Storage refused (a private window, say): the set is still sent, it just is not kept for a retry.
+    }
+  }
+
+  return {
+    list,
+    add: (set: PendingMiniSet) => save([...list().filter((item) => item.clientKey !== set.clientKey), set]),
+    remove: (clientKey: string) => save(list().filter((item) => item.clientKey !== clientKey)),
+  }
+}
 
 // ---------------------------------------------------------------- nudges
 

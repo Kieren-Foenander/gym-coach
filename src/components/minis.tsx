@@ -304,7 +304,8 @@ export function MiniSettingsForm({ settings, today }: SettingsFormProps) {
     edit({ ...form, days: form.days.includes(day) ? form.days.filter((item) => item !== day) : [...form.days, day] })
 
   const save = () => {
-    const next = readMiniForm(form, deviceTimeZone(), settings.pausedUntil)
+    // The saved time zone stays: a phone that has travelled moves it only when asked to (ZoneNotice).
+    const next = readMiniForm(form, loaded.timeZone || deviceTimeZone(), settings.pausedUntil)
 
     if (!next.ok) {
       setProblem(next.problem)
@@ -491,6 +492,34 @@ export function PauseNudges({ settings, today }: PauseProps) {
         </Button>
       )}
     </div>
+  )
+}
+
+/**
+ * Shown when this device is in another time zone from the one nudges follow (after a flight, say),
+ * with the way to move them to it. Nothing else moves them, so an ordinary save never does.
+ */
+export function ZoneNotice({ settings, today }: PauseProps) {
+  const { act, pending, error } = useAction()
+  const device = deviceTimeZone()
+
+  if (settings.timeZone === "" || device === "" || device === settings.timeZone) return null
+
+  const move = () =>
+    void act(async () => {
+      await updateMinis({ data: { day: today, settings: { ...settings, timeZone: device }, base: settings.targets, loaded: settings } })
+    })
+
+  return (
+    <Card className="mt-3">
+      <p className="text-muted">
+        Nudges follow {settings.timeZone.replaceAll("_", " ")}. This device is in {device.replaceAll("_", " ")}.
+      </p>
+      <ErrorNote message={error} />
+      <Button className="mt-3 w-full" disabled={pending} data-testid={testIds.minis.useDeviceZone} onClick={move}>
+        Use this time zone
+      </Button>
+    </Card>
   )
 }
 

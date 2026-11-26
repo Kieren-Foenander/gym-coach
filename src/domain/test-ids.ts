@@ -124,6 +124,8 @@ export const testIds = {
     save: "minis.save",
     pauseToday: "minis.pause-today",
     resume: "minis.resume",
+    /** Moves the nudges to this device's time zone, shown when it differs from the saved one. */
+    useDeviceZone: "minis.use-device-zone",
     /** Whether this browser gets nudges, in `data-state` (PUSH_STATES). */
     push: "minis.push",
     enablePush: "minis.enable-push",
