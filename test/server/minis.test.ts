@@ -643,6 +643,45 @@ describe("nudges", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toHaveLength(1)
   })
 
+  it("stops the browsers not yet posted to once a workout begins", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await me.call("subscribePush", {
+      subscription: { endpoint: "https://web.push.apple.com/device-2", keys: { p256dh: browser.p256dh, auth: browser.auth } },
+      origin: "https://gym.example.com",
+    })
+
+    // A workout is started as soon as the first browser has been posted to.
+    vi.stubGlobal("fetch", async (input: string, init: RequestInit) => {
+      pushes.push({ url: input, headers: new Headers(init.headers), body: new Uint8Array(await new Response(init.body).arrayBuffer()) })
+      server.exec(`INSERT INTO workouts (user_id, name, started_at) SELECT id, 'Push day', ${TEN_AM} FROM users WHERE email = '${me.email}'`)
+
+      return new Response(null, { status: 201 })
+    })
+
+    await server.run(runNudges(TEN_AM, () => 0))
+
+    expect(pushes).toHaveLength(1)
+  })
+
+  it("sends nothing for a day that ended before a move west made it today again", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { timeZone: "Australia/Brisbane" })
+    await subscribe(me)
+
+    // Friday 09:00 in Brisbane is still Thursday 15:00 in Los Angeles, inside the window there.
+    const fridayInBrisbane = Date.parse(`${DAY}T23:00:00Z`)
+
+    clockAt(fridayInBrisbane)
+    await me.call("updateMinis", { day: shiftDay(DAY, 1), settings: { ...SETTINGS, timeZone: "America/Los_Angeles" } })
+
+    expect((await tick(fridayInBrisbane)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+  })
+
   it("asks for nothing that was finished after the run chose it", async () => {
     const me = await server.signUp()
 
@@ -819,6 +858,20 @@ describe("the day's targets", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
   })
 
+  it("keep the streak for names kept before their keys were when settings are saved", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Élévation", unit: "reps", daily: 20, chunk: 10, growBy: 0 }] })
+    await me.call("logMini", { day: DAY, exercise: "Élévation", amount: 20 })
+
+    server.exec(`UPDATE mini_days SET targets = json_remove(targets, '$[0].key')`)
+    server.exec(`UPDATE mini_sets SET exercise_key = lower(trim(exercise))`)
+
+    await setUp(me, { targets: [{ exercise: "Élévation", unit: "reps", daily: 20, chunk: 10, growBy: 0 }], gapMinutes: 60 })
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
+  })
+
   it("refuse two targets that are one exercise written two ways", async () => {
     const me = await server.signUp()
 
@@ -934,6 +987,27 @@ describe("growing targets", () => {
     await me.call("logMini", { day: "2026-11-23", exercise: "Push-Up", amount: 10 })
 
     expect((await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })).settings.targets[0]!.daily).toBe(110)
+  })
+
+  it("review a week that ended only in the new time zone, by the settings that held during it", async () => {
+    const me = await server.signUp()
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    // Sundays only, in Los Angeles; Sunday 22 November is done there.
+    await setUp(me, { targets, days: [6], timeZone: "America/Los_Angeles" }, "2026-11-16")
+    clockAt(Date.parse("2026-11-22T20:00:00Z"))
+    await me.call("logMini", { day: "2026-11-22", exercise: "Push-Up", amount: 100 })
+
+    // Off the plane in Brisbane, where it is Monday, while Los Angeles is still on Sunday: Mondays are added.
+    clockAt(Date.parse("2026-11-23T06:00:00Z"))
+
+    const saved = await me.call("updateMinis", {
+      day: "2026-11-23",
+      settings: { ...SETTINGS, targets, days: [0, 6], timeZone: "Australia/Brisbane" },
+      base: targets,
+    })
+
+    expect(saved.targets[0]!.daily).toBe(110)
   })
 
   it("let a target the user changes on that day be what they set", async () => {

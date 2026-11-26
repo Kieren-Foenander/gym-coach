@@ -1,7 +1,6 @@
 import { D1Client } from "@effect/sql-d1"
 import { Clock, Effect, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
-import type { SqlError } from "effect/sql/SqlError"
 import type * as Statement from "effect/sql/Statement"
 import { daysBetween, daysFrom, shiftDay } from "~/domain/days"
 import {
@@ -94,6 +93,18 @@ const atomically = Effect.fn("minis.atomically")(function* (statements: Readonly
   return yield* sql.withTransaction(Effect.forEach(statements, (statement) => statement))
 })
 
+/** Runs three reads as one, so they all see the database as it was at one moment. */
+const readTogether = <A, B, C>(a: Statement.Statement<A>, b: Statement.Statement<B>, c: Statement.Statement<C>) =>
+  Effect.gen(function* () {
+    const d1 = yield* Effect.serviceOption(D1Client.D1Client)
+
+    if (Option.isSome(d1)) return yield* d1.value.batch([a, b, c] as const)
+
+    const sql = yield* SqlClient.SqlClient
+
+    return yield* sql.withTransaction(Effect.all([a, b, c] as const))
+  })
+
 // ---------------------------------------------------------------- settings
 
 const decodeSettings = Schema.decodeUnknownOption(Schema.fromJsonString(MiniSettingsInput))
@@ -179,13 +190,17 @@ const writeSettings = Effect.fn("minis.writeSettings")(function* (userId: string
   const targets = snapshotOf(settings.targets)
   const before = accountToday(stored.settings, time) ?? ""
   const after = accountToday(settings, time) ?? ""
-  // Each statement after the first only does anything if the first went in.
-  const won = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_revision = ${revision} AND mini_settings = ${json})`
+  const token = crypto.randomUUID()
+  // Each statement after the first only does anything if the first went in: the token is this write's own.
+  const won = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_write_token = ${token})`
   const openFrom = sql`(SELECT mini_open_from FROM users WHERE id = ${userId})`
+
+  // Keys kept before 0012 could make them are put right first, so the open days are judged as the app judges them.
+  for (const row of yield* dayRows(userId, later(before, stored.openFrom), "9999-12-31")) yield* repairKeys(userId, row.day)
 
   const results = yield* atomically([
     sql<Won>`
-      UPDATE users SET mini_settings = ${json}, mini_revision = ${revision},
+      UPDATE users SET mini_settings = ${json}, mini_revision = ${revision}, mini_write_token = ${token},
         mini_reviewed_week = COALESCE(${write.reviewedWeek}, mini_reviewed_week),
         mini_open_from = MAX(mini_open_from, ${before}, ${after})
       WHERE id = ${userId} AND mini_revision = ${stored.revision}
@@ -408,10 +423,20 @@ export const getMinis = Effect.fn("getMinis")(function* (from: string, to: strin
 
   const { settings } = yield* settingsOf(user.id)
 
-  const { rows, entries, nudges, metDays, devices, keys } = yield* Effect.all(
+  // The days, their sets and the streak together, as they were at one moment, so they agree.
+  const [rows, entries, metDays] = yield* readTogether(
+    sql<DayRow>`
+      SELECT day, targets, met, next_nudge_at, targets_revision FROM mini_days
+      WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to}`,
+    sql<MiniEntry>`
+      SELECT ${sql.unsafe(ENTRY_COLUMNS)} FROM mini_sets
+      WHERE user_id = ${user.id} AND day >= ${from} AND day <= ${to}
+      ORDER BY day, created_at, id`,
+    sql<{ day: string }>`SELECT day FROM mini_days WHERE user_id = ${user.id} AND met = 1 ORDER BY day`,
+  )
+
+  const { nudges, devices, keys } = yield* Effect.all(
     {
-      rows: dayRows(user.id, from, to),
-      entries: entriesOn(user.id, from, to),
       // A nudge is done when a set answers it, whatever was last written to its status.
       nudges: sql<MiniNudge>`
         SELECT n.id, n.day, n.exercise, n.unit, n.amount, n.sent_at,
@@ -419,7 +444,6 @@ export const getMinis = Effect.fn("getMinis")(function* (from: string, to: strin
             WHEN n.status = 'skipped' THEN 'skipped' ELSE 'sent' END AS status
         FROM mini_nudges n
         WHERE n.user_id = ${user.id} AND n.day >= ${from} AND n.day <= ${to} ORDER BY n.sent_at, n.id`,
-      metDays: sql<{ day: string }>`SELECT day FROM mini_days WHERE user_id = ${user.id} AND met = 1 ORDER BY day`,
       devices: sql<{ endpoint: string }>`SELECT endpoint FROM push_subscriptions WHERE user_id = ${user.id} ORDER BY id`,
       keys: vapidKeys,
     },
@@ -489,13 +513,17 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const stored = yield* settingsOf(user.id)
-    const today = accountToday(stored.settings, time)
+    const before = accountToday(stored.settings, time)
+    // Where the change moves the account to: a save made after a flight east may begin a new week there.
+    const moved = accountToday(yield* change(stored.settings), time)
+    // The week is reviewed by whichever today is later, old zone or new, and by the settings that held before.
+    const today = before === null ? null : moved === null ? before : later(before, moved)
     const week = today !== null && stored.reviewedWeek < mondayOf(today) ? mondayOf(today) : null
     const saved = week !== null && today !== null ? yield* grow(user.id, stored.settings, today) : stored.settings
     const submitted = yield* change(saved)
     const settings = keepGrowth(submitted, base ?? stored.settings.targets, saved)
     // The first save with a time zone starts the weeks: there is no week before it to review.
-    const first = today === null ? accountToday(settings, time) : null
+    const first = before === null ? accountToday(settings, time) : null
     const reviewedWeek = week ?? (first === null ? null : mondayOf(first))
     const day = accountToday(settings, time) ?? deviceDay
 
@@ -708,7 +736,8 @@ const pushToUser = Effect.fn("minis.pushToUser")(function* (
   message: PushMessage,
   time: number,
   expiresAt?: number,
-  stillWanted: Effect.Effect<boolean, SqlError, SqlClient.SqlClient> = Effect.succeed(true),
+  /** What must still be true for each post, checked by the database in the same query as the browser's owner. */
+  stillWanted?: Statement.Statement<Won>,
 ) {
   const sql = yield* SqlClient.SqlClient
   const keys = yield* vapidKeys
@@ -738,9 +767,11 @@ const pushToUser = Effect.fn("minis.pushToUser")(function* (
 
       if (push === "failed") return "failed" as const
 
-      const owned = (yield* sql<{ id: number }>`SELECT id FROM push_subscriptions WHERE ${same(subscription)}`).length > 0
+      // One query, the last thing before the post: the browser is still this user's, and the push still wanted.
+      const wanted = stillWanted ?? sql<Won>`1 = 1`
+      const go = yield* sql<{ id: number }>`SELECT id FROM push_subscriptions WHERE ${same(subscription)} AND ${wanted}`
 
-      if (!owned || !(yield* stillWanted)) return "cancelled" as const
+      if (go.length === 0) return "cancelled" as const
 
       const outcome: PushOutcome = yield* Effect.promise((): Promise<PushOutcome> => dispatchPush(push).catch(() => "failed"))
 
@@ -845,18 +876,22 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (userId: string, time: 
   const sql = yield* SqlClient.SqlClient
   const before = yield* settingsOf(userId)
 
-  // Nothing is kept for a day until its window is open.
-  if (!isTimeZone(before.settings.timeZone) || !nudgesOpen(before.settings, localTime(before.settings.timeZone, time))) return false
+  // Nothing is kept for a day until its window is open, nor for a day that has ended (after a move west, say).
+  if (!isTimeZone(before.settings.timeZone)) return false
+
+  const start = localTime(before.settings.timeZone, time)
+
+  if (!nudgesOpen(before.settings, start) || start.day < before.openFrom) return false
 
   // Settles the day and last week's review first, which may change the settings: plan under what they are after.
-  const { row, stored } = yield* ensureDay(userId, localTime(before.settings.timeZone, time).day)
+  const { row, stored } = yield* ensureDay(userId, start.day)
   const { settings, revision } = stored
 
   if (!isTimeZone(settings.timeZone)) return false
 
   const now = localTime(settings.timeZone, time)
 
-  if (row.day !== now.day || !nudgesOpen(settings, now)) return false
+  if (row.day !== now.day || now.day < stored.openFrom || !nudgesOpen(settings, now)) return false
 
   if (row.nextNudgeAt === 0 || (row.nextNudgeAt !== null && row.nextNudgeAt > time)) return false
 
@@ -865,7 +900,8 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (userId: string, time: 
   const minutesLeft = settings.endMinute - now.minute
   const gap = settings.gapMinutes * MINUTE
   const lastRun = time + lastRunWithin(minutesLeft) * MINUTE
-  const current = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_revision = ${revision})`
+  // The settings are the ones this run planned under, and its day has not ended where the account is.
+  const current = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_revision = ${revision} AND mini_open_from <= ${now.day})`
   const dayIs = (state: DayIs) => sql.unsafe(state === "any" ? "1 = 1" : `${MET_NOW} = ${state === "met" ? 1 : 0}`)
 
   /** Moves the plan on from what this run read, unless someone else already has, the settings changed, or the day is not `state`. */
@@ -937,13 +973,14 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (userId: string, time: 
   }
 
   // Whether this run may still send: it holds the claim, the settings are the ones it planned
-  // under, the day is not done, and neither is the exercise it asks for.
-  const holds = sql`
+  // under, the day is not done, neither is the exercise it asks for, and no workout has begun.
+  const holds = sql<Won>`
     EXISTS (SELECT 1 FROM mini_days WHERE user_id = ${userId} AND day = ${now.day} AND next_nudge_at = ${claim}
       AND ${dayIs("open")})
     AND ${current}
     AND COALESCE((SELECT SUM(amount) FROM mini_sets WHERE user_id = ${userId} AND day = ${now.day}
-      AND exercise_key = ${exerciseKey(ask.exercise)} AND unit = ${ask.unit}), 0) < ${ask.target}`
+      AND exercise_key = ${exerciseKey(ask.exercise)} AND unit = ${ask.unit}), 0) < ${ask.target}
+    AND NOT EXISTS (SELECT 1 FROM workouts WHERE user_id = ${userId} AND finished_at IS NULL AND started_at > ${time - WORKOUT_HOLD_MS})`
 
   const nudge = (yield* sql<{ id: number }>`
     INSERT INTO mini_nudges (user_id, day, exercise, unit, amount, sent_at)
@@ -957,7 +994,6 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (userId: string, time: 
   }
 
   const message = nudgeMessage(ask, random)
-  const isWanted = Effect.map(sql<{ ok: number }>`SELECT 1 AS ok WHERE ${holds}`, (rows) => rows.length > 0)
 
   // Kept by the push service no longer than the window stays open: a nudge after it closes is no use.
   const delivery = yield* pushToUser(
@@ -965,7 +1001,7 @@ const nudgeUser = Effect.fn("minis.nudgeUser")(function* (userId: string, time: 
     { ...message, url: `/minis?nudge=${nudge.id}`, tag: `mini-${nudge.id}` },
     time,
     time + minutesLeft * MINUTE,
-    isWanted,
+    holds,
   )
 
   if (delivery.sent === 0) {
