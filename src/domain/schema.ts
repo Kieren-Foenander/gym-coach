@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { HEALTH_BODY_KINDS, HEALTH_IMPORT_LIMITS, HEALTH_METRICS, HEALTH_VALUE_LIMITS } from "./health"
 import { isDay } from "./days"
-import { isPushEndpoint, isTimeZone, MINI_LIMITS, MINI_UNITS } from "./minis"
+import { exerciseKey, isPushEndpoint, isTimeZone, MINI_LIMITS, MINI_UNITS } from "./minis"
 import { FOOD_LIMITS, TARGET_LIMITS } from "./nutrition"
 import { MAX_STREAK_GOALS, MAX_WEEKLY_TARGET, STREAK_ACTIVITIES, STREAK_PERIODS } from "./streaks"
 import { MEASUREMENT_KINDS } from "./units"
@@ -234,7 +234,7 @@ const SETTINGS_RULES = Schema.makeFilter((settings: WindowAndTargets) => {
     return `Nudges need a window of at least ${MINI_LIMITS.window} minutes, ending after it starts`
   }
 
-  const names = settings.targets.map((target) => target.exercise.toLowerCase())
+  const names = settings.targets.map((target) => exerciseKey(target.exercise))
 
   return new Set(names).size === names.length || "Each exercise can have one target"
 })

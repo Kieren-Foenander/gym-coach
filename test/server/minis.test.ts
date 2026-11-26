@@ -452,6 +452,19 @@ describe("nudges", () => {
     expect((await tick(TEN_AM + 45 * 60_000)).sent).toBe(1)
   })
 
+  it("lets only the pause change when pausing from a screen that shows older settings", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    // Another device turns nudges off; this one still shows them on, and pauses for the day.
+    await setUp(me, { nudges: false })
+    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+
+    const { settings } = await me.call("getMinis", { from: DAY, to: DAY })
+
+    expect(settings).toMatchObject({ nudges: false, pausedUntil: shiftDay(DAY, 1) })
+  })
+
   it("logs one set for a nudge, on the nudge's own day, however many times and days it is answered", async () => {
     const me = await server.signUp()
 
@@ -563,6 +576,64 @@ describe("nudges", () => {
     expect((await server.run(runNudges(TEN_AM, () => 1))).sent).toBe(1)
   })
 
+  it("sends nothing when nudges are turned off while the push is being prepared", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    // A save that lands while the push is signed, after every check made before it.
+    const sign = crypto.subtle.sign.bind(crypto.subtle)
+
+    vi.spyOn(crypto.subtle, "sign").mockImplementation((...args: Parameters<typeof crypto.subtle.sign>) => {
+      server.exec(`UPDATE users SET mini_revision = mini_revision + 1, mini_settings = json_set(mini_settings, '$.nudges', json('false'))`)
+
+      return sign(...args)
+    })
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toEqual([])
+    vi.restoreAllMocks()
+  })
+
+  it("asks for nothing that was finished after the run chose it", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    // Push-ups (the run's choice) are finished the moment it claims the nudge; sit-ups are still to do.
+    server.exec(`CREATE TRIGGER finish_choice AFTER UPDATE OF next_nudge_at ON mini_days WHEN NEW.next_nudge_at > ${TEN_AM}
+      BEGIN INSERT INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, created_at)
+        VALUES (NEW.user_id, NEW.day, 'Push-Up', 'push-up', 'reps', 100, 0); END`)
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+  })
+
+  it("sends the first nudge of a week whose review just grew a target", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
+
+    await subscribe(me)
+
+    // Monday's first run reviews the week itself, which changes the settings it read.
+    const monday = Date.parse("2026-11-23T10:00:00Z")
+
+    clockAt(monday)
+    expect((await tick(monday)).sent).toBe(1)
+    expect((await message(0)).body).toBe("0 of 110 done today. Tap to log it.")
+  })
+
   it("keeps the gap across midnight", async () => {
     const me = await server.signUp()
 
@@ -601,6 +672,77 @@ describe("nudges", () => {
 
     expect((await me.call("getMinis", { from: DAY, to: DAY })).push.endpoints).toEqual([])
     expect((await other.call("getMinis", { from: DAY, to: DAY })).push.endpoints).toEqual(["https://web.push.apple.com/device-1"])
+  })
+})
+
+describe("the day's targets", () => {
+  it("keep a save's targets for its day even when another write moves the settings on just after it", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+
+    // Whatever writes the settings next (the weekly review, say) does so the moment this save lands.
+    server.exec(`CREATE TRIGGER write_after_save AFTER UPDATE OF mini_settings ON users
+      WHEN json_extract(NEW.mini_settings, '$.targets[0].daily') = 125
+      BEGIN UPDATE users SET mini_revision = mini_revision + 1 WHERE id = NEW.id; END`)
+
+    const saved = await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, daily: 125 }, SETTINGS.targets[1]!] })
+
+    expect(saved.targets[0]!.daily).toBe(125)
+    expect((await today(me)).progress[0]!.target).toBe(125)
+  })
+
+  it("follow the settings until the day is over, for a day logged ahead of an account with no time zone yet", async () => {
+    const me = await server.signUp()
+    const tomorrow = shiftDay(DAY, 1)
+
+    // Before any settings: a set logged for tomorrow keeps a day with no targets.
+    await me.call("logMini", { day: tomorrow, exercise: "Push-Up", amount: 10 })
+    await setUp(me)
+
+    clockAt(Date.parse(`${tomorrow}T10:00:00Z`))
+    await me.call("logMini", { day: tomorrow, exercise: "Push-Up", amount: 15 })
+
+    expect((await today(me, tomorrow)).progress[0]).toMatchObject({ target: 100, done: 25 })
+  })
+
+  it("take a set for the day after the account's today, from a phone further east", async () => {
+    const me = await server.signUp()
+
+    // Saved in Los Angeles, where it is still Thursday morning when Friday has begun in Brisbane.
+    clockAt(Date.parse(`${DAY}T18:30:00Z`))
+    await me.call("updateMinis", { day: DAY, settings: { ...SETTINGS, timeZone: "America/Los_Angeles" } })
+
+    const friday = shiftDay(DAY, 1)
+
+    expect((await me.call("logMini", { day: friday, exercise: "Push-Up", amount: 20 })).day).toBe(friday)
+    expect((await server.request("call/logMini", { token: me.token, body: { day: shiftDay(DAY, 2), exercise: "Push-Up", amount: 20 } })).status).toBe(400)
+  })
+
+  it("match names kept before their keys were, once their day is touched", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Élévation", unit: "reps", daily: 20, chunk: 10, growBy: 0 }] })
+    await me.call("logMini", { day: DAY, exercise: "Élévation", amount: 10 })
+
+    // As 0012 left them: the target with no key, the set keyed by SQLite's ASCII-only lower().
+    server.exec(`UPDATE mini_days SET targets = json_remove(targets, '$[0].key')`)
+    server.exec(`UPDATE mini_sets SET exercise_key = lower(trim(exercise))`)
+
+    await me.call("logMini", { day: DAY, exercise: "Élévation", amount: 10 })
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
+  })
+
+  it("refuse two targets that are one exercise written two ways", async () => {
+    const me = await server.signUp()
+
+    const twice = [
+      { exercise: "Élévation".normalize("NFC"), unit: "reps", daily: 20, chunk: 10, growBy: 0 },
+      { exercise: "Élévation".normalize("NFD"), unit: "reps", daily: 20, chunk: 10, growBy: 0 },
+    ]
+
+    expect((await server.request("call/updateMinis", { token: me.token, body: { day: DAY, settings: { ...SETTINGS, targets: twice } } })).status).toBe(400)
   })
 })
 

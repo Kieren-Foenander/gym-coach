@@ -1801,6 +1801,81 @@
       "null"
     ]
   },
+  "pauseMinis": {
+    "fields": {
+      "days": {
+        "array": true,
+        "items": {
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "endMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "gapMinutes": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "nudges": {
+        "kinds": [
+          "boolean"
+        ]
+      },
+      "pausedUntil": {
+        "kinds": [
+          "null",
+          "string"
+        ]
+      },
+      "startMinute": {
+        "kinds": [
+          "number"
+        ]
+      },
+      "targets": {
+        "array": true,
+        "items": {
+          "fields": {
+            "chunk": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "daily": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "exercise": {
+              "kinds": [
+                "string"
+              ]
+            },
+            "growBy": {
+              "kinds": [
+                "number"
+              ]
+            },
+            "unit": {
+              "kinds": [
+                "string"
+              ]
+            }
+          }
+        }
+      },
+      "timeZone": {
+        "kinds": [
+          "string"
+        ]
+      }
+    }
+  },
   "removePlanDay": {
     "kinds": [
       "null"

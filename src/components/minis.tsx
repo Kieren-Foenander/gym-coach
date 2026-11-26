@@ -24,7 +24,7 @@ import {
   type MiniTargetForm,
 } from "~/domain/minis"
 import { CHOICE_STATES, MINI_DAY_STATES, PUSH_STATES, SAVE_STATES, testIds, TOGGLE_STATES, type PushState } from "~/domain/test-ids"
-import { deleteMini, subscribePush, testPush, unsubscribePush, updateMinis } from "~/functions/api"
+import { deleteMini, pauseMinis, subscribePush, testPush, unsubscribePush, updateMinis } from "~/functions/api"
 import { currentSubscription, deviceTimeZone, pushSupport, subscribe, unsubscribe } from "~/push"
 import type { MiniDay, MiniNudge } from "~/server/minis"
 
@@ -472,9 +472,8 @@ export function PauseNudges({ settings, today }: PauseProps) {
 
   const setPause = (pausedUntil: string | null) =>
     void act(async () => {
-      await updateMinis({
-        data: { day: today, settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil }, base: settings.targets },
-      })
+      // Only the pause changes, so a screen showing older settings cannot put them back.
+      await pauseMinis({ data: { day: today, until: pausedUntil } })
     })
 
   return (

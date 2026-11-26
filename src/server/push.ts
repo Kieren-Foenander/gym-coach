@@ -171,7 +171,16 @@ export type PushOutcome = "sent" | "gone" | "failed"
 /** The longest a push service keeps trying a phone that is off: a nudge much later than that is no use. */
 export const MAX_TIME_TO_LIVE_SECONDS = 30 * 60
 
-export const sendPush = async (
+/** A push encrypted and signed, ready to post: all the slow work done, so the post can follow a last check at once. */
+export interface PreparedPush {
+  readonly endpoint: string
+  readonly authorization: string
+  readonly body: Uint8Array<ArrayBuffer>
+  readonly expiresAt: number | undefined
+}
+
+/** Encrypts and signs a push for one subscription. Answers "gone" for an address that is no push service's. */
+export const preparePush = async (
   subscription: Subscription,
   message: PushMessage,
   keys: VapidKeys,
@@ -179,29 +188,33 @@ export const sendPush = async (
   now: number,
   /** When the message stops being worth delivering, such as when the nudge window closes. */
   expiresAt?: number,
-): Promise<PushOutcome> => {
+): Promise<PreparedPush | "gone"> => {
   if (!isPushEndpoint(subscription.endpoint)) return "gone"
 
   const body = await encryptPayload(JSON.stringify(message), subscription)
   const authorization = await cachedAuthorization(subscription.endpoint, keys, subject, now)
-  // Worked out last, as it goes, so time spent getting here does not stretch it past the expiry.
-  const left = expiresAt === undefined ? MAX_TIME_TO_LIVE_SECONDS : Math.floor((expiresAt - Date.now()) / 1000)
+
+  return { endpoint: subscription.endpoint, authorization, body, expiresAt }
+}
+
+/** Posts a prepared push to its push service. */
+export const dispatchPush = async (push: PreparedPush): Promise<PushOutcome> => {
+  // Worked out as it goes, so time spent getting here does not stretch it past the expiry.
+  const left = push.expiresAt === undefined ? MAX_TIME_TO_LIVE_SECONDS : Math.floor((push.expiresAt - Date.now()) / 1000)
 
   // Expired already: a TTL of 0 would still let it through to a phone that is on, so it is not sent.
   if (left <= 0) return "failed"
 
-  const ttl = Math.min(MAX_TIME_TO_LIVE_SECONDS, left)
-
-  const response = await fetch(subscription.endpoint, {
+  const response = await fetch(push.endpoint, {
     method: "POST",
     headers: {
-      authorization,
+      authorization: push.authorization,
       "content-encoding": "aes128gcm",
       "content-type": "application/octet-stream",
-      ttl: String(ttl),
+      ttl: String(Math.min(MAX_TIME_TO_LIVE_SECONDS, left)),
       urgency: "normal",
     },
-    body,
+    body: push.body,
     // A push service answers itself; a redirect would send the push somewhere this did not check.
     redirect: "manual",
   }).catch(() => null)
@@ -211,4 +224,18 @@ export const sendPush = async (
   if (response.status === 404 || response.status === 410) return "gone"
 
   return response.ok ? "sent" : "failed"
+}
+
+/** Prepares and posts a push in one go. */
+export const sendPush = async (
+  subscription: Subscription,
+  message: PushMessage,
+  keys: VapidKeys,
+  subject: string,
+  now: number,
+  expiresAt?: number,
+): Promise<PushOutcome> => {
+  const prepared = await preparePush(subscription, message, keys, subject, now, expiresAt)
+
+  return prepared === "gone" ? "gone" : dispatchPush(prepared)
 }

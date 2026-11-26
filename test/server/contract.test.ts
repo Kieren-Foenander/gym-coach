@@ -192,6 +192,11 @@ const STEPS = {
         pausedUntil: null,
       },
     }),
+  pauseMinis: async () => {
+    await record("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+
+    return record("pauseMinis", { day: DAY, until: null })
+  },
   logMini: () => record("logMini", { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "contract-mini-1" }),
   skipNudge: async () => {
     server.exec(`INSERT INTO mini_nudges (user_id, day, exercise, unit, amount, sent_at)
@@ -293,6 +298,7 @@ const ORDER: ReadonlyArray<CallName> = [
   "getHealth",
   "getHistory",
   "updateMinis",
+  "pauseMinis",
   "logMini",
   "skipNudge",
   "deleteMini",

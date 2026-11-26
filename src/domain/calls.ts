@@ -104,6 +104,8 @@ export const CallInputs = {
     settings: MiniSettingsInput,
     base: Schema.optional(Schema.Array(MiniTargetInput).check(Schema.isMaxLength(MINI_LIMITS.targets))),
   }),
+  /** Pauses nudges until a day (null ends the pause), changing nothing else that is saved. */
+  pauseMinis: Schema.Struct({ day: Day, until: Schema.NullOr(Day) }),
   logMini: Schema.Struct({
     day: Day,
     exercise: ExerciseName,

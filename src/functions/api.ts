@@ -248,6 +248,10 @@ export const updateMinis = createServerFn({ method: "POST" })
   .validator(input(CallInputs.updateMinis))
   .handler(({ data }) => authed(Calls.updateMinis.run(data)))
 
+export const pauseMinis = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.pauseMinis))
+  .handler(({ data }) => authed(Calls.pauseMinis.run(data)))
+
 export const logMini = createServerFn({ method: "POST" })
   .validator(input(CallInputs.logMini))
   .handler(({ data }) => authed(Calls.logMini.run(data)))

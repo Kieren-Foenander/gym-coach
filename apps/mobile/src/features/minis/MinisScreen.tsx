@@ -460,11 +460,8 @@ function PauseNudges({ settings, today }: { readonly settings: MiniSettings; rea
 
   const setPause = (pausedUntil: string | null) =>
     void act(async () => {
-      await call("updateMinis", {
-        day: today,
-        settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil },
-        base: settings.targets,
-      })
+      // Only the pause changes, so a screen showing older settings cannot put them back.
+      await call("pauseMinis", { day: today, until: pausedUntil })
     })
 
   return (
