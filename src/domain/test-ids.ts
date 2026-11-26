@@ -99,9 +99,13 @@ export const testIds = {
     /** Inside a target's progress: the amount to log, and logging it. */
     amount: "minis.amount",
     log: "minis.log",
-    /** A set whose answer never came back, keyed by its client key, with trying it again and putting it aside. */
+    /**
+     * A set whose answer never came back, keyed by its client key, shown beside the Log button it
+     * came from: trying it again, logging another set as well, and putting it aside.
+     */
     unconfirmed: keyed<string>("minis.unconfirmed"),
     retry: "minis.retry",
+    logAnother: "minis.log-another",
     dismiss: "minis.dismiss",
     /** A logged set, keyed by its id, and removing it. */
     entry: keyed<number>("minis.entry"),

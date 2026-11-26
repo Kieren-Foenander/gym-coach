@@ -6,6 +6,7 @@ import { ExercisePicker } from "~/components/exercise"
 import {
   dayFraction,
   describeAmount,
+  exerciseKey,
   formatMiniAmount,
   isPaused,
   MINI_LIMITS,
@@ -100,10 +101,13 @@ interface DayProgressProps {
   readonly onLog: (exercise: string, unit: MiniUnit, amount: number) => Promise<boolean>
   readonly pending: boolean
   readonly chunks: ReadonlyMap<string, number>
+  /** Sets whose answer never came back, each shown under its own exercise's Log button. */
+  readonly unconfirmed: ReadonlyArray<UnconfirmedMiniSet>
+  readonly recovery: Recovery
 }
 
 /** Each target today: how far it is, and a quick way to log a set of it. */
-export function DayProgress({ day, onLog, pending, chunks }: DayProgressProps) {
+export function DayProgress({ day, onLog, pending, chunks, unconfirmed, recovery }: DayProgressProps) {
   const fraction = dayFraction(day.progress)
 
   return (
@@ -117,7 +121,15 @@ export function DayProgress({ day, onLog, pending, chunks }: DayProgressProps) {
         <p className="eyebrow text-mini">{day.met ? "Every target done" : `${Math.round(fraction * 100)}% of today`}</p>
         <div className="mt-4 space-y-5">
           {day.progress.map((item) => (
-            <ProgressRow key={item.exercise} item={item} chunk={chunks.get(item.exercise) ?? 10} pending={pending} onLog={onLog} />
+            <ProgressRow
+              key={item.exercise}
+              item={item}
+              chunk={chunks.get(item.exercise) ?? 10}
+              pending={pending}
+              onLog={onLog}
+              waiting={unconfirmed.filter((set) => exerciseKey(set.exercise) === exerciseKey(item.exercise))}
+              recovery={recovery}
+            />
           ))}
         </div>
       </div>
@@ -130,9 +142,11 @@ interface ProgressRowProps {
   readonly chunk: number
   readonly pending: boolean
   readonly onLog: (exercise: string, unit: MiniUnit, amount: number) => Promise<boolean>
+  readonly waiting: ReadonlyArray<UnconfirmedMiniSet>
+  readonly recovery: Recovery
 }
 
-function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
+function ProgressRow({ item, chunk, pending, onLog, waiting, recovery }: ProgressRowProps) {
   const left = remainingOf(item)
   const suggested = left > 0 ? Math.min(chunk, left) : chunk
   const [amount, setAmount] = useState(String(suggested))
@@ -161,9 +175,11 @@ function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
           data-testid={testIds.minis.log}
           onClick={() => void (value === null ? null : onLog(item.exercise, item.unit, value))}
         >
-          Log
+          {/* A tap while a set from here is unconfirmed sends that set again rather than another. */}
+          {waiting.some((set) => set.nudgeId === undefined) ? "Retry" : "Log"}
         </Button>
       </div>
+      <UnconfirmedSets sets={waiting} pending={pending} {...recovery} />
     </div>
   )
 }
@@ -216,18 +232,23 @@ export function NudgeCard({ nudge, pending, onDone, onSkip }: NudgeCardProps) {
 
 // ---------------------------------------------------------------- what was done
 
-interface UnconfirmedProps {
-  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
-  readonly pending: boolean
+/** What can be done with a set whose answer never came back. */
+export interface Recovery {
+  /** Sends it again under its own key, so it cannot go in twice. */
   readonly onRetry: (set: UnconfirmedMiniSet) => void
+  /** Logs another set like it under a new key, for when it really was a second set. */
+  readonly onLogAnother: (set: UnconfirmedMiniSet) => void
+  /** Puts it aside. */
   readonly onDismiss: (set: UnconfirmedMiniSet) => void
 }
 
-/**
- * Sets whose answer never came back: perhaps in, perhaps not. Retry sends one again under its
- * own key, so it cannot go in twice; Dismiss puts it aside. Log again only for another set.
- */
-export function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: UnconfirmedProps) {
+interface UnconfirmedProps extends Recovery {
+  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
+  readonly pending: boolean
+}
+
+/** Sets whose answer never came back: perhaps in, perhaps not. */
+export function UnconfirmedSets({ sets, pending, onRetry, onLogAnother, onDismiss }: UnconfirmedProps) {
   if (sets.length === 0) return null
 
   return (
@@ -239,6 +260,9 @@ export function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: Unconfirm
             <span className="min-w-0 flex-1 truncate font-semibold">{describeAmount(set.exercise, set.unit, set.amount)}</span>
             <Button className="shrink-0" disabled={pending} data-testid={testIds.minis.retry} onClick={() => onRetry(set)}>
               Retry
+            </Button>
+            <Button variant="ghost" className="shrink-0" disabled={pending} data-testid={testIds.minis.logAnother} onClick={() => onLogAnother(set)}>
+              Log another
             </Button>
             <Button variant="ghost" className="shrink-0" disabled={pending} data-testid={testIds.minis.dismiss} onClick={() => onDismiss(set)}>
               Dismiss

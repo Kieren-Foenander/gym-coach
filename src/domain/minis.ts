@@ -214,13 +214,16 @@ export const miniSessions = (metDays: ReadonlyArray<string>): ReadonlyArray<Stre
 
 /**
  * A set logged on a screen whose answer has not come back: perhaps in, perhaps not. The screen
- * shows it with Retry, which sends it again under the same key (the server answers a key it has
- * with the set it already has, and one taken back since with a refusal), and Dismiss. A new tap of
- * Log is always a new set with a new key. It lives only as long as the screen: once reloaded, the
- * screen shows what the server has.
+ * shows it beside the Log button it came from, with Retry, which sends it again under the same key
+ * (the server answers a key it has with the set it already has, and one taken back since with a
+ * refusal), Log another, and Dismiss. Tapping that Log button again is a retry too, since it most
+ * likely means "did that go in?"; only Log another makes a new set. It lives only as long as the
+ * screen: once reloaded, the screen shows what the server has.
  */
 export interface UnconfirmedMiniSet {
   readonly clientKey: string
+  /** The account signed in when it was logged. It is only ever sent for that account, and only shown to it. */
+  readonly account: string
   readonly day: string
   readonly exercise: string
   /** The unit the screen showed, which the set is kept in. */
@@ -228,6 +231,26 @@ export interface UnconfirmedMiniSet {
   readonly amount: number
   readonly nudgeId?: number | undefined
 }
+
+/** The unconfirmed sets the signed-in account may see and retry. */
+export const unconfirmedFor = (sets: ReadonlyArray<UnconfirmedMiniSet>, account: string): ReadonlyArray<UnconfirmedMiniSet> =>
+  sets.filter((set) => set.account === account)
+
+/**
+ * The unconfirmed set a tap on Log (or a nudge's Done) would repeat: the same account, day,
+ * exercise and nudge. A tap that finds one retries it under its key instead of logging a new set.
+ */
+export const repeatedTap = (
+  sets: ReadonlyArray<UnconfirmedMiniSet>,
+  tap: { readonly account: string; readonly day: string; readonly exercise: string; readonly nudgeId?: number | undefined },
+): UnconfirmedMiniSet | undefined =>
+  sets.find(
+    (set) =>
+      set.account === tap.account &&
+      set.day === tap.day &&
+      exerciseKey(set.exercise) === exerciseKey(tap.exercise) &&
+      set.nudgeId === tap.nudgeId,
+  )
 
 // ---------------------------------------------------------------- nudges
 

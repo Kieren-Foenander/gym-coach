@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Schema } from "effect"
 import { useState } from "react"
-import type { MiniUnit, UnconfirmedMiniSet } from "~/domain/minis"
+import { exerciseKey, repeatedTap, unconfirmedFor, type MiniUnit, type UnconfirmedMiniSet } from "~/domain/minis"
 import {
   DayProgress,
+  type Recovery,
   EntryList,
   MiniSettingsForm,
   NudgeCard,
@@ -56,28 +57,45 @@ function MinisDay({ today }: { readonly today: string }) {
   const chunks = new Map(day.targets.map((target) => [target.exercise, target.chunk]))
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
-  // Sets whose answer never came back, shown until tried again or put aside.
-  const [unconfirmed, setUnconfirmed] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
-  const forget = (set: UnconfirmedMiniSet) => setUnconfirmed((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
+  // Sets whose answer never came back, shown until tried again or put aside. Each keeps the account
+  // it was logged in, and only that account sees it or sends it.
+  const [kept, setKept] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
+  const unconfirmed = unconfirmedFor(kept, user.id)
+  const forget = (set: UnconfirmedMiniSet) => setKept((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
 
-  // Logged under the account this screen is for, so it never lands in another one signed in since.
   const send = async (set: UnconfirmedMiniSet) => {
-    await logMini({ data: { ...set, account: user.id } })
+    await logMini({ data: set })
     forget(set)
   }
 
-  // Each tap is a new set, with a key of its own. One whose answer never comes is kept to try again under that key.
-  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number) =>
+  // A tap is a new set with a key of its own, unless the same button's last set is still unconfirmed:
+  // then it is that set again. One whose answer never comes is kept to try again under its key.
+  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number, another = false) =>
     act(async () => {
-      const set = { clientKey: crypto.randomUUID(), day: today, exercise, unit, amount, nudgeId }
+      const tap = { account: user.id, day: today, exercise, nudgeId }
+      const repeated = another ? undefined : repeatedTap(unconfirmed, tap)
+
+      if (repeated) return send(repeated)
+
+      const set = { ...tap, clientKey: crypto.randomUUID(), unit, amount }
 
       try {
         await send(set)
       } catch (cause) {
-        setUnconfirmed((sets) => [...sets, set])
+        setKept((sets) => [...sets, set])
         throw cause
       }
     })
+
+  const recovery: Recovery = {
+    onRetry: (set) => void act(() => send(set)),
+    onLogAnother: (set) => void log(set.exercise, set.unit, set.amount, undefined, true),
+    onDismiss: forget,
+  }
+
+  // Ones with no target to show them under, a nudge's for an exercise since taken out, say.
+  const shown = new Set(day.progress.map((item) => exerciseKey(item.exercise)))
+  const elsewhere = unconfirmed.filter((set) => !shown.has(exerciseKey(set.exercise)))
 
   return (
     <>
@@ -92,10 +110,18 @@ function MinisDay({ today }: { readonly today: string }) {
         />
       ) : null}
 
+      <UnconfirmedSets sets={elsewhere} pending={pending} {...recovery} />
+
       {day.progress.length > 0 ? (
         <>
-          <DayProgress day={day} chunks={chunks} pending={pending} onLog={(exercise, unit, amount) => log(exercise, unit, amount)} />
-          <UnconfirmedSets sets={unconfirmed} pending={pending} onRetry={(set) => void act(() => send(set))} onDismiss={forget} />
+          <DayProgress
+            day={day}
+            chunks={chunks}
+            pending={pending}
+            onLog={(exercise, unit, amount) => log(exercise, unit, amount)}
+            unconfirmed={unconfirmed}
+            recovery={recovery}
+          />
           <PauseNudges settings={data.settings} today={today} />
           <ZoneNotice settings={data.settings} today={today} />
           <p className="pt-3 text-sm text-faint">
@@ -103,8 +129,6 @@ function MinisDay({ today }: { readonly today: string }) {
               ? `Your streak goal: ${describeGoal(minisGoal)}. Days with every target done get a blue ring on the calendar.`
               : "Add a mini workouts streak goal in Settings to ring the days you finish every target on the calendar."}
           </p>
-          <SectionTitle>Done today</SectionTitle>
-          <EntryList entries={entries} />
         </>
       ) : (
         <div className="space-y-3">
@@ -115,6 +139,14 @@ function MinisDay({ today }: { readonly today: string }) {
           <SetupLink />
         </div>
       )}
+
+      {/* Sets logged today stay listed, to take back, even once the targets are all taken out. */}
+      {day.progress.length > 0 || entries.length > 0 ? (
+        <>
+          <SectionTitle>Done today</SectionTitle>
+          <EntryList entries={entries} />
+        </>
+      ) : null}
 
       <div id="setup">
         <SectionTitle>Targets and nudges</SectionTitle>

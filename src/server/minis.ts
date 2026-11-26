@@ -614,7 +614,7 @@ const mergeTarget = (was: MiniTarget, is: MiniTarget, now: MiniTarget): MiniTarg
  * taken whole, but for the pause.
  */
 const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, saved: MiniSettings): MiniSettings => {
-  if (loaded === undefined) return { ...submitted, pausedUntil: saved.pausedUntil }
+  if (loaded === undefined) return { ...submitted, pausedUntil: saved.pausedUntil, timeZone: saved.timeZone === "" ? submitted.timeZone : saved.timeZone }
 
   const keep = <K extends keyof MiniSettings>(key: K): MiniSettings[K] => (sameValue(submitted[key], loaded[key]) ? saved[key] : submitted[key])
   const windowKept = submitted.startMinute === loaded.startMinute && submitted.endMinute === loaded.endMinute
@@ -649,20 +649,29 @@ const keepPause = (before: MiniSettings, after: MiniSettings, time: number): Min
   const ends = startOfDayIn(before.timeZone, before.pausedUntil)
   const through = shiftDay(localTime(after.timeZone, ends - 1).day, 1)
 
-  return { ...after, pausedUntil: later(after.pausedUntil ?? through, later(through, shiftDay(now, 1))) }
+  // The pause the form carried was the old zone's, read as dates: only the moment above counts.
+  return { ...after, pausedUntil: later(through, shiftDay(now, 1)) }
 }
 
-/** The moment a day begins in a time zone. Worked out twice over, so a daylight saving change on the day is allowed for. */
+/**
+ * The moment a day begins in a time zone: the first minute whose local day is that day or later.
+ * Found by searching the 26 hours either side of midnight UTC, which every zone's offset fits in,
+ * so a day that starts at 01:00 after a daylight saving change, or one a zone skipped, is right too.
+ */
 const startOfDayIn = (timeZone: string, day: string): number => {
-  let guess = Date.parse(`${day}T00:00:00Z`)
+  const span = 26 * 60
+  const midnight = Date.parse(`${day}T00:00:00Z`)
+  let low = -span
+  let high = span
 
-  for (let pass = 0; pass < 3; pass++) {
-    const there = localTime(timeZone, guess)
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
 
-    guess -= (daysBetween(day, there.day) * 1440 + there.minute) * 60_000
+    if (localTime(timeZone, midnight + middle * 60_000).day >= day) high = middle
+    else low = middle + 1
   }
 
-  return guess
+  return midnight + low * 60_000
 }
 
 const decodeMerged = Schema.decodeUnknownEffect(MiniSettingsInput)
@@ -680,12 +689,50 @@ export const updateMinis = (
   changeMinis(
     deviceDay,
     // What the merge makes is checked like anything sent: two devices' targets together may be too many, say.
-    (saved) =>
-      decodeMerged(mergeForm(submitted, loaded, saved)).pipe(
+    (saved) => {
+      const conflict = mergeConflict(submitted, loaded, saved)
+
+      if (conflict !== null) return Effect.fail(new Invalid({ reason: conflict }))
+
+      return decodeMerged(mergeForm(submitted, loaded, saved)).pipe(
         Effect.mapError((error) => new Invalid({ reason: `These changes and another device's do not fit together. ${error.message}` })),
-      ),
+        Effect.flatMap((merged) => {
+          const over = merged.targets.find((target) => target.chunk > target.daily)
+
+          return over === undefined
+            ? Effect.succeed(merged)
+            : Effect.fail(
+                new Invalid({
+                  reason: `With another device's change, ${over.exercise} would ask for more a nudge than in a day. Check it and save again.`,
+                }),
+              )
+        }),
+      )
+    },
     base ?? loaded?.targets,
   )
+
+/**
+ * An edit the form made that another device's change since makes meaningless: amounts for a
+ * target whose unit was changed meanwhile (25 reps is not 25 seconds). The user is asked to look
+ * again rather than have one silently replace the other. Null when there is none.
+ */
+const mergeConflict = (submitted: MiniSettings, loaded: MiniSettings | undefined, saved: MiniSettings): string | null => {
+  if (loaded === undefined) return null
+
+  for (const target of submitted.targets) {
+    const was = loaded.targets.find((item) => sameExercise(item.exercise, target.exercise))
+    const now = saved.targets.find((item) => sameExercise(item.exercise, target.exercise))
+
+    if (!was || !now || now.unit === was.unit) continue
+
+    const edited = target.daily !== was.daily || target.chunk !== was.chunk || target.growBy !== was.growBy || target.unit !== was.unit
+
+    if (edited) return `${now.exercise} was changed to ${now.unit} on another device. Check it and save again.`
+  }
+
+  return null
+}
 
 /**
  * Pauses nudges for the rest of the account's today (true), or ends a pause (false), changing
@@ -757,8 +804,11 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   }
 
   if (input.clientKey !== undefined) {
+    // Any set logged under this key, as its own or as an answer it was given (mini_set_keys).
     const again = yield* sql<MiniEntry>`
-      SELECT ${sql.unsafe(ENTRY_COLUMNS)} FROM mini_sets WHERE user_id = ${user.id} AND client_key = ${input.clientKey}`
+      SELECT ${sql.unsafe(ENTRY_COLUMNS.split(", ").map((column) => `s.${column}`).join(", "))} FROM mini_sets s
+      JOIN mini_set_keys k ON k.set_id = s.id
+      WHERE k.user_id = ${user.id} AND k.client_key = ${input.clientKey} AND s.user_id = ${user.id}`
 
     if (again[0]) return yield* finish(again[0])
 
@@ -800,12 +850,24 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   // The set, its nudge answered and its day worked out again go in as one, so a failure part of
   // the way leaves nothing logged: a retry, with a fresh key or none, logs it once. A second
   // answer to the same nudge is left out by its unique index, and answered with the first.
-  const [inserted] = yield* atomically([
+  // A key taken back is checked in the same batch as the insert, so it cannot be taken back in between.
+  const removedKey = sql`EXISTS (SELECT 1 FROM mini_removed_keys WHERE user_id = ${user.id} AND client_key = ${input.clientKey ?? null})`
+
+  const [inserted, , refused] = yield* atomically([
     sql<MiniEntry>`
       INSERT OR IGNORE INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, nudge_id, client_key, created_at)
-      VALUES (${user.id}, ${set.day}, ${exercise}, ${exerciseKey(exercise)}, ${unit}, ${input.amount}, ${set.nudgeId},
-        ${input.clientKey ?? null}, ${time})
+      SELECT ${user.id}, ${set.day}, ${exercise}, ${exerciseKey(exercise)}, ${unit}, ${input.amount}, ${set.nudgeId},
+        ${input.clientKey ?? null}, ${time}
+      WHERE NOT ${removedKey}
       RETURNING ${sql.unsafe(ENTRY_COLUMNS)}`,
+    // The key answers to whichever set it was given: the new one, or the nudge's answer already in.
+    sql<MiniEntry>`
+      INSERT OR IGNORE INTO mini_set_keys (user_id, client_key, set_id)
+      SELECT ${user.id}, ${input.clientKey ?? null}, id FROM mini_sets
+      WHERE ${input.clientKey ?? null} IS NOT NULL AND NOT ${removedKey} AND user_id = ${user.id}
+        AND (client_key = ${input.clientKey ?? null} OR nudge_id = ${set.nudgeId})
+      LIMIT 1`,
+    sql<MiniEntry>`SELECT 1 AS id WHERE ${removedKey}`,
     sql<MiniEntry>`UPDATE mini_nudges SET status = 'done' WHERE id = ${set.nudgeId} AND user_id = ${user.id}`,
     sql<MiniEntry>`
       UPDATE mini_days SET
@@ -813,6 +875,8 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
         next_nudge_at = CASE WHEN next_nudge_at = 0 AND ${sql.unsafe(MET_NOW)} = 0 THEN NULL ELSE next_nudge_at END
       WHERE user_id = ${user.id} AND day = ${set.day}`,
   ])
+
+  if (refused && refused.length > 0) return yield* new Invalid({ reason: "That set was taken back since, so it was not logged again." })
 
   const entry =
     inserted?.[0] ??
@@ -842,10 +906,11 @@ export const deleteMini = Effect.fn("deleteMini")(function* (entryId: number) {
   yield* repairKeys(user.id, removed.day)
 
   const [, deleted] = yield* atomically([
-    // Its key is kept, so a device trying it again under that key is told it was taken back.
+    // Every key it was logged or answered under is kept, so a device trying any of them again is told it was taken back.
     sql<Won>`
       INSERT OR IGNORE INTO mini_removed_keys (user_id, client_key)
-      SELECT user_id, client_key FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} AND client_key IS NOT NULL`,
+      SELECT user_id, client_key FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} AND client_key IS NOT NULL
+      UNION SELECT user_id, client_key FROM mini_set_keys WHERE set_id = ${entryId} AND user_id = ${user.id}`,
     sql<Won>`DELETE FROM mini_sets WHERE id = ${entryId} AND user_id = ${user.id} RETURNING 0 AS mini_revision`,
     sql<Won>`UPDATE mini_nudges SET status = 'sent' WHERE id = ${removed.nudgeId} AND user_id = ${user.id}`,
     sql<Won>`

@@ -5,16 +5,18 @@ import { localDay } from "~/domain/health"
 import {
   dayFraction,
   describeAmount,
+  exerciseKey,
   formatMiniAmount,
   isPaused,
-
   MINI_LIMITS,
   MINI_UNITS,
   miniFormFor,
   miniRange,
   readMiniForm,
   remainingOf,
+  repeatedTap,
   suggestTarget,
+  unconfirmedFor,
   targetFormFor,
   WEEKDAY_LETTERS,
   WEEKDAY_SHORT,
@@ -49,18 +51,23 @@ const UNIT_LABELS = { reps: "Reps", seconds: "Seconds" } as const
 /** The phone's time zone, which the nudge window is read in. */
 const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
 
-interface UnconfirmedProps {
-  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
-  readonly pending: boolean
+/** What can be done with a set whose answer never came back. */
+interface Recovery {
+  /** Sends it again under its own key, so it cannot go in twice. */
   readonly onRetry: (set: UnconfirmedMiniSet) => void
+  /** Logs another set like it under a new key, for when it really was a second set. */
+  readonly onLogAnother: (set: UnconfirmedMiniSet) => void
+  /** Puts it aside. */
   readonly onDismiss: (set: UnconfirmedMiniSet) => void
 }
 
-/**
- * Sets whose answer never came back: perhaps in, perhaps not. Retry sends one again under its
- * own key, so it cannot go in twice; Dismiss puts it aside. Log again only for another set.
- */
-function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: UnconfirmedProps) {
+interface UnconfirmedProps extends Recovery {
+  readonly sets: ReadonlyArray<UnconfirmedMiniSet>
+  readonly pending: boolean
+}
+
+/** Sets whose answer never came back: perhaps in, perhaps not. */
+function UnconfirmedSets({ sets, pending, onRetry, onLogAnother, onDismiss }: UnconfirmedProps) {
   if (sets.length === 0) return null
 
   return (
@@ -74,6 +81,9 @@ function UnconfirmedSets({ sets, pending, onRetry, onDismiss }: UnconfirmedProps
             </Text>
             <Button testID={testIds.minis.retry} disabled={pending} onPress={() => onRetry(set)}>
               Retry
+            </Button>
+            <Button testID={testIds.minis.logAnother} variant="ghost" disabled={pending} onPress={() => onLogAnother(set)}>
+              Log another
             </Button>
             <Button testID={testIds.minis.dismiss} variant="ghost" disabled={pending} onPress={() => onDismiss(set)}>
               Dismiss
@@ -91,13 +101,14 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const { data, error } = useCall("getMinis", miniRange(today))
   const user = useUser()
   const { act, pending, error: actionError } = useAction()
-  // Sets whose answer never came back, shown until tried again or put aside.
-  const [unconfirmed, setUnconfirmed] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
-  const forget = (set: UnconfirmedMiniSet) => setUnconfirmed((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
+  // Sets whose answer never came back, shown until tried again or put aside. Each keeps the account
+  // it was logged in, and only that account sees it or sends it.
+  const [kept, setKept] = useState<ReadonlyArray<UnconfirmedMiniSet>>([])
+  const unconfirmed = unconfirmedFor(kept, user.id)
+  const forget = (set: UnconfirmedMiniSet) => setKept((sets) => sets.filter((item) => item.clientKey !== set.clientKey))
 
-  // Logged under the account this screen is for, so it never lands in another one signed in since.
   const send = async (set: UnconfirmedMiniSet) => {
-    await call("logMini", { ...set, account: user.id })
+    await call("logMini", set)
     forget(set)
   }
 
@@ -118,18 +129,34 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const nudge = route.params.nudgeId === undefined ? undefined : data.nudges.find((item) => item.id === route.params.nudgeId)
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
-  // Each tap is a new set, with a key of its own. One whose answer never comes is kept to try again under that key.
-  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number) =>
+  // A tap is a new set with a key of its own, unless the same button's last set is still unconfirmed:
+  // then it is that set again. One whose answer never comes is kept to try again under its key.
+  const log = (exercise: string, unit: MiniUnit, amount: number, nudgeId?: number, another = false) =>
     act(async () => {
-      const set = { clientKey: Crypto.randomUUID(), day: today, exercise, unit, amount, nudgeId }
+      const tap = { account: user.id, day: today, exercise, nudgeId }
+      const repeated = another ? undefined : repeatedTap(unconfirmed, tap)
+
+      if (repeated) return send(repeated)
+
+      const set = { ...tap, clientKey: Crypto.randomUUID(), unit, amount }
 
       try {
         await send(set)
       } catch (cause) {
-        setUnconfirmed((sets) => [...sets, set])
+        setKept((sets) => [...sets, set])
         throw cause
       }
     })
+
+  const recovery: Recovery = {
+    onRetry: (set) => void act(() => send(set)),
+    onLogAnother: (set) => void log(set.exercise, set.unit, set.amount, undefined, true),
+    onDismiss: forget,
+  }
+
+  // Ones with no target to show them under, a nudge's for an exercise since taken out, say.
+  const shown = new Set(day.progress.map((item) => exerciseKey(item.exercise)))
+  const elsewhere = unconfirmed.filter((set) => !shown.has(exerciseKey(set.exercise)))
 
   return (
     <Screen>
@@ -150,6 +177,8 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
         />
       ) : null}
 
+      <UnconfirmedSets sets={elsewhere} pending={pending} {...recovery} />
+
       {day.progress.length > 0 ? (
         <>
           <View
@@ -165,11 +194,12 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
                   chunk={day.targets.find((target) => target.exercise === item.exercise)?.chunk ?? 10}
                   pending={pending}
                   onLog={(amount) => void log(item.exercise, item.unit, amount)}
+                  waiting={unconfirmed.filter((set) => exerciseKey(set.exercise) === exerciseKey(item.exercise))}
+                  recovery={recovery}
                 />
               ))}
             </View>
           </View>
-          <UnconfirmedSets sets={unconfirmed} pending={pending} onRetry={(set) => void act(() => send(set))} onDismiss={forget} />
           <PauseNudges settings={data.settings} today={today} />
           <ZoneNotice settings={data.settings} today={today} />
           <Text className="pt-3 text-sm text-faint">
@@ -177,8 +207,6 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
               ? `Your streak goal: ${describeGoal(minisGoal)}. Days with every target done get a blue ring on the calendar.`
               : "Add a mini workouts streak goal in Settings to ring the days you finish every target on the calendar."}
           </Text>
-          <SectionTitle>Done today</SectionTitle>
-          <EntryList entries={entries} />
         </>
       ) : (
         <Text className="text-muted">
@@ -186,6 +214,14 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
           come at random through your day, each asking for a few, until the day is done.
         </Text>
       )}
+
+      {/* Sets logged today stay listed, to take back, even once the targets are all taken out. */}
+      {day.progress.length > 0 || entries.length > 0 ? (
+        <>
+          <SectionTitle>Done today</SectionTitle>
+          <EntryList entries={entries} />
+        </>
+      ) : null}
 
       <SectionTitle>Targets and nudges</SectionTitle>
       <SettingsForm settings={data.settings} today={today} />
@@ -208,9 +244,11 @@ interface ProgressRowProps {
   readonly chunk: number
   readonly pending: boolean
   readonly onLog: (amount: number) => void
+  readonly waiting: ReadonlyArray<UnconfirmedMiniSet>
+  readonly recovery: Recovery
 }
 
-function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
+function ProgressRow({ item, chunk, pending, onLog, waiting, recovery }: ProgressRowProps) {
   const left = remainingOf(item)
   const suggested = left > 0 ? Math.min(chunk, left) : chunk
   const [amount, setAmount] = useState(String(suggested))
@@ -239,9 +277,11 @@ function ProgressRow({ item, chunk, pending, onLog }: ProgressRowProps) {
           disabled={pending || !valid}
           onPress={() => value !== null && onLog(value)}
         >
-          Log
+          {/* A tap while a set from here is unconfirmed sends that set again rather than another. */}
+          {waiting.some((set) => set.nudgeId === undefined) ? "Retry" : "Log"}
         </Button>
       </View>
+      <UnconfirmedSets sets={waiting} pending={pending} {...recovery} />
     </View>
   )
 }

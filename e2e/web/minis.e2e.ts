@@ -49,6 +49,33 @@ describe("mini workouts", { requires: ["browser"] }, () => {
     await expect(screen.getByTestId(testIds.today.mini("Push-Up"))).toHaveAttribute("data-value", "25")
   })
 
+  test("logs a set once when its answer is lost and Log is tapped again", { tags: ["smoke"] }, async ({ browser, screen }) => {
+    await setUpPushUps(screen, "100")
+
+    // The first set reaches the server, but its answer never comes back to the page.
+    let lost = false
+
+    await browser.route(/_serverFn/, async (route) => {
+      if (lost || !(route.request.postData ?? "").includes("clientKey")) return route.fallback()
+
+      lost = true
+      await route.fetch()
+      await route.abort()
+    })
+
+    const progress = screen.getByTestId(testIds.minis.progress("Push-Up"))
+
+    await progress.getByTestId(testIds.minis.amount).getByTestId(testIds.stepper.input).fill("30")
+    await progress.getByTestId(testIds.minis.log).tap()
+    // Kept under the button it came from, to try again.
+    await expect(progress.getByTestId(testIds.minis.retry)).toBeVisible()
+
+    // Tapping Log again sends that set again, which the server already has: 30 done, not 60.
+    await progress.getByTestId(testIds.minis.log).tap()
+    await expect(progress).toHaveAttribute("data-value", "30")
+    await expect(progress.getByTestId(testIds.minis.retry)).toHaveCount(0)
+  })
+
   test("rings a day blue once every target is done and mini workouts are a streak goal", { tags: ["smoke"] }, async ({ screen }) => {
     const today = Date.now()
 

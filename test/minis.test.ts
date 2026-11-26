@@ -22,7 +22,9 @@ import {
   nudgesOpen,
   parseMinute,
   readMiniForm,
+  repeatedTap,
   suggestTarget,
+  unconfirmedFor,
   weekBefore,
   weekdayOf,
   type MiniSettings,
@@ -280,5 +282,25 @@ describe("the settings form", () => {
     expect(suggestTarget("Plank")).toMatchObject({ unit: "seconds", daily: 180, chunk: 60 })
     expect(suggestTarget("Pull-Up")).toMatchObject({ unit: "reps", daily: 50, chunk: 10 })
     expect(suggestTarget("Push-Up")).toMatchObject({ unit: "reps", daily: 100, chunk: 25 })
+  })
+})
+
+describe("sets whose answer never came back", () => {
+  const set = { clientKey: "phone-1", account: "me", day: "2026-11-26", exercise: "Push-Up", unit: "reps", amount: 25 } as const
+  const fromNudge = { ...set, clientKey: "phone-2", nudgeId: 7 }
+
+  it("are shown to and sent for only the account they were logged in", () => {
+    expect(unconfirmedFor([set, { ...set, clientKey: "phone-3", account: "someone else" }], "me")).toEqual([set])
+  })
+
+  it("are sent again by another tap of the button they came from, not logged twice", () => {
+    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "push-up " })).toBe(set)
+    expect(repeatedTap([set, fromNudge], { account: "me", day: set.day, exercise: "Push-Up", nudgeId: 7 })).toBe(fromNudge)
+  })
+
+  it("leave a tap for another exercise, day or account a new set", () => {
+    expect(repeatedTap([set], { account: "me", day: set.day, exercise: "Sit-Up" })).toBeUndefined()
+    expect(repeatedTap([set], { account: "me", day: "2026-11-27", exercise: "Push-Up" })).toBeUndefined()
+    expect(repeatedTap([set], { account: "someone else", day: set.day, exercise: "Push-Up" })).toBeUndefined()
   })
 })

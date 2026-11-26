@@ -649,6 +649,102 @@ describe("nudges", () => {
     expect(saved.targets[0]).toMatchObject({ chunk: 35, growBy: 5 })
   })
 
+  it("keeps a nudge's set taken back under every key it was answered with", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    // The nudge is answered on the phone and the laptop, each with its own key: one set.
+    const nudge = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+    const entry = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25, nudgeId: nudge.id, clientKey: "phone-5678" })
+
+    await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25, nudgeId: nudge.id, clientKey: "laptop-5678" })
+    await me.call("deleteMini", { entryId: entry.id })
+
+    // The laptop, never sure its answer went in, tries it again.
+    const again = await server.request("call/logMini", {
+      token: me.token,
+      body: { day: DAY, exercise: "Push-Up", amount: 25, nudgeId: nudge.id, clientKey: "laptop-5678" },
+    })
+
+    expect(again.status).toBe(400)
+    expect((await today(me)).progress[0]!.done).toBe(0)
+  })
+
+  it("asks again rather than merging amounts into a target whose unit another device changed", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+
+    // Another device makes push-ups a hold in seconds; this one, loaded before, sets 150 reps a day.
+    await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, unit: "seconds" }, SETTINGS.targets[1]!] })
+
+    const saved = await server.request("call/updateMinis", {
+      token: me.token,
+      body: { day: DAY, settings: { ...loaded, targets: [{ ...loaded.targets[0]!, daily: 150 }, loaded.targets[1]!] }, loaded },
+    })
+
+    expect(saved.status).toBe(400)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).settings.targets[0]).toMatchObject({ unit: "seconds", daily: SETTINGS.targets[0]!.daily })
+  })
+
+  it("asks again rather than saving a target that would ask for more a nudge than in a day", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+    const target = loaded.targets[0]!
+
+    // Another device lowers the day to 20; this one, loaded before, raises each nudge to 30.
+    await setUp(me, { targets: [{ ...target, daily: 20, chunk: 10 }, SETTINGS.targets[1]!] })
+
+    const saved = await server.request("call/updateMinis", {
+      token: me.token,
+      body: { day: DAY, settings: { ...loaded, targets: [{ ...target, chunk: 30 }, loaded.targets[1]!] }, loaded },
+    })
+
+    expect(saved.status).toBe(400)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).settings.targets[0]).toMatchObject({ daily: 20, chunk: 10 })
+  })
+
+  it("keeps a pause running when its last day starts late after a daylight saving change", async () => {
+    const me = await server.signUp()
+
+    // Cairo moves its clocks on at midnight into Friday 24 April 2026: that day begins at 01:00,
+    // 22:00 Thursday in UTC. Paused on Thursday, the pause ends then.
+    const thursday = "2026-04-23"
+    const thursdayInCairo = Date.parse(`${thursday}T12:00:00Z`)
+
+    await setUp(me, { timeZone: "Africa/Cairo", startMinute: 0, endMinute: 1440 }, thursday)
+    await subscribe(me)
+    clockAt(thursdayInCairo)
+    await me.call("pauseMinis", { day: thursday, pause: true })
+    await me.call("moveMinisZone", { day: thursday, timeZone: "Europe/Moscow" })
+
+    // 21:30 in UTC is 00:30 Friday in Moscow but still Thursday in Cairo: still paused, so nothing goes.
+    const justBefore = Date.parse(`${thursday}T21:30:00Z`)
+
+    clockAt(justBefore)
+    expect((await tick(justBefore)).sent).toBe(0)
+    expect((await me.call("getMinis", { from: thursday, to: thursday })).settings.pausedUntil).toBe(shiftDay(thursday, 2))
+  })
+
+  it("keeps a pause no longer than the moment it would have ended, moving a day back across the date line", async () => {
+    const me = await server.signUp()
+
+    // Thursday in Kiritimati (UTC+14), paused: it ends at midnight there, 10:00 Thursday in UTC,
+    // which is still Wednesday in Pago Pago (UTC-11). Its form said Friday, a date that meant less there.
+    const thursdayInKiritimati = Date.parse(`${shiftDay(DAY, -1)}T12:00:00Z`)
+
+    await setUp(me, { timeZone: "Pacific/Kiritimati", startMinute: 0, endMinute: 1440 })
+    clockAt(thursdayInKiritimati)
+    await me.call("pauseMinis", { day: DAY, pause: true })
+
+    const moved = await me.call("moveMinisZone", { day: DAY, timeZone: "Pacific/Pago_Pago" })
+
+    // Through Wednesday there, and today (Wednesday) at least: it ends as Thursday begins.
+    expect(moved.pausedUntil).toBe(DAY)
+  })
+
   it("keeps nudges off when a form opened before they were turned off is saved", async () => {
     const me = await server.signUp()
     const loaded = await setUp(me)
@@ -924,7 +1020,7 @@ describe("nudges", () => {
     const fridayInBrisbane = Date.parse(`${DAY}T23:00:00Z`)
 
     clockAt(fridayInBrisbane)
-    await me.call("updateMinis", { day: shiftDay(DAY, 1), settings: { ...SETTINGS, timeZone: "America/Los_Angeles" } })
+    await me.call("moveMinisZone", { day: shiftDay(DAY, 1), timeZone: "America/Los_Angeles" })
 
     expect((await tick(fridayInBrisbane)).sent).toBe(0)
     expect(pushes).toHaveLength(0)
@@ -1248,6 +1344,7 @@ describe("growing targets", () => {
 
     // Off the plane in Brisbane, where it is Monday, while Los Angeles is still on Sunday: Mondays are added.
     clockAt(Date.parse("2026-11-23T06:00:00Z"))
+    await me.call("moveMinisZone", { day: "2026-11-23", timeZone: "Australia/Brisbane" })
 
     const saved = await me.call("updateMinis", {
       day: "2026-11-23",
