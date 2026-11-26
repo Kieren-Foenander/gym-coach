@@ -79,6 +79,8 @@ export default Alchemy.Stack(
       main: "src/server.ts",
       compatibility: { date: "2026-11-01", flags: ["nodejs_compat", "global_fetch_strictly_public"] },
       env: bindings(names, stage),
+      // Sends the mini workout nudges that are due (the `scheduled` handler in src/server.ts).
+      crons: ["*/5 * * * *"],
       // The browser tests serve their own copy on another port, beside a `bun run dev` already running.
       dev: process.env.GYM_DEV_PORT ? { port: Number(process.env.GYM_DEV_PORT), strictPort: true } : undefined,
     })

@@ -237,3 +237,35 @@ export const updateFood = createServerFn({ method: "POST" })
 export const deleteFood = createServerFn({ method: "POST" })
   .validator(input(CallInputs.deleteFood))
   .handler(({ data }) => authed(Calls.deleteFood.run(data)))
+
+// ---------------------------------------------------------------- mini workouts
+
+export const getMinis = createServerFn({ method: "GET" })
+  .validator(input(CallInputs.getMinis))
+  .handler(({ data }) => authed(Calls.getMinis.run(data)))
+
+export const updateMinis = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.updateMinis))
+  .handler(({ data }) => authed(Calls.updateMinis.run(data)))
+
+export const logMini = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.logMini))
+  .handler(({ data }) => authed(Calls.logMini.run(data)))
+
+export const deleteMini = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.deleteMini))
+  .handler(({ data }) => authed(Calls.deleteMini.run(data)))
+
+export const skipNudge = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.skipNudge))
+  .handler(({ data }) => authed(Calls.skipNudge.run(data)))
+
+export const subscribePush = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.subscribePush))
+  .handler(({ data }) => authed(Calls.subscribePush.run(data)))
+
+export const unsubscribePush = createServerFn({ method: "POST" })
+  .validator(input(CallInputs.unsubscribePush))
+  .handler(({ data }) => authed(Calls.unsubscribePush.run(data)))
+
+export const testPush = createServerFn({ method: "POST" }).handler(() => authed(Calls.testPush.run({})))

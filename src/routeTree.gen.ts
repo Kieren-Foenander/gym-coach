@@ -15,6 +15,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppCalendarRouteImport } from './routes/_app/calendar'
 import { Route as AppHistoryRouteImport } from './routes/_app/history'
+import { Route as AppMinisRouteImport } from './routes/_app/minis'
 import { Route as AppNutritionRouteImport } from './routes/_app/nutrition'
 import { Route as AppPlanRouteImport } from './routes/_app/plan'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
@@ -50,6 +51,11 @@ const AppCalendarRoute = AppCalendarRouteImport.update({
 const AppHistoryRoute = AppHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMinisRoute = AppMinisRouteImport.update({
+  id: '/minis',
+  path: '/minis',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNutritionRoute = AppNutritionRouteImport.update({
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/calendar': typeof AppCalendarRoute
   '/history': typeof AppHistoryRoute
+  '/minis': typeof AppMinisRoute
   '/nutrition': typeof AppNutritionRoute
   '/plan': typeof AppPlanRoute
   '/settings': typeof AppSettingsRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/calendar': typeof AppCalendarRoute
   '/history': typeof AppHistoryRoute
+  '/minis': typeof AppMinisRoute
   '/nutrition': typeof AppNutritionRoute
   '/plan': typeof AppPlanRoute
   '/settings': typeof AppSettingsRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/calendar': typeof AppCalendarRoute
   '/_app/history': typeof AppHistoryRoute
+  '/_app/minis': typeof AppMinisRoute
   '/_app/nutrition': typeof AppNutritionRoute
   '/_app/plan': typeof AppPlanRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/calendar'
     | '/history'
+    | '/minis'
     | '/nutrition'
     | '/plan'
     | '/settings'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/calendar'
     | '/history'
+    | '/minis'
     | '/nutrition'
     | '/plan'
     | '/settings'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/calendar'
     | '/_app/history'
+    | '/_app/minis'
     | '/_app/nutrition'
     | '/_app/plan'
     | '/_app/settings'
@@ -228,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHistoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/minis': {
+      id: '/_app/minis'
+      path: '/minis'
+      fullPath: '/minis'
+      preLoaderRoute: typeof AppMinisRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/nutrition': {
       id: '/_app/nutrition'
       path: '/nutrition'
@@ -283,6 +302,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppCalendarRoute: typeof AppCalendarRoute
   AppHistoryRoute: typeof AppHistoryRoute
+  AppMinisRoute: typeof AppMinisRoute
   AppNutritionRoute: typeof AppNutritionRoute
   AppPlanRoute: typeof AppPlanRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -296,6 +316,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppCalendarRoute: AppCalendarRoute,
   AppHistoryRoute: AppHistoryRoute,
+  AppMinisRoute: AppMinisRoute,
   AppNutritionRoute: AppNutritionRoute,
   AppPlanRoute: AppPlanRoute,
   AppSettingsRoute: AppSettingsRoute,

@@ -6,8 +6,11 @@ import { startOfDay, startOfWeek, weekdayIndex } from "./week"
  * against these, so a walk only keeps a streak alive when walking is the goal.
  */
 
-/** What a goal counts: workouts other than walks, walks only, or anything logged. */
-export const STREAK_ACTIVITIES = ["training", "walking", "any"] as const
+/**
+ * What a goal counts: workouts other than walks, walks only, anything logged, or days every mini
+ * workout target was met (src/domain/minis.ts).
+ */
+export const STREAK_ACTIVITIES = ["training", "walking", "any", "minis"] as const
 
 export type StreakActivity = (typeof STREAK_ACTIVITIES)[number]
 
@@ -22,7 +25,7 @@ export interface StreakGoal {
   readonly target: number
 }
 
-export const MAX_STREAK_GOALS = 2
+export const MAX_STREAK_GOALS = 3
 export const MAX_WEEKLY_TARGET = 7
 
 /** What everyone starts with: a workout every week, which is what the streak counted before goals. */
@@ -54,6 +57,9 @@ const WALKING_EXERCISES: ReadonlySet<string> = new Set(["Walk"])
 
 export type WorkoutKind = "training" | "walk"
 
+/** What a streak counts: a workout, a walk, or a day the mini workout targets were met. */
+export type SessionKind = WorkoutKind | "minis"
+
 /** A walk when every exercise in it is a walk; anything else, including an empty workout, is training. */
 export const workoutKind = (exerciseNames: ReadonlyArray<string>): WorkoutKind =>
   exerciseNames.length > 0 && exerciseNames.every((name) => WALKING_EXERCISES.has(name)) ? "walk" : "training"
@@ -65,14 +71,17 @@ export const EXERCISE_NAME_SEPARATOR = "\u001f"
 export const kindFromPackedNames = (packed: string | null): WorkoutKind =>
   workoutKind(packed ? packed.split(EXERCISE_NAME_SEPARATOR) : [])
 
-export const countsToward = (activity: StreakActivity, kind: WorkoutKind): boolean =>
-  activity === "any" || (activity === "walking") === (kind === "walk")
+export const countsToward = (activity: StreakActivity, kind: SessionKind): boolean => {
+  if (activity === "minis" || kind === "minis") return activity === "minis" && kind === "minis"
+
+  return activity === "any" || (activity === "walking") === (kind === "walk")
+}
 
 // ---------------------------------------------------------------- streaks
 
 export interface StreakSession {
   readonly startedAt: number
-  readonly kind: WorkoutKind
+  readonly kind: SessionKind
 }
 
 export interface GoalStreak {
@@ -144,6 +153,8 @@ export interface WeekSession extends StreakSession {
 export interface WeekSummary {
   /** Monday to Sunday: how each day is marked. */
   readonly days: ReadonlyArray<DayMark>
+  /** Monday to Sunday: the rings round each day, one for each goal it counted toward. */
+  readonly rings: ReadonlyArray<ReadonlyArray<Ring>>
   /** 0 for Monday through 6 for Sunday. */
   readonly todayIndex: number
   /** Workouts this week other than walks, and walks apart. */
@@ -154,6 +165,8 @@ export interface WeekSummary {
   readonly streak: GoalStreak
 }
 
+const WEEK_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const
+
 export const summariseWeek = (
   sessions: ReadonlyArray<WeekSession>,
   goals: ReadonlyArray<StreakGoal>,
@@ -162,14 +175,11 @@ export const summariseWeek = (
   const thisWeek = startOfWeek(now)
   const current = sessions.filter((session) => startOfWeek(session.startedAt) === thisWeek)
   const primary = goals[0] ?? DEFAULT_STREAK_GOALS[0]!
+  const onDay = (index: number) => current.filter((session) => weekdayIndex(session.startedAt) === index)
 
   return {
-    days: [0, 1, 2, 3, 4, 5, 6].map((index) =>
-      dayMark(
-        current.filter((session) => weekdayIndex(session.startedAt) === index),
-        goals,
-      ),
-    ),
+    days: WEEK_INDEXES.map((index) => dayMark(onDay(index), goals)),
+    rings: WEEK_INDEXES.map((index) => dayRings(onDay(index), goals)),
     todayIndex: weekdayIndex(now),
     workouts: current.filter((session) => session.kind === "training").length,
     walks: current.filter((session) => session.kind === "walk").length,
@@ -187,6 +197,54 @@ export const dayMark = (sessions: ReadonlyArray<StreakSession>, goals: ReadonlyA
   if (sessions.length === 0) return null
 
   return sessions.some((session) => goals.some((goal) => countsToward(goal.activity, session.kind))) ? "counted" : "other"
+}
+
+// ---------------------------------------------------------------- rings
+
+/**
+ * The ring a goal draws round a day it counts on, each in its own colour: training (or anything)
+ * in the accent, walks in pink, mini workouts in blue. A day can wear all three.
+ */
+export const RINGS = ["training", "walking", "minis"] as const
+
+export type Ring = (typeof RINGS)[number]
+
+export const ringFor = (activity: StreakActivity): Ring => (activity === "any" ? "training" : activity)
+
+/** The rings round a day: one for each goal its sessions count toward, in the goals' order, the first outermost. */
+export const dayRings = (sessions: ReadonlyArray<StreakSession>, goals: ReadonlyArray<StreakGoal>): ReadonlyArray<Ring> => {
+  const rings: Array<Ring> = []
+
+  for (const goal of goals) {
+    const ring = ringFor(goal.activity)
+
+    if (!rings.includes(ring) && sessions.some((session) => countsToward(goal.activity, session.kind))) rings.push(ring)
+  }
+
+  return rings
+}
+
+/** The colour of each ring, for both clients. The stylesheets have the same values as named colours. */
+export const RING_COLORS = { training: "#d7ff3e", walking: "#ff6fb5", minis: "#4cc2ff" } as const satisfies Record<Ring, string>
+
+export interface RingLegend {
+  readonly ring: Ring
+  readonly label: string
+}
+
+const RING_NAMES = { training: "Workout", walking: "Walk", minis: "Mini targets" } as const satisfies Record<Ring, string>
+
+/** What each ring on the calendar stands for, one entry for each ring the goals draw. */
+export const ringLegend = (goals: ReadonlyArray<StreakGoal>): ReadonlyArray<RingLegend> => {
+  const seen = new Map<Ring, string>()
+
+  for (const goal of goals) {
+    const ring = ringFor(goal.activity)
+
+    if (!seen.has(ring)) seen.set(ring, goal.activity === "any" ? "Workout or walk" : RING_NAMES[ring])
+  }
+
+  return [...seen].map(([ring, label]) => ({ ring, label }))
 }
 
 const KIND_NAMES = { training: "Workout", walk: "Walk" } as const satisfies Record<WorkoutKind, string>
@@ -216,15 +274,17 @@ export const ACTIVITY_LABELS = {
   training: "Workouts",
   walking: "Walks",
   any: "Anything",
+  minis: "Mini targets",
 } as const satisfies Record<StreakActivity, string>
 
 export const ACTIVITY_HINTS = {
   training: "Lifting and cardio. Walks don't count.",
   walking: "Walks you log or Apple Health records.",
   any: "Any workout or walk.",
+  minis: "Days you hit every mini workout target.",
 } as const satisfies Record<StreakActivity, string>
 
-const VERBS = { training: "Train", walking: "Walk", any: "Move" } as const satisfies Record<StreakActivity, string>
+const VERBS = { training: "Train", walking: "Walk", any: "Move", minis: "Hit minis" } as const satisfies Record<StreakActivity, string>
 
 /** A goal as a short phrase: "Train 3× a week", "Walk every day". */
 export const describeGoal = (goal: StreakGoal): string => {
@@ -278,7 +338,10 @@ export const streakTiles = (streaks: ReadonlyArray<GoalStreak>): ReadonlyArray<S
   }))
 }
 
-const COUNT_NOUNS = { training: "Workouts", walking: "Walks", any: "Sessions" } as const satisfies Record<StreakActivity, string>
+const COUNT_NOUNS = { training: "Workouts", walking: "Walks", any: "Sessions", minis: "Mini days" } as const satisfies Record<
+  StreakActivity,
+  string
+>
 
 /** What the month's count on the calendar is called, after the leading goal: "Walks in Nov". */
 export const countNoun = (activity: StreakActivity): string => COUNT_NOUNS[activity]
@@ -303,6 +366,15 @@ export const isFrequency = (goal: StreakGoal, frequency: Frequency): boolean => 
   return period === frequency.period && target === frequency.target
 }
 
-/** A second goal to start from that differs from the first: walks beside training, training beside anything else. */
-export const suggestSecondGoal = (first: StreakGoal): StreakGoal =>
-  first.activity === "training" ? { activity: "walking", period: "day", target: 1 } : { activity: "training", period: "week", target: 3 }
+const SUGGESTIONS: ReadonlyArray<StreakGoal> = [
+  { activity: "training", period: "week", target: 3 },
+  { activity: "walking", period: "day", target: 1 },
+  { activity: "minis", period: "day", target: 1 },
+]
+
+/** A goal to add that draws a ring none of the others do: walks beside training, then mini workouts. */
+export const suggestNextGoal = (goals: ReadonlyArray<StreakGoal>): StreakGoal => {
+  const used = new Set(goals.map((goal) => ringFor(goal.activity)))
+
+  return SUGGESTIONS.find((goal) => !used.has(ringFor(goal.activity))) ?? { activity: "training", period: "week", target: 3 }
+}

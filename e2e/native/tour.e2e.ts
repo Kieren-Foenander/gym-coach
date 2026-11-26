@@ -53,6 +53,15 @@ describe("a tour of the main screens", { serial: true, requires: ["device"] }, (
     await app.screenshot("02-today")
   })
 
+  test("opens mini workouts from Today, and goes back", async ({ app, screen }) => {
+    await screen.getByTestId(testIds.today.miniCard).tap()
+    await expect(screen.getByTestId(testIds.minis.save)).toBeVisible()
+    await app.screenshot("02b-mini-workouts")
+
+    await screen.getByTestId(testIds.minis.back).tap()
+    await expect(screen.getByTestId(testIds.today.miniCard)).toBeVisible()
+  })
+
   test("opens the plan", async ({ app, screen }) => {
     await screen.getByTestId(testIds.nav.tab("plan")).tap()
 

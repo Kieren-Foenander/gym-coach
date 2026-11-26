@@ -7,6 +7,7 @@ import { SESSION_COOKIE, userById, userFromSession } from "./server/auth"
 import { API_PREFIX, apiHandlerFor } from "./server/http"
 import { isExerciseMedia, serveExerciseMedia } from "./server/media"
 import { handleMcpRequest, MCP_PATH } from "./server/mcp"
+import { runNudges } from "./server/minis"
 import type { User } from "./server/repo"
 import { runtime, signupCode, stage } from "./server/runtime"
 
@@ -19,6 +20,8 @@ const handleApiRequest = apiHandlerFor({ run: (effect) => runtime.runPromise(eff
  *   /oauth/*          the OAuth endpoints an MCP client uses to get that token
  *   /api/v1/*         the JSON API the native app uses (session token required)
  *   everything else   the TanStack Start app
+ *
+ * The cron trigger in alchemy.run.ts calls `scheduled`, which sends the mini workout nudges that are due.
  */
 
 type OAuthEnv = Env & { OAUTH_PROVIDER: OAuthHelpers }
@@ -218,5 +221,11 @@ export default {
     if (isExerciseMedia(new URL(request.url).pathname)) return serveExerciseMedia(request, env.EXERCISE_MEDIA)
 
     return providerFor(new URL(request.url).origin).fetch(request, env, ctx)
+  },
+  // Every few minutes: one run looks at every user with nudges on and sends what is due.
+  async scheduled(controller: ScheduledController) {
+    await runtime.runPromise(
+      runNudges(controller.scheduledTime).pipe(Effect.catch((error) => Effect.logError("Sending mini workout nudges failed", error))),
+    )
   },
 } satisfies ExportedHandler<OAuthEnv>

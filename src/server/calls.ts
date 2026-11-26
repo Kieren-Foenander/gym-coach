@@ -7,6 +7,7 @@ import { demoFor, RENDERED_SLUGS } from "~/domain/demos"
 import { PLAN_TEMPLATES } from "~/domain/templates"
 import { Invalid, NotFound, type DomainError } from "./errors"
 import * as Health from "./health"
+import * as Minis from "./minis"
 import * as Nutrition from "./nutrition"
 import * as Repo from "./repo"
 import { CurrentUser } from "./repo"
@@ -133,6 +134,16 @@ export const Calls = {
   importHealth: define(CallInputs.importHealth, (data) => Health.importHealth(data)),
   /** Daily readings from the last five weeks: enough for the latest of each and what is usual. */
   getHealth: define(CallInputs.getHealth, () => Effect.map(Health.listHealthDaily(35), (daily) => ({ daily }))),
+
+  // mini workouts
+  getMinis: define(CallInputs.getMinis, (data) => Minis.getMinis(data.from, data.to)),
+  updateMinis: define(CallInputs.updateMinis, (data) => Minis.updateMinis(data.day, data.settings)),
+  logMini: define(CallInputs.logMini, (data) => Minis.logMini(data)),
+  deleteMini: define(CallInputs.deleteMini, (data) => Minis.deleteMini(data.entryId)),
+  skipNudge: define(CallInputs.skipNudge, (data) => Minis.skipNudge(data.nudgeId)),
+  subscribePush: define(CallInputs.subscribePush, (data) => Minis.subscribePush(data.subscription, data.origin)),
+  unsubscribePush: define(CallInputs.unsubscribePush, (data) => Minis.unsubscribePush(data.endpoint)),
+  testPush: define(CallInputs.testPush, () => Minis.testPush()),
 } satisfies { readonly [K in CallName]: { readonly run: (data: (typeof CallInputs)[K]["Type"]) => CallEffect<Answer> } }
 
 /** What a client sends for a call: its input as JSON, before the server trims or checks it. */

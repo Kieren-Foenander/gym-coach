@@ -1,5 +1,7 @@
 import { Schema } from "effect"
+import { MINI_LIMITS, MINI_UNITS } from "./minis"
 import {
+  AppOrigin,
   Day,
   Direction,
   ExercisePrescription,
@@ -7,8 +9,10 @@ import {
   HealthImport,
   Id,
   MeasurementInput,
+  MiniSettingsInput,
   PlanExercisePatch,
   ProfilePatch,
+  PushSubscriptionInput,
   SetInput,
 } from "./schema"
 
@@ -86,6 +90,29 @@ export const CallInputs = {
   // Apple Health, from the iPhone app
   importHealth: HealthImport,
   getHealth: Nothing,
+
+  // mini workouts
+  /** Mini workouts from one day to another (a phone asks for the days around its today), with the settings. */
+  getMinis: Schema.Struct({ from: Day, to: Day }),
+  /** Saves the settings. `day` is the phone's today, which takes the new targets at once. */
+  updateMinis: Schema.Struct({ day: Day, settings: MiniSettingsInput }),
+  logMini: Schema.Struct({
+    day: Day,
+    exercise: ExerciseName,
+    amount: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MINI_LIMITS.daily })),
+    /** Only needed for an exercise with no target that day. */
+    unit: Schema.optional(Schema.Literals(MINI_UNITS)),
+    /** The nudge this answers, when it was logged from one. */
+    nudgeId: Schema.optional(Id),
+    clientKey: Schema.optional(Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(64))),
+  }),
+  deleteMini: Schema.Struct({ entryId: Id }),
+  skipNudge: Schema.Struct({ nudgeId: Id }),
+  /** Turns nudges on in this browser. `origin` is the address the app is open at, which a nudge opens. */
+  subscribePush: Schema.Struct({ subscription: PushSubscriptionInput, origin: AppOrigin }),
+  unsubscribePush: Schema.Struct({ endpoint: Schema.String.check(Schema.isMaxLength(1000)) }),
+  /** Sends a notification to every browser with nudges on, to check they arrive. */
+  testPush: Nothing,
 } as const
 
 export type CallName = keyof typeof CallInputs

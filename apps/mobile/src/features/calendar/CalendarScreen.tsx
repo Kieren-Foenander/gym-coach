@@ -1,24 +1,32 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Pressable, View } from "react-native"
+import { localDay } from "~/domain/health"
+import { miniRange, miniSessions } from "~/domain/minis"
 import {
   activeGoals,
   countNoun,
   countsToward,
   dayMark,
+  dayRings,
   describeGoal,
   goalStreak,
   isInRun,
   markLegend,
+  ringFor,
+  ringLegend,
   streakTiles,
-  type DayMark,
   type GoalStreak,
+  type Ring,
   type StreakGoal,
+  type StreakSession,
 } from "~/domain/streaks"
+import { testIds } from "~/domain/test-ids"
 import { byDay, countInMonth, monthGrid, shiftMonth, startOfDay } from "~/domain/week"
 import { describeTrainingDay, formatLongDay } from "~/format"
 import type { CalendarWorkout } from "~/server/repo"
 import { describeError } from "@/api/client"
 import { BackIcon, ChevronIcon } from "@/components/icons"
+import { DayRings, RingSwatch } from "@/components/rings"
 import { BackLink, Card, CARD_CLASS, Display, Eyebrow, Loading, Screen, SectionTitle, Stat, Text } from "@/components/ui"
 import { useCall } from "@/data/calls"
 import { useUser } from "@/features/user"
@@ -32,9 +40,15 @@ const monthFormat = new Intl.DateTimeFormat(undefined, { month: "long", year: "n
 const shortMonth = new Intl.DateTimeFormat(undefined, { month: "short" })
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" })
 
+/** The band behind the leading goal's current run, in its ring's colour. */
+const BANDS = { training: "bg-accent/10", walking: "bg-walk/10", minis: "bg-mini/10" } as const satisfies Record<Ring, string>
+
 /** Every day trained, a month at a time, with the streaks for the user's goals marked on it. */
 export function CalendarScreen({ navigation }: AppScreenProps<"Calendar">) {
+  const now = useNow()
   const { data, error } = useCall("getCalendar", {})
+  // Days the mini workout targets were met ring too. Until they load, the workouts show on their own.
+  const metDays = useCall("getMinis", miniRange(localDay(now))).data?.metDays ?? []
   const goals = activeGoals(useUser().streakGoals)
 
   return (
@@ -45,7 +59,13 @@ export function CalendarScreen({ navigation }: AppScreenProps<"Calendar">) {
         Calendar
       </Display>
       {data ? (
-        <Calendar workouts={data} goals={goals} onOpen={(workoutId) => navigation.navigate("Workout", { workoutId })} />
+        <Calendar
+          workouts={data}
+          metDays={metDays}
+          goals={goals}
+          now={now}
+          onOpen={(workoutId) => navigation.navigate("Workout", { workoutId })}
+        />
       ) : (
         <Loading error={error ? describeError(error) : null} />
       )}
@@ -55,23 +75,29 @@ export function CalendarScreen({ navigation }: AppScreenProps<"Calendar">) {
 
 interface CalendarProps {
   readonly workouts: ReadonlyArray<CalendarWorkout>
+  readonly metDays: ReadonlyArray<string>
   readonly goals: ReadonlyArray<StreakGoal>
+  readonly now: number
   readonly onOpen: (workoutId: number) => void
 }
 
-function Calendar({ workouts, goals, onOpen }: CalendarProps) {
-  const now = useNow()
+function Calendar({ workouts, metDays, goals, now, onOpen }: CalendarProps) {
+  // Workouts open from the calendar; days the mini workout targets were met only count and ring.
+  const sessions = useMemo((): ReadonlyArray<StreakSession> => [...workouts, ...miniSessions(metDays)], [workouts, metDays])
   const thisMonth = shiftMonth(now, 0)
-  const firstMonth = shiftMonth(workouts[0]?.startedAt ?? now, 0)
+  const firstMonth = shiftMonth(Math.min(now, ...sessions.map((session) => session.startedAt)), 0)
   const [month, setMonth] = useState(thisMonth)
   const [selected, setSelected] = useState<number | null>(null)
-  const streaks = goals.map((goal) => goalStreak(goal, workouts, now))
-  const days = byDay(workouts)
+  const streaks = useMemo(() => goals.map((goal) => goalStreak(goal, sessions, now)), [goals, sessions, now])
+  const days = useMemo(() => byDay(workouts), [workouts])
+  const sessionDays = useMemo(() => byDay(sessions), [sessions])
   const grid = monthGrid(month)
   const today = startOfDay(now)
   const lead = streaks[0]!
-  const inMonth = countInMonth(workouts.filter((workout) => countsToward(lead.goal.activity, workout.kind)), month)
-  const legend = markLegend(goals)
+  const band = BANDS[ringFor(lead.goal.activity)]
+  const inMonth = countInMonth(sessions.filter((session) => countsToward(lead.goal.activity, session.kind)), month)
+  const other = markLegend(goals).other
+  const tiles = streakTiles(streaks)
   // A weekly goal's run is a band along whole weeks; a daily goal's runs from day to day.
   const weeklyBand = lead.goal.period === "week"
   const picked = selected === null ? [] : (days.get(selected) ?? [])
@@ -91,16 +117,20 @@ function Calendar({ workouts, goals, onOpen }: CalendarProps) {
 
   return (
     <>
-      <View className="flex-row gap-2 pb-4">
-        {streakTiles(streaks).map((tile) => (
-          <Stat key={tile.label} label={tile.label} value={tile.value} unit={tile.unit} />
+      <View className="flex-row flex-wrap gap-2 pb-4">
+        {tiles.map((tile) => (
+          <View key={tile.label} className={tiles.length + 1 > 3 ? "w-[48.5%]" : "flex-1"}>
+            <Stat label={tile.label} value={tile.value} unit={tile.unit} />
+          </View>
         ))}
-        <Stat label={`${countNoun(lead.goal.activity)} in ${shortMonth.format(month)}`} value={inMonth} />
+        <View className={tiles.length + 1 > 3 ? "w-[48.5%]" : "flex-1"}>
+          <Stat label={`${countNoun(lead.goal.activity)} in ${shortMonth.format(month)}`} value={inMonth} />
+        </View>
       </View>
 
       <Card>
         <View className="flex-row items-center gap-1">
-          <Display accessibilityLiveRegion="polite" numberOfLines={1} className="flex-1 text-2xl">
+          <Display testID={testIds.calendar.month} accessibilityLiveRegion="polite" numberOfLines={1} className="flex-1 text-2xl">
             {monthFormat.format(month)}
           </Display>
           {month === thisMonth ? null : (
@@ -122,23 +152,21 @@ function Calendar({ workouts, goals, onOpen }: CalendarProps) {
 
         <View className="gap-1">
           {grid.weeks.map((week) => (
-            <View
-              key={week.monday}
-              className={cn("flex-row rounded-full", weeklyBand && isInRun(lead, week.monday) ? "bg-accent/10" : "")}
-            >
+            <View key={week.monday} className={cn("flex-row rounded-full", weeklyBand && isInRun(lead, week.monday) ? band : "")}>
               {week.days.map((day, index) => (
                 <View
                   key={day ?? `blank-${index}`}
                   className={cn(
                     "flex-1 items-center py-0.5",
-                    day !== null && !weeklyBand ? dailyBand(lead, day, week.days[index - 1], week.days[index + 1]) : "",
+                    day !== null && !weeklyBand ? dailyBand(lead, band, day, week.days[index - 1], week.days[index + 1]) : "",
                   )}
                 >
                   {day === null ? null : (
                     <DayButton
                       day={day}
-                      sessions={days.get(day) ?? []}
-                      mark={dayMark(days.get(day) ?? [], goals)}
+                      workouts={days.get(day) ?? []}
+                      sessions={sessionDays.get(day) ?? []}
+                      goals={goals}
                       isToday={day === today}
                       isFuture={day > today}
                       isSelected={day === selected}
@@ -152,18 +180,20 @@ function Calendar({ workouts, goals, onOpen }: CalendarProps) {
         </View>
 
         <View className="flex-row flex-wrap gap-x-4 gap-y-1 pt-4">
-          <View className="flex-row items-center gap-1.5">
-            <View className="size-3 rounded-full bg-accent" />
-            <Text className="text-xs text-muted">{legend.counted}</Text>
-          </View>
-          {legend.other ? (
+          {ringLegend(goals).map((entry) => (
+            <View key={entry.ring} className="flex-row items-center gap-1.5">
+              <RingSwatch ring={entry.ring} />
+              <Text className="text-xs text-muted">{entry.label}</Text>
+            </View>
+          ))}
+          {other ? (
             <View className="flex-row items-center gap-1.5">
-              <View className="size-3 rounded-full border-2 border-accent bg-accent/15" />
-              <Text className="text-xs text-muted">{legend.other}</Text>
+              <View className="size-3 rounded-full border-2 border-faint/60" />
+              <Text className="text-xs text-muted">{other}</Text>
             </View>
           ) : null}
           <View className="flex-row items-center gap-1.5">
-            <View className="h-3 w-5 rounded-full bg-accent/20" />
+            <View className={cn("h-3 w-5 rounded-full", band)} />
             <Text className="text-xs text-muted">Current streak</Text>
           </View>
         </View>
@@ -171,7 +201,7 @@ function Calendar({ workouts, goals, onOpen }: CalendarProps) {
 
       {picked.length > 0 && selected !== null ? <DayWorkouts day={selected} workouts={picked} onOpen={onOpen} /> : null}
 
-      {workouts.length === 0 ? (
+      {sessions.length === 0 ? (
         <Text className="pt-4 text-center text-sm text-muted">Finish a workout and its day lights up here.</Text>
       ) : null}
     </>
@@ -190,6 +220,7 @@ function MonthButton({ label, disabled, onPress, back = false }: MonthButtonProp
 
   return (
     <Pressable
+      testID={back ? testIds.calendar.previousMonth : testIds.calendar.nextMonth}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
@@ -203,65 +234,76 @@ function MonthButton({ label, disabled, onPress, back = false }: MonthButtonProp
 }
 
 /** The rounded band behind a day in a daily goal's current run, closed off where the run or the row ends. */
-const dailyBand = (lead: GoalStreak, day: number, before: number | null | undefined, after: number | null | undefined) => {
+const dailyBand = (lead: GoalStreak, band: string, day: number, before: number | null | undefined, after: number | null | undefined) => {
   if (!isInRun(lead, day)) return ""
   const joinsBefore = before != null && isInRun(lead, before)
   const joinsAfter = after != null && isInRun(lead, after)
 
-  return cn("bg-accent/10", !joinsBefore && "rounded-l-full", !joinsAfter && "rounded-r-full")
+  return cn(band, !joinsBefore && "rounded-l-full", !joinsAfter && "rounded-r-full")
 }
 
 interface DayButtonProps {
   readonly day: number
-  readonly sessions: ReadonlyArray<CalendarWorkout>
-  readonly mark: DayMark
+  /** The workouts that day, which tapping it opens. */
+  readonly workouts: ReadonlyArray<CalendarWorkout>
+  /** Everything that day a goal might count: the workouts, and the mini workout targets when met. */
+  readonly sessions: ReadonlyArray<StreakSession>
+  readonly goals: ReadonlyArray<StreakGoal>
   readonly isToday: boolean
   readonly isFuture: boolean
   readonly isSelected: boolean
   readonly onPress: () => void
 }
 
-function DayButton({ day, sessions, mark, isToday, isFuture, isSelected, onPress }: DayButtonProps) {
+function DayButton({ day, workouts, sessions, goals, isToday, isFuture, isSelected, onPress }: DayButtonProps) {
   const date = new Date(day).getDate()
-  const count = sessions.length
-  const walks = sessions.filter((session) => session.kind === "walk").length
-  const label = describeTrainingDay(day, count - walks, walks)
+  const count = workouts.length
+  const walks = workouts.filter((workout) => workout.kind === "walk").length
+  const minis = sessions.some((session) => session.kind === "minis")
+  const label = describeTrainingDay(day, count - walks, walks, minis)
+  const mark = dayMark(sessions, goals)
+  const rings = dayRings(sessions, goals)
 
-  if (mark === null) {
-    return (
-      <View
-        accessible
-        accessibilityLabel={label}
-        className={cn("size-10 items-center justify-center rounded-full", isToday ? "border-2 border-accent/70" : "")}
-      >
-        <Text className={cn("text-sm tabular-nums", isToday ? "font-semibold text-chalk" : isFuture ? "text-line" : "text-muted")}>
-          {date}
-        </Text>
-      </View>
-    )
-  }
-
-  // Counted days are filled; days whose sessions count toward no goal, such as a walk, get a ring.
-  const counted = mark === "counted"
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={count > 1 ? { selected: isSelected } : {}}
-      onPress={onPress}
-      className={cn(
-        "size-10 items-center justify-center rounded-full",
-        counted ? "bg-accent active:bg-accent-strong" : "border-2 border-accent bg-accent/15 active:bg-accent/30",
-        isSelected ? "border-2 border-chalk" : "",
-      )}
+  const face = (
+    <DayRings
+      rings={rings}
+      other={mark === "other"}
+      className={cn("size-10", isToday && mark === null ? "border-2 border-dashed border-white/50" : "", isSelected ? "border-2 border-chalk" : "")}
     >
-      <Text className={cn("text-sm font-bold tabular-nums", counted ? "text-accent-ink" : "text-accent")}>{date}</Text>
+      <Text
+        className={cn(
+          "text-sm tabular-nums",
+          mark !== null ? "font-bold text-chalk" : isToday ? "font-semibold text-chalk" : isFuture ? "text-line" : "text-muted",
+        )}
+      >
+        {date}
+      </Text>
       {count > 1 ? (
         <View className="absolute -right-0.5 -top-0.5 size-4 items-center justify-center rounded-full bg-chalk">
           <Text className="text-[10px] font-bold text-accent-ink">{count}</Text>
         </View>
       ) : null}
+    </DayRings>
+  )
+
+  if (count === 0) {
+    return (
+      <View testID={testIds.calendar.day(day)} accessible accessibilityLabel={label}>
+        {face}
+      </View>
+    )
+  }
+
+  return (
+    <Pressable
+      testID={testIds.calendar.day(day)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={count > 1 ? { selected: isSelected } : {}}
+      onPress={onPress}
+      className="rounded-full active:bg-raised"
+    >
+      {face}
     </Pressable>
   )
 }
@@ -281,6 +323,7 @@ function DayWorkouts({ day, workouts, onOpen }: DayWorkoutsProps) {
         {workouts.map((workout) => (
           <Pressable
             key={workout.id}
+            testID={testIds.calendar.dayWorkout(workout.id)}
             accessibilityRole="button"
             onPress={() => onOpen(workout.id)}
             className={cn(CARD_CLASS, "flex-row items-center gap-3 active:bg-raised")}

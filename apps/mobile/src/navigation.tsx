@@ -18,6 +18,7 @@ import { AddToPlanSheet } from "@/features/exercises/AddToPlanSheet"
 import { LibraryExerciseScreen, OwnExerciseScreen } from "@/features/exercises/ExerciseDetailScreen"
 import { ExercisesScreen } from "@/features/exercises/ExercisesScreen"
 import { MuscleGroupScreen } from "@/features/exercises/MuscleGroupScreen"
+import { MinisScreen } from "@/features/minis/MinisScreen"
 import { NutritionScreen } from "@/features/nutrition/NutritionScreen"
 import { HistoryScreen } from "@/features/history/HistoryScreen"
 import { AddPlanDaySheet, AddPlanExerciseSheet, EditPlanExerciseSheet, TemplatesSheet } from "@/features/plan/PlanSheets"
@@ -43,6 +44,8 @@ export type AppStackParams = {
   readonly Workout: { readonly workoutId: number }
   readonly Calendar: undefined
   readonly Nutrition: undefined
+  /** Mini workouts, with the nudge to answer when one was opened. */
+  readonly Minis: { readonly nudgeId?: number }
   readonly MuscleGroup: { readonly muscle: Muscle }
   readonly LibraryExercise: { readonly slug: string }
   readonly OwnExercise: { readonly exerciseId: number }
@@ -171,6 +174,7 @@ export function Navigation() {
             <AppStack.Screen name="Workout" component={WorkoutScreen} options={{ gestureEnabled: false }} />
             <AppStack.Screen name="Calendar" component={CalendarScreen} />
             <AppStack.Screen name="Nutrition" component={NutritionScreen} />
+            <AppStack.Screen name="Minis" component={MinisScreen} />
             <AppStack.Screen name="MuscleGroup" component={MuscleGroupScreen} />
             <AppStack.Screen name="LibraryExercise" component={LibraryExerciseScreen} />
             <AppStack.Screen name="OwnExercise" component={OwnExerciseScreen} />

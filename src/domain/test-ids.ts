@@ -1,5 +1,6 @@
 import { slugFor } from "./catalog"
-import { normaliseGoal, type DayMark, type Frequency, type StreakActivity, type StreakGoal } from "./streaks"
+import type { MiniUnit } from "./minis"
+import { normaliseGoal, type DayMark, type Frequency, type Ring, type StreakActivity, type StreakGoal } from "./streaks"
 
 /**
  * Every test id in the app, for `data-testid` on the web and `testID` in the native app. Tests
@@ -38,7 +39,9 @@ export const goalKey = (goal: StreakGoal): string => {
 }
 
 /** Which of the user's streak goals a part of the goal editor belongs to. */
-export type GoalSlot = "main" | "second"
+export type GoalSlot = "main" | "second" | "third"
+
+export const GOAL_SLOTS: ReadonlyArray<GoalSlot> = ["main", "second", "third"]
 
 export const TABS = ["today", "plan", "exercises", "history", "settings"] as const
 
@@ -76,6 +79,56 @@ export const testIds = {
     /** Start a plan day other than the next one, keyed by its name. */
     startDay: (name: string) => `today.start-day:${slugFor(name)}`,
     startOpenWorkout: "today.start-open-workout",
+    /** The mini workouts card, which opens the mini workouts screen. */
+    miniCard: "today.mini-card",
+    /** One target on the card, keyed by its exercise; `data-value` is what is done today. */
+    mini: (exercise: string) => `today.mini:${slugFor(exercise)}`,
+  },
+  /** The rings round a day, on the calendar and the week card. */
+  dayRings: {
+    /** One goal's ring, keyed by the ring (src/domain/streaks.ts RINGS). */
+    ring: keyed<Ring>("day-rings.ring"),
+  },
+  minis: {
+    /** Back to where the screen was opened from, in the native app. */
+    back: "minis.back",
+    /** Whether every target is done today, in `data-state` (MINI_DAY_STATES). */
+    day: "minis.day",
+    /** One target's progress today, keyed by its exercise; `data-value` is what is done. */
+    progress: (exercise: string) => `minis.progress:${slugFor(exercise)}`,
+    /** Inside a target's progress: the amount to log, and logging it. */
+    amount: "minis.amount",
+    log: "minis.log",
+    /** A logged set, keyed by its id, and removing it. */
+    entry: keyed<number>("minis.entry"),
+    deleteEntry: "minis.delete-entry",
+    /** The nudge a notification opened; `data-state` is its status. */
+    nudge: "minis.nudge",
+    nudgeDone: "minis.nudge-done",
+    nudgeSkip: "minis.nudge-skip",
+    /** One target in the editor, keyed by its exercise; its parts below are found inside it. */
+    target: (exercise: string) => `minis.target:${slugFor(exercise)}`,
+    targetUnit: keyed<MiniUnit>("minis.target-unit"),
+    targetDaily: "minis.target-daily",
+    targetChunk: "minis.target-chunk",
+    targetGrow: "minis.target-grow",
+    removeTarget: "minis.remove-target",
+    addTarget: "minis.add-target",
+    /** Nudges on or off, in `data-state` (TOGGLE_STATES). */
+    nudges: "minis.nudges",
+    /** A day of the week nudges may come on, 0 for Monday; picked or not in `data-state`. */
+    weekday: keyed<number>("minis.weekday"),
+    start: "minis.start",
+    end: "minis.end",
+    gap: "minis.gap",
+    save: "minis.save",
+    pauseToday: "minis.pause-today",
+    resume: "minis.resume",
+    /** Whether this browser gets nudges, in `data-state` (PUSH_STATES). */
+    push: "minis.push",
+    enablePush: "minis.enable-push",
+    disablePush: "minis.disable-push",
+    testPush: "minis.test-push",
   },
   plan: {
     template: keyed<string>("plan.template"),
@@ -187,3 +240,17 @@ export const CHOICE_STATES = { selected: "selected", unselected: "unselected" } 
 
 /** Whether a form's changes have been saved, in its save button's `data-state`. */
 export const SAVE_STATES = { saved: "saved", unsaved: "unsaved" } as const
+
+/** Whether a switch is on, in its `data-state`. */
+export const TOGGLE_STATES = { on: "on", off: "off" } as const
+
+/** Whether a day's mini workout targets, or one of them, are done. */
+export const MINI_DAY_STATES = { met: "met", open: "open" } as const
+
+/**
+ * Whether this browser gets nudges: it cannot (unsupported), it can once added to the home screen
+ * (install), the user refused notifications (blocked), it could but does not (off), or it does (on).
+ */
+export const PUSH_STATES = { unsupported: "unsupported", install: "install", blocked: "blocked", off: "off", on: "on" } as const
+
+export type PushState = keyof typeof PUSH_STATES

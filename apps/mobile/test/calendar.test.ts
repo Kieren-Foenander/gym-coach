@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { dayMark, DEFAULT_STREAK_GOALS, goalStreak, workoutKind } from "~/domain/streaks"
-import { byDay, monthGrid, shiftMonth } from "~/domain/week"
+import { shiftDay } from "~/domain/days"
+import { middayOf, miniSessions } from "~/domain/minis"
+import { dayMark, dayRings, DEFAULT_STREAK_GOALS, goalStreak, workoutKind } from "~/domain/streaks"
+import { dayKey } from "~/domain/test-ids"
+import { byDay, monthGrid, shiftMonth, startOfDay } from "~/domain/week"
 
 // The calendar screen reads every finished workout. The seed history is a few years of real training.
 const history: {
@@ -63,5 +66,22 @@ describe("the calendar over a real training history", () => {
     expect(before.longest).toBeGreaterThan(0)
     expect(later.current).toBe(0)
     expect(later.longest).toBe(before.longest)
+  })
+
+  it("rings a day once for each goal it met, with mini workout days from the server on their own calendar day", () => {
+    const goals = [
+      { activity: "training", period: "week", target: 3 },
+      { activity: "minis", period: "day", target: 1 },
+    ] as const
+
+    const last = workouts.at(-1)!
+    const lastDay = dayKey(last.startedAt)
+    const days = byDay([...workouts, ...miniSessions([lastDay, shiftDay(lastDay, 1)])])
+
+    expect(dayRings(days.get(startOfDay(last.startedAt)) ?? [], goals)).toEqual(["training", "minis"])
+    expect(dayRings(days.get(startOfDay(middayOf(shiftDay(lastDay, 1)))) ?? [], goals)).toEqual(["minis"])
+    // Mini workouts never make a training day.
+    expect(goalStreak(goals[1], miniSessions([lastDay]), last.startedAt).current).toBe(1)
+    expect(goalStreak(goals[0], miniSessions([lastDay]), last.startedAt).current).toBe(0)
   })
 })

@@ -29,5 +29,6 @@ describe("calendar wording", () => {
     expect(describeTrainingDay(day, 2)).toBe(`${formatLongDay(day)}, 2 workouts`)
     expect(describeTrainingDay(day, 0, 1)).toBe(`${formatLongDay(day)}, 1 walk`)
     expect(describeTrainingDay(day, 1, 2)).toBe(`${formatLongDay(day)}, 1 workout and 2 walks`)
+    expect(describeTrainingDay(day, 0, 0, true)).toBe(`${formatLongDay(day)}, mini workout targets met`)
   })
 })

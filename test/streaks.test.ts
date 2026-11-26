@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest"
 import { StreakGoals } from "~/domain/schema"
 import {
   activeGoals,
+  countsToward,
   dayMark,
+  dayRings,
   DEFAULT_STREAK_GOALS,
   describeGoal,
   describeGoalStreak,
@@ -12,12 +14,16 @@ import {
   isInRun,
   kindFromPackedNames,
   markLegend,
+  RING_COLORS,
+  ringLegend,
+  RINGS,
   streakTiles,
+  suggestNextGoal,
   summariseWeek,
   workoutKind,
+  type SessionKind,
   type StreakGoal,
   type StreakSession,
-  type WorkoutKind,
 } from "~/domain/streaks"
 
 const at = (year: number, month: number, day: number, hour = 12) => new Date(year, month - 1, day, hour).getTime()
@@ -28,8 +34,9 @@ const now = at(2026, 11, 11)
 const weekly: StreakGoal = { activity: "training", period: "week", target: 1 }
 const walkDaily: StreakGoal = { activity: "walking", period: "day", target: 1 }
 const threeAWeek: StreakGoal = { activity: "training", period: "week", target: 3 }
+const minisDaily: StreakGoal = { activity: "minis", period: "day", target: 1 }
 
-const sessions = (kind: WorkoutKind, ...times: ReadonlyArray<number>): ReadonlyArray<StreakSession> =>
+const sessions = (kind: SessionKind, ...times: ReadonlyArray<number>): ReadonlyArray<StreakSession> =>
   times.map((startedAt) => ({ startedAt, kind }))
 
 const training = (...times: ReadonlyArray<number>) => sessions("training", ...times)
@@ -171,22 +178,27 @@ describe("activeGoals", () => {
     expect(activeGoals([])).toEqual(DEFAULT_STREAK_GOALS)
   })
 
-  it("keeps at most two, and reads a daily goal as once a day", () => {
-    expect(activeGoals([{ activity: "walking", period: "day", target: 5 }, weekly, threeAWeek])).toEqual([walkDaily, weekly])
+  it("keeps at most three, and reads a daily goal as once a day", () => {
+    expect(activeGoals([{ activity: "walking", period: "day", target: 5 }, weekly, threeAWeek, minisDaily])).toEqual([
+      walkDaily,
+      weekly,
+      threeAWeek,
+    ])
   })
 })
 
 describe("the saved goals", () => {
   const decode = Schema.decodeUnknownSync(StreakGoals)
 
-  it("accepts one or two goals", () => {
+  it("accepts one, two or three goals", () => {
     expect(decode([walkDaily])).toEqual([walkDaily])
     expect(decode([threeAWeek, walkDaily])).toEqual([threeAWeek, walkDaily])
+    expect(decode([threeAWeek, walkDaily, minisDaily])).toEqual([threeAWeek, walkDaily, minisDaily])
   })
 
-  it("refuses none, three, or a goal it does not know", () => {
+  it("refuses none, four, or a goal it does not know", () => {
     expect(() => decode([])).toThrow()
-    expect(() => decode([weekly, weekly, weekly])).toThrow()
+    expect(() => decode([weekly, weekly, weekly, weekly])).toThrow()
     expect(() => decode([{ activity: "swimming", period: "day", target: 1 }])).toThrow()
     expect(() => decode([{ activity: "training", period: "week", target: 8 }])).toThrow()
   })
@@ -206,6 +218,71 @@ describe("day marks", () => {
     expect(markLegend([walkDaily])).toEqual({ counted: "Walk", other: "Workout" })
     expect(markLegend([weekly, walkDaily])).toEqual({ counted: "Workout or walk", other: null })
     expect(markLegend([{ activity: "any", period: "week", target: 2 }])).toEqual({ counted: "Workout or walk", other: null })
+  })
+})
+
+describe("mini workout days", () => {
+  const miniDay = (...times: ReadonlyArray<number>) => sessions("minis", ...times)
+
+  it("count only toward a goal for mini workouts, and a workout never counts toward one", () => {
+    expect(countsToward("minis", "minis")).toBe(true)
+    expect(countsToward("minis", "training")).toBe(false)
+    expect(countsToward("minis", "walk")).toBe(false)
+    expect(countsToward("any", "minis")).toBe(false)
+    expect(countsToward("training", "minis")).toBe(false)
+    expect(dayMark(miniDay(now), [weekly])).toBe("other")
+    expect(dayMark(miniDay(now), [weekly, minisDaily])).toBe("counted")
+  })
+
+  it("make a streak of days in a row with every target done", () => {
+    const streak = goalStreak(minisDaily, [...miniDay(at(2026, 11, 9), at(2026, 11, 10), at(2026, 11, 11)), ...training(at(2026, 11, 8))], now)
+
+    expect(streak.current).toBe(3)
+  })
+})
+
+describe("rings", () => {
+  it("ring a day once for each goal it counted toward, in the goals' order", () => {
+    const day = [...training(now), ...walks(now), ...sessions("minis", now)]
+
+    expect(dayRings(day, [weekly, walkDaily, minisDaily])).toEqual(["training", "walking", "minis"])
+    expect(dayRings(day, [minisDaily, weekly])).toEqual(["minis", "training"])
+    expect(dayRings(walks(now), [weekly, minisDaily])).toEqual([])
+    expect(dayRings(walks(now), [{ activity: "any", period: "day", target: 1 }])).toEqual(["training"])
+  })
+
+  it("draw one ring for two goals of the same kind", () => {
+    expect(dayRings(training(now), [weekly, threeAWeek])).toEqual(["training"])
+    expect(ringLegend([weekly, threeAWeek, minisDaily])).toEqual([
+      { ring: "training", label: "Workout" },
+      { ring: "minis", label: "Mini targets" },
+    ])
+  })
+
+  it("give each ring its own colour", () => {
+    expect(new Set(RINGS.map((ring) => RING_COLORS[ring])).size).toBe(RINGS.length)
+  })
+
+  it("show on each day of the week card", () => {
+    const week = summariseWeek(
+      [
+        { ...training(at(2026, 11, 9))[0]!, volume: 1000 },
+        { ...walks(at(2026, 11, 9))[0]!, volume: 0 },
+        { ...sessions("minis", at(2026, 11, 10))[0]!, volume: 0 },
+      ],
+      [weekly, walkDaily, minisDaily],
+      now,
+    )
+
+    expect(week.rings.slice(0, 3)).toEqual([["training", "walking"], ["minis"], []])
+    expect(week.workouts).toBe(1)
+  })
+
+  it("suggest a goal that adds a ring the others do not draw", () => {
+    expect(suggestNextGoal([weekly])).toEqual(walkDaily)
+    expect(suggestNextGoal([weekly, walkDaily])).toEqual(minisDaily)
+    expect(suggestNextGoal([walkDaily])).toEqual(threeAWeek)
+    expect(describeGoal(minisDaily)).toBe("Hit minis every day")
   })
 })
 

@@ -14,6 +14,9 @@
   --color-accent-ink: #0b0d05;
   --color-muted: #9299a5;
   --color-faint: #737a86;
+  /* The streak rings beside the accent: walks and mini workouts (src/domain/streaks.ts RING_COLORS). */
+  --color-walk: #ff6fb5;
+  --color-mini: #4cc2ff;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif;
   --font-display: "Barlow Condensed", "SF Pro Display", ui-sans-serif, system-ui, sans-serif;
 

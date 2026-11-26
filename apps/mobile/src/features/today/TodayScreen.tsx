@@ -3,16 +3,20 @@ import type { ReactNode } from "react"
 import { Pressable, View } from "react-native"
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg"
 import { isCardio } from "~/domain/catalog"
-import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal } from "~/domain/streaks"
+import { localDay } from "~/domain/health"
+import { miniRange, miniSessions } from "~/domain/minis"
+import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal, type WeekSession } from "~/domain/streaks"
 import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
-import type { ActivityEntry, Adjustment } from "~/server/repo"
+import type { Adjustment } from "~/server/repo"
 import { describeError } from "@/api/client"
 import { call } from "@/api/session"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "@/components/icons"
 import { Button, Card, CARD_CLASS, Display, Divider, ErrorNote, Eyebrow, Loading, PageTitle, Screen, SectionTitle, Text } from "@/components/ui"
 import { useAction, useCall } from "@/data/calls"
 import { RecoveryCard } from "@/features/health/RecoveryCard"
+import { MiniCard } from "@/features/minis/MiniCard"
 import { NutritionCard } from "@/features/nutrition/NutritionCard"
+import { DayRings } from "@/components/rings"
 import { useUser } from "@/features/user"
 import { cn } from "@/lib/cn"
 import { useNow } from "@/lib/useNow"
@@ -27,6 +31,7 @@ export function TodayScreen() {
   const navigation = useNavigation()
   const now = useNow()
   const { data, error: loadError } = useCall("getToday", {})
+  const metDays = useCall("getMinis", miniRange(localDay(now))).data?.metDays ?? []
   const { act, pending, error } = useAction()
 
   if (!data) {
@@ -55,7 +60,7 @@ export function TodayScreen() {
       <PageTitle eyebrow={longDay.format(now)}>{`Hi ${user.displayName}`}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} onPress={() => navigation.navigate("Calendar")} />
+      <WeekCard activity={[...activity, ...miniSessions(metDays)]} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} onPress={() => navigation.navigate("Calendar")} />
 
       {activeWorkout ? (
         <Hero eyebrow="In progress" title={activeWorkout.name}>
@@ -125,6 +130,8 @@ export function TodayScreen() {
       )}
 
       <RecoveryCard now={now} />
+
+      <MiniCard now={now} />
 
       <NutritionCard now={now} />
 
@@ -238,7 +245,8 @@ function Hero({ eyebrow, title, children }: HeroProps) {
 }
 
 interface WeekCardProps {
-  readonly activity: ReadonlyArray<ActivityEntry>
+  /** The workouts of the last few days, and the days the mini workout targets were met. */
+  readonly activity: ReadonlyArray<WeekSession>
   readonly goals: ReadonlyArray<StreakGoal>
   readonly now: number
   readonly unit: string
@@ -270,6 +278,7 @@ function WeekCard({ activity, goals, now, unit, onPress }: WeekCardProps) {
       <View accessibilityLabel="Days trained this week" className="flex-row pt-3">
         {WEEKDAYS.map((name, index) => {
           const mark = week.days[index] ?? null
+          const rings = week.rings[index] ?? []
           const isToday = week.todayIndex === index
 
           return (
@@ -280,20 +289,13 @@ function WeekCard({ activity, goals, now, unit, onPress }: WeekCardProps) {
               className="flex-1 items-center gap-1.5"
             >
               <Text className={cn("text-xs font-semibold", isToday ? "text-chalk" : "text-faint")}>{name.charAt(0)}</Text>
-              <View
-                className={cn(
-                  "size-9 items-center justify-center rounded-full",
-                  mark === "counted"
-                    ? "bg-accent"
-                    : mark === "other"
-                      ? "border-2 border-accent bg-accent/15"
-                      : isToday
-                        ? "border-2 border-accent/70"
-                        : "border border-line bg-raised/50",
-                )}
+              <DayRings
+                rings={rings}
+                other={mark === "other"}
+                className={cn("size-9", mark === null ? (isToday ? "border-2 border-dashed border-white/50" : "border border-line bg-raised/50") : "")}
               >
-                {mark === "counted" ? <CheckIcon color={colors.accentInk} /> : null}
-              </View>
+                {mark === "counted" && rings.length === 1 ? <CheckIcon size={14} color={colors.white} /> : null}
+              </DayRings>
             </View>
           )
         })}

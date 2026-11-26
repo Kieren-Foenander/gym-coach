@@ -25,7 +25,7 @@ import {
   isTestStage,
   type CoachAppId,
 } from "~/domain/coach-apps"
-import { CHOICE_STATES, SAVE_STATES, testIds } from "~/domain/test-ids"
+import { CHOICE_STATES, GOAL_SLOTS, SAVE_STATES, testIds } from "~/domain/test-ids"
 import {
   ACTIVITY_HINTS,
   ACTIVITY_LABELS,
@@ -35,11 +35,15 @@ import {
   isFrequency,
   MAX_STREAK_GOALS,
   normaliseGoal,
+  RING_COLORS,
+  ringFor,
   STREAK_ACTIVITIES,
-  suggestSecondGoal,
+  suggestNextGoal,
   type StreakGoal,
 } from "~/domain/streaks"
 import { getDeployment, signOut, updateProfile } from "~/functions/api"
+
+const SLOT_NAMES = ["Main goal", "Second goal", "Third goal"] as const
 
 export const Route = createFileRoute("/_app/settings")({
   loader: () => getDeployment(),
@@ -166,7 +170,7 @@ function Choice({ testId, label, selected, onClick }: ChoiceProps) {
   )
 }
 
-/** What the calendar's streaks count and how often: one goal, or two with the first leading. */
+/** What the calendar's streaks count and how often: one goal, or up to three with the first leading. */
 function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> }) {
   const { act, pending, error } = useAction()
   const [goals, setGoals] = useState(saved)
@@ -190,15 +194,23 @@ function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> 
   return (
     <Card>
       <p className="pb-4 text-muted">
-        Your streak counts what you set here. A walk on its own only counts toward a goal for walks or for anything.
+        Your streak counts what you set here. A walk on its own only counts toward a goal for walks or for anything. Each
+        goal rings the days it counts on the calendar in its own colour.
       </p>
       <div className="space-y-5">
         {goals.map((goal, index) => (
-          <fieldset key={index} className="space-y-3" data-testid={testIds.settings.streakGoal(index === 0 ? "main" : "second")}>
+          <fieldset key={index} className="space-y-3" data-testid={testIds.settings.streakGoal(GOAL_SLOTS[index] ?? "third")}>
             <legend className="flex w-full items-center justify-between gap-3 pb-1">
-              <span>
-                <span className="eyebrow block text-xs text-faint">{index === 0 ? "Main goal" : "Second goal"}</span>
-                <span className="display block text-2xl">{describeGoal(goal)}</span>
+              <span className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="size-6 shrink-0 rounded-full"
+                  style={{ borderWidth: 3, borderStyle: "solid", borderColor: RING_COLORS[ringFor(goal.activity)] }}
+                />
+                <span>
+                  <span className="eyebrow block text-xs text-faint">{SLOT_NAMES[index] ?? "Goal"}</span>
+                  <span className="display block text-2xl">{describeGoal(goal)}</span>
+                </span>
               </span>
               {index > 0 ? (
                 <button
@@ -246,9 +258,9 @@ function StreakGoalsCard({ saved }: { readonly saved: ReadonlyArray<StreakGoal> 
           <Button
             className="w-full"
             data-testid={testIds.settings.addStreakGoal}
-            onClick={() => edit([...goals, suggestSecondGoal(first)])}
+            onClick={() => edit([...goals, suggestNextGoal(goals)])}
           >
-            Add a second goal
+            {goals.length === 1 ? "Add a second goal" : "Add a third goal"}
           </Button>
         ) : null}
         <ErrorNote message={error} />

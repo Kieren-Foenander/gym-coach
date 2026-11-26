@@ -1,23 +1,27 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronIcon, FlameIcon } from "~/components/icons"
+import { MiniCard } from "~/components/minis"
 import { NutritionCard } from "~/components/nutrition"
+import { DayRings } from "~/components/rings"
+import { miniSessions } from "~/domain/minis"
 import { Button, buttonClass, Card, cardClass, ErrorNote, PageTitle, SectionTitle, useAction, useNow } from "~/components/ui"
 import { localDay } from "~/domain/health"
 import { daysAround } from "~/domain/days"
 import { dayState, testIds } from "~/domain/test-ids"
 import { startOfWeek } from "~/domain/week"
-import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal } from "~/domain/streaks"
+import { activeGoals, describeGoalStreak, MARK_WORDS, summariseWeek, type StreakGoal, type WeekSession } from "~/domain/streaks"
 import { isCardio } from "~/domain/catalog"
 import { estimateMinutes, formatCompact, formatDay, formatPrescription, formatReps, formatWeight } from "~/format"
-import { deleteCoachNote, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
-import type { ActivityEntry, Adjustment } from "~/server/repo"
+import { deleteCoachNote, getMinis, getNutrition, getToday, startOpenWorkout, startWorkout } from "~/functions/api"
+import type { Adjustment } from "~/server/repo"
 
 export const Route = createFileRoute("/_app/")({
   loader: async () => {
     // The days that may be today wherever the browser is; the screen picks its own.
-    const [today, nutrition] = await Promise.all([getToday(), getNutrition({ data: daysAround(Date.now()) })])
+    const around = daysAround(Date.now())
+    const [today, nutrition, minis] = await Promise.all([getToday(), getNutrition({ data: around }), getMinis({ data: around })])
 
-    return { ...today, nutrition }
+    return { ...today, nutrition, minis }
   },
   component: TodayPage,
 })
@@ -27,7 +31,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 const longDay = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" })
 
 function TodayPage() {
-  const { today, activity, nutrition } = Route.useLoaderData()
+  const { today, activity, nutrition, minis } = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const navigate = useNavigate()
   const now = useNow()
@@ -47,7 +51,7 @@ function TodayPage() {
       <PageTitle eyebrow={now === null ? "" : longDay.format(now)}>Hi {user.displayName}</PageTitle>
       <ErrorNote message={error} />
 
-      <WeekCard activity={activity} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} />
+      <WeekCard activity={[...activity, ...miniSessions(minis.metDays)]} goals={activeGoals(user.streakGoals)} now={now} unit={user.unit} />
 
       {today.activeWorkout ? (
         <Hero eyebrow="In progress" title={today.activeWorkout.name}>
@@ -125,6 +129,8 @@ function TodayPage() {
           <p className="pt-2 text-sm text-faint">An open workout follows no plan. You add exercises as you go.</p>
         </>
       )}
+
+      <MiniCard day={now === null ? undefined : minis.days.find((item) => item.day === localDay(now))} />
 
       <NutritionCard
         day={now === null ? undefined : nutrition.days.find((item) => item.day === localDay(now))}
@@ -238,7 +244,8 @@ const dayOfWeek = (now: number, index: number) => {
 }
 
 interface WeekCardProps {
-  readonly activity: ReadonlyArray<ActivityEntry>
+  /** The workouts of the last few days, and the days the mini workout targets were met. */
+  readonly activity: ReadonlyArray<WeekSession>
   readonly goals: ReadonlyArray<StreakGoal>
   readonly now: number | null
   readonly unit: string
@@ -273,6 +280,7 @@ function WeekCard({ activity, goals, now, unit }: WeekCardProps) {
       <ol className="grid grid-cols-7 gap-1 pt-3" aria-label="Days trained this week">
         {WEEKDAYS.map((name, index) => {
           const mark = week?.days[index] ?? null
+          const rings = week?.rings[index] ?? []
           const isToday = week?.todayIndex === index
 
           return (
@@ -283,20 +291,14 @@ function WeekCard({ activity, goals, now, unit }: WeekCardProps) {
               data-state={dayState(mark)}
             >
               <span className={`text-xs font-semibold ${isToday ? "text-white" : "text-faint"}`}>{name.charAt(0)}</span>
-              <span
-                className={`flex size-9 items-center justify-center rounded-full ${
-                  mark === "counted"
-                    ? "bg-accent text-accent-ink"
-                    : mark === "other"
-                      ? "border-2 border-accent bg-accent/15"
-                      : isToday
-                        ? "border-2 border-accent/70"
-                        : "border border-line bg-raised/50"
-                }`}
+              <DayRings
+                rings={rings}
+                other={mark === "other"}
+                className={`size-9 ${mark === null ? (isToday ? "border-2 border-dashed border-white/50" : "border border-line bg-raised/50") : "text-white"}`}
               >
-                {mark === "counted" ? <CheckIcon /> : null}
+                {mark === "counted" && rings.length === 1 ? <CheckIcon className="size-3.5" /> : null}
                 <span className="sr-only">{mark ? MARK_WORDS[mark] : "Nothing logged"}</span>
-              </span>
+              </DayRings>
             </li>
           )
         })}
