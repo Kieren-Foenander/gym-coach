@@ -81,18 +81,24 @@ export const vapidAuthorization = async (endpoint: string, keys: VapidKeys, subj
 /** How long a signed token is used before a new one is made. Apple asks for no more than one an hour. */
 const TOKEN_REUSE_MS = 60 * 60_000
 
-const tokens = new Map<string, { readonly header: string; readonly until: number }>()
+const tokens = new Map<string, { readonly header: Promise<string>; readonly until: number }>()
 
-/** The Authorization header for a push service, reusing the token made for it within the last hour. */
-const cachedAuthorization = async (endpoint: string, keys: VapidKeys, subject: string, now: number): Promise<string> => {
+/**
+ * The Authorization header for a push service, reusing the token made for it within the last
+ * hour. The token being made is shared too, so pushes sent at once sign once. This lasts as long
+ * as the Worker's isolate does; a fresh one signs again, which is still within what Apple allows.
+ */
+const cachedAuthorization = (endpoint: string, keys: VapidKeys, subject: string, now: number): Promise<string> => {
   const key = `${new URL(endpoint).origin} ${keys.publicKey} ${subject}`
   const kept = tokens.get(key)
 
   if (kept && kept.until > now) return kept.header
 
-  const header = await vapidAuthorization(endpoint, keys, subject, now)
+  const header = vapidAuthorization(endpoint, keys, subject, now)
 
   tokens.set(key, { header, until: now + TOKEN_REUSE_MS })
+  // A failed signing is not kept, so the next push tries again.
+  header.catch(() => tokens.delete(key))
 
   return header
 }
@@ -171,12 +177,15 @@ export const sendPush = async (
   keys: VapidKeys,
   subject: string,
   now: number,
-  timeToLiveSeconds: number = MAX_TIME_TO_LIVE_SECONDS,
+  /** When the message stops being worth delivering, such as when the nudge window closes. */
+  expiresAt?: number,
 ): Promise<PushOutcome> => {
   if (!isPushEndpoint(subscription.endpoint)) return "gone"
 
   const body = await encryptPayload(JSON.stringify(message), subscription)
-  const ttl = Math.max(0, Math.min(MAX_TIME_TO_LIVE_SECONDS, Math.floor(timeToLiveSeconds)))
+  // Worked out as it goes, so time spent getting here does not stretch it past the expiry.
+  const left = expiresAt === undefined ? MAX_TIME_TO_LIVE_SECONDS : Math.floor((expiresAt - Date.now()) / 1000)
+  const ttl = Math.max(0, Math.min(MAX_TIME_TO_LIVE_SECONDS, left))
 
   const response = await fetch(subscription.endpoint, {
     method: "POST",

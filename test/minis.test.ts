@@ -157,8 +157,8 @@ describe("what a nudge asks for", () => {
   })
 
   it("asks for more at a time when the day is running short, up to twice the usual", () => {
-    // An hour and a half left with a 45 minute gap: three nudges for four nudges' worth.
-    expect(chooseNudge([PUSH_UPS], dayProgress([PUSH_UPS], []), 90, 45, null, () => 0)?.amount).toBe(35)
+    // An hour and a half left with a 45 minute gap: nudges now and in 45 minutes (90 is closed), two for four nudges' worth.
+    expect(chooseNudge([PUSH_UPS], dayProgress([PUSH_UPS], []), 90, 45, null, () => 0)?.amount).toBe(50)
     // No time at all: one last nudge, capped at twice the usual.
     expect(chooseNudge([PUSH_UPS], dayProgress([PUSH_UPS], []), 0, 45, null, () => 0)?.amount).toBe(50)
   })

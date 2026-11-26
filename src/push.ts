@@ -87,11 +87,18 @@ export const unsubscribe = async (): Promise<string | null> => {
 
 /**
  * Stops nudges in this browser before signing out, so the next person to sign in here does not
- * get the last one's. Tells the server first, while still signed in. Never fails the sign-out.
+ * get the last one's, and closes any still showing. Tells the server first, while still signed
+ * in. Never fails the sign-out.
  */
 export const forgetThisBrowser = async (tellServer: (endpoint: string) => Promise<void>): Promise<void> => {
   try {
-    const subscription = await currentSubscription()
+    const worker = pushSupport() === "ready" ? await navigator.serviceWorker.getRegistration(WORKER_URL) : undefined
+
+    if (!worker) return
+
+    for (const notification of await worker.getNotifications()) notification.close()
+
+    const subscription = await worker.pushManager.getSubscription()
 
     if (!subscription) return
 

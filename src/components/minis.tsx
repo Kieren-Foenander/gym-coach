@@ -285,6 +285,8 @@ interface SettingsFormProps {
 export function MiniSettingsForm({ settings, today }: SettingsFormProps) {
   const { act, pending, error } = useAction()
   const [form, setForm] = useState<MiniForm>(() => miniFormFor(settings))
+  // The targets the form started from, so the server keeps any that grew since (keepGrowth in src/server/minis.ts).
+  const [base, setBase] = useState(settings.targets)
   const [problem, setProblem] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -311,7 +313,11 @@ export function MiniSettingsForm({ settings, today }: SettingsFormProps) {
     }
 
     void act(async () => {
-      await updateMinis({ data: { day: today, settings: next.settings } })
+      // What was saved, which may differ: a target saved unchanged keeps growth it earned meanwhile.
+      const stored = await updateMinis({ data: { day: today, settings: next.settings, base } })
+
+      setForm(miniFormFor(stored))
+      setBase(stored.targets)
       setSaved(true)
     })
   }
@@ -465,7 +471,11 @@ export function PauseNudges({ settings, today }: PauseProps) {
   if (!settings.nudges || settings.targets.length === 0) return null
 
   const setPause = (pausedUntil: string | null) =>
-    void act(() => updateMinis({ data: { day: today, settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil } } }).then(() => undefined))
+    void act(async () => {
+      await updateMinis({
+        data: { day: today, settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil }, base: settings.targets },
+      })
+    })
 
   return (
     <div className="pt-3">

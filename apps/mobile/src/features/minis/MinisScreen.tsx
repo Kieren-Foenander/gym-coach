@@ -295,6 +295,8 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
   const [problem, setProblem] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [picking, setPicking] = useState(false)
+  // The targets the form started from, so the server keeps any that grew since (keepGrowth in src/server/minis.ts).
+  const [base, setBase] = useState(settings.targets)
 
   const edit = (next: MiniForm) => {
     setForm(next)
@@ -318,7 +320,11 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
     }
 
     void act(async () => {
-      await call("updateMinis", { day: today, settings: next.settings })
+      // What was saved, which may differ: a target saved unchanged keeps growth it earned meanwhile.
+      const stored = await call("updateMinis", { day: today, settings: next.settings, base })
+
+      setForm(miniFormFor(stored))
+      setBase(stored.targets)
       setSaved(true)
     })
   }
@@ -454,7 +460,11 @@ function PauseNudges({ settings, today }: { readonly settings: MiniSettings; rea
 
   const setPause = (pausedUntil: string | null) =>
     void act(async () => {
-      await call("updateMinis", { day: today, settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil } })
+      await call("updateMinis", {
+        day: today,
+        settings: { ...settings, timeZone: settings.timeZone || deviceTimeZone(), pausedUntil },
+        base: settings.targets,
+      })
     })
 
   return (

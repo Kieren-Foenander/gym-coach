@@ -156,6 +156,28 @@ describe("logging mini workouts", () => {
     expect((await server.request("call/deleteMini", { token: other.token, body: { entryId: entry.id } })).status).toBe(404)
   })
 
+  it("counts the day done when sets logged at once finish it, whichever request ends last", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { targets: [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 0 }] })
+    await Promise.all([
+      me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 40 }),
+      me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 60 }),
+    ])
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).metDays).toEqual([DAY])
+  })
+
+  it("never writes back a planned nudge time when a set is logged", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    server.exec(`UPDATE mini_days SET next_nudge_at = 123456 WHERE day = '${DAY}'`)
+    await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25 })
+
+    expect(server.readText(`SELECT CAST(next_nudge_at AS TEXT) FROM mini_days WHERE day = '${DAY}'`)).toBe("123456")
+  })
+
   it("never shows in the training history or counts as a workout", async () => {
     const me = await server.signUp()
 
@@ -261,10 +283,11 @@ describe("nudges", () => {
 
     await setUp(me, { targets: [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 20, growBy: 0 }], gapMinutes: 60 })
     await subscribe(me)
-    // Two hours left, so three nudges at most: 100 asks for 35 at a time, not 20.
+    // Two hours left with an hour gap: nudges at 15:00 and 16:00 only, as 17:00 is closed. 100 asks for 50,
+    // held to twice the usual: 40.
     await tick(Date.parse(`${DAY}T15:00:00Z`))
 
-    expect((await message(0)).title).toBe("Got time for 35 push-ups?")
+    expect((await message(0)).title).toBe("Got time for 40 push-ups?")
   })
 
   it("sends nothing outside the window, on a day off, while paused, or while a workout is open", async () => {
@@ -430,6 +453,63 @@ describe("nudges", () => {
     expect((await me.call("getMinis", { from: DAY, to: DAY })).push.devices).toBe(0)
   })
 
+  it("logs an answer in what the nudge asked for, even after the target changed to another unit", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await tick(TEN_AM)
+
+    const nudge = (await me.call("getMinis", { from: DAY, to: DAY })).nudges[0]!
+
+    await setUp(me, { targets: [{ exercise: "Push-Up", unit: "seconds", daily: 100, chunk: 25, growBy: 0 }, SETTINGS.targets[1]!] })
+
+    const entry = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25, nudgeId: nudge.id })
+
+    expect(entry).toMatchObject({ exercise: "Push-Up", unit: "reps" })
+    expect((await today(me)).progress[0]).toMatchObject({ unit: "seconds", done: 0 })
+  })
+
+  it("sends nothing when the settings change after a run has claimed a nudge", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    // A save that lands the moment the run claims the nudge: it turns nudges off.
+    server.exec(`CREATE TRIGGER save_mid_claim AFTER UPDATE OF next_nudge_at ON mini_days WHEN NEW.next_nudge_at > ${TEN_AM}
+      BEGIN UPDATE users SET mini_revision = mini_revision + 1, mini_settings = json_set(mini_settings, '$.nudges', json('false')); END`)
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toEqual([])
+  })
+
+  it("keeps the gap across midnight", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { startMinute: 0, endMinute: 1440 })
+    await subscribe(me)
+
+    const lateNight = Date.parse(`${DAY}T23:55:00Z`)
+
+    clockAt(lateNight)
+    expect((await tick(lateNight)).sent).toBe(1)
+    expect((await tick(lateNight + 5 * 60_000)).sent).toBe(0)
+    expect((await tick(lateNight + 40 * 60_000)).sent).toBe(0)
+    expect((await tick(lateNight + 45 * 60_000)).sent).toBe(1)
+  })
+
+  it("uses the last cron run before the window closes", async () => {
+    const me = await server.signUp()
+
+    await setUp(me, { startMinute: 10 * 60, endMinute: 10 * 60 + 31, gapMinutes: 30 })
+    await subscribe(me)
+
+    expect((await tick(TEN_AM)).sent).toBe(1)
+    expect((await tick(TEN_AM + 30 * 60_000)).sent).toBe(1)
+  })
+
   it("keeps the address the request came to, not the one the browser sends, and moves a browser to whoever subscribes it", async () => {
     const me = await server.signUp()
     const other = await server.signUp()
@@ -464,12 +544,14 @@ describe("growing targets", () => {
     await setUp(me, settings, week[0])
 
     for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
       await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
 
       if (day !== "2026-11-18") await me.call("logMini", { day, exercise: "Sit-Up", amount: 50 })
     }
 
     // The first thing logged in the next week looks back at the last one.
+    clockAt(Date.parse("2026-11-23T10:00:00Z"))
     await me.call("logMini", { day: "2026-11-23", exercise: "Push-Up", amount: 10 })
 
     const minis = await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })
@@ -488,13 +570,62 @@ describe("growing targets", () => {
 
     await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
 
-    for (const day of week) await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
 
     // Monday: the screen still shows 100 when the user pauses for the day.
     const saved = await setUp(me, { targets, days: [0, 1, 2, 3, 4], pausedUntil: "2026-11-24" }, "2026-11-23")
 
     expect(saved.targets[0]!.daily).toBe(110)
     expect((await today(me, "2026-11-23")).progress[0]!.target).toBe(110)
+    expect((await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })).settings.targets[0]!.daily).toBe(110)
+  })
+
+  it("keep the growth through a second save from a form that still shows the old target", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
+
+    clockAt(Date.parse("2026-11-23T10:00:00Z"))
+
+    const settings = { ...SETTINGS, targets, days: [0, 1, 2, 3, 4] }
+
+    // Both saves come from a form loaded before the week was reviewed, so it starts from 100.
+    await me.call("updateMinis", { day: "2026-11-23", settings: { ...settings, pausedUntil: "2026-11-24" }, base: targets })
+
+    const saved = await me.call("updateMinis", { day: "2026-11-23", settings: { ...settings, endMinute: 18 * 60 }, base: targets })
+
+    expect(saved.targets[0]!.daily).toBe(110)
+    expect((await today(me, "2026-11-23")).progress[0]!.target).toBe(110)
+  })
+
+  it("review the account's own week, not one a set logged ahead of time names", async () => {
+    const me = await server.signUp()
+    const week = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
+    const targets = [{ exercise: "Push-Up", unit: "reps", daily: 100, chunk: 25, growBy: 10 }] as const
+
+    await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
+
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
+
+    // On the Friday, a set logged for a week later does not mark the coming week as reviewed.
+    await me.call("logMini", { day: "2026-11-30", exercise: "Push-Up", amount: 10 })
+
+    clockAt(Date.parse("2026-11-23T10:00:00Z"))
+    await me.call("logMini", { day: "2026-11-23", exercise: "Push-Up", amount: 10 })
+
     expect((await me.call("getMinis", { from: "2026-11-23", to: "2026-11-23" })).settings.targets[0]!.daily).toBe(110)
   })
 
@@ -505,7 +636,10 @@ describe("growing targets", () => {
 
     await setUp(me, { targets, days: [0, 1, 2, 3, 4] }, week[0])
 
-    for (const day of week) await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    for (const day of week) {
+      clockAt(Date.parse(`${day}T10:00:00Z`))
+      await me.call("logMini", { day, exercise: "Push-Up", amount: 100 })
+    }
 
     const saved = await setUp(me, { targets: [{ ...targets[0], daily: 80 }], days: [0, 1, 2, 3, 4] }, "2026-11-23")
 

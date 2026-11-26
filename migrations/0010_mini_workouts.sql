@@ -44,11 +44,6 @@ CREATE TABLE mini_sets (
 );
 CREATE INDEX mini_sets_user_day ON mini_sets (user_id, day);
 CREATE UNIQUE INDEX mini_sets_client_key ON mini_sets (user_id, client_key) WHERE client_key IS NOT NULL;
--- A nudge is answered by one set at most, however many devices answer it.
-CREATE UNIQUE INDEX mini_sets_nudge ON mini_sets (nudge_id) WHERE nudge_id IS NOT NULL;
-
--- When the user last sent themselves a test notification, so a test cannot be sent over and over.
-ALTER TABLE users ADD COLUMN push_tested_at INTEGER;
 
 -- Browsers (the installed web app) that receive nudges. The origin is the address the app was
 -- opened at, which a notification opens again and the push signature names.

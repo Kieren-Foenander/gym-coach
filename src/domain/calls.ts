@@ -10,6 +10,7 @@ import {
   Id,
   MeasurementInput,
   MiniSettingsInput,
+  MiniTargetInput,
   PlanExercisePatch,
   ProfilePatch,
   PushSubscriptionInput,
@@ -94,8 +95,15 @@ export const CallInputs = {
   // mini workouts
   /** Mini workouts from one day to another (a phone asks for the days around its today), with the settings. */
   getMinis: Schema.Struct({ from: Day, to: Day }),
-  /** Saves the settings. `day` is the phone's today, which takes the new targets at once. */
-  updateMinis: Schema.Struct({ day: Day, settings: MiniSettingsInput }),
+  /**
+   * Saves the settings. `day` is the phone's today, which takes the new targets at once. `base` is
+   * the targets the form was loaded with, so a target sent unchanged keeps one that grew meanwhile.
+   */
+  updateMinis: Schema.Struct({
+    day: Day,
+    settings: MiniSettingsInput,
+    base: Schema.optional(Schema.Array(MiniTargetInput).check(Schema.isMaxLength(MINI_LIMITS.targets))),
+  }),
   logMini: Schema.Struct({
     day: Day,
     exercise: ExerciseName,

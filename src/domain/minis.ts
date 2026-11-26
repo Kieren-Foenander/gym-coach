@@ -261,7 +261,7 @@ export const chooseNudge = (
   const picked = pool.find((_, index) => (roll -= weights[index]!) < 0) ?? pool.at(-1)!
 
   // How many nudges are left for it: what it wants, or its share of the time left when that is short.
-  const slots = Math.max(1, Math.floor(Math.max(0, minutesLeft) / gapMinutes) + 1)
+  const slots = nudgeSlots(minutesLeft, gapMinutes)
   const total = open.reduce((sum, item) => sum + wanted(item), 0)
   const share = total <= slots ? wanted(picked) : Math.max(1, Math.floor((slots * wanted(picked)) / total))
   const left = remainingOf(picked)
@@ -279,12 +279,26 @@ export const afterAsk = (progress: ReadonlyArray<MiniProgress>, ask: NudgeAsk): 
 export const CRON_MINUTES = 5
 
 /**
+ * The latest a nudge can still be due, in minutes from a cron run now: the last run before the
+ * window closes. Runs come every CRON_MINUTES on the clock, and every time zone is a whole number
+ * of quarter hours from UTC, so they land on the same minutes wherever the user is.
+ */
+const lastRunWithin = (minutesLeft: number) => Math.floor((minutesLeft - 1) / CRON_MINUTES) * CRON_MINUTES
+
+/** How many nudges still fit in the window from a cron run now, one now and then one a gap apart, each on a run. */
+export const nudgeSlots = (minutesLeft: number, gapMinutes: number): number => {
+  const gap = Math.ceil(gapMinutes / CRON_MINUTES) * CRON_MINUTES
+
+  return 1 + Math.max(0, Math.floor(lastRunWithin(minutesLeft) / gap))
+}
+
+/**
  * Minutes until the next nudge, spreading what is still needed over the time left with some
- * randomness, never sooner than the gap and early enough for a cron run to catch before the window
+ * randomness, never sooner than the gap and no later than the last cron run before the window
  * closes. Null when nothing is needed or no such time is left.
  */
 export const nextNudgeDelay = (needed: number, minutesLeft: number, gapMinutes: number, random: () => number): number | null => {
-  const latest = minutesLeft - CRON_MINUTES
+  const latest = lastRunWithin(minutesLeft)
 
   if (needed <= 0 || latest < gapMinutes) return null
 
