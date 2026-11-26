@@ -597,6 +597,52 @@ describe("nudges", () => {
     vi.restoreAllMocks()
   })
 
+  it("posts to no browser that was signed in to another account while the push was being prepared", async () => {
+    const me = await server.signUp()
+    const other = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+
+    // The browser is handed to another account while the push for this one is signed.
+    const sign = crypto.subtle.sign.bind(crypto.subtle)
+
+    vi.spyOn(crypto.subtle, "sign").mockImplementation((...args: Parameters<typeof crypto.subtle.sign>) => {
+      server.exec(`UPDATE push_subscriptions SET user_id = (SELECT id FROM users WHERE email = '${other.email}')`)
+
+      return sign(...args)
+    })
+
+    expect((await tick(TEN_AM)).sent).toBe(0)
+    expect(pushes).toHaveLength(0)
+    vi.restoreAllMocks()
+  })
+
+  it("checks again before each browser, so one turned off after the first went gets nothing", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+    await subscribe(me)
+    await me.call("subscribePush", {
+      subscription: { endpoint: "https://web.push.apple.com/device-2", keys: { p256dh: browser.p256dh, auth: browser.auth } },
+      origin: "https://gym.example.com",
+    })
+
+    // Nudges are turned off as soon as the first browser has been posted to.
+    vi.stubGlobal("fetch", async (input: string, init: RequestInit) => {
+      pushes.push({ url: input, headers: new Headers(init.headers), body: new Uint8Array(await new Response(init.body).arrayBuffer()) })
+      server.exec(`UPDATE users SET mini_revision = mini_revision + 1, mini_settings = json_set(mini_settings, '$.nudges', json('false'))`)
+
+      return new Response(null, { status: 201 })
+    })
+
+    await server.run(runNudges(TEN_AM, () => 0))
+
+    expect(pushes).toHaveLength(1)
+    // It reached one browser, so it stays on record to be answered.
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).nudges).toHaveLength(1)
+  })
+
   it("asks for nothing that was finished after the run chose it", async () => {
     const me = await server.signUp()
 
@@ -676,20 +722,59 @@ describe("nudges", () => {
 })
 
 describe("the day's targets", () => {
-  it("keep a save's targets for its day even when another write moves the settings on just after it", async () => {
+  it("go in with the settings as one: a save whose day targets cannot be written saves nothing", async () => {
     const me = await server.signUp()
 
     await setUp(me)
 
-    // Whatever writes the settings next (the weekly review, say) does so the moment this save lands.
-    server.exec(`CREATE TRIGGER write_after_save AFTER UPDATE OF mini_settings ON users
-      WHEN json_extract(NEW.mini_settings, '$.targets[0].daily') = 125
-      BEGIN UPDATE users SET mini_revision = mini_revision + 1 WHERE id = NEW.id; END`)
+    // Writing the day's new targets fails, after the settings themselves were written in the same save.
+    server.exec(`CREATE TRIGGER refuse_targets BEFORE UPDATE OF targets ON mini_days WHEN NEW.targets LIKE '%"daily":125%'
+      BEGIN SELECT RAISE(ABORT, 'refused'); END`)
 
-    const saved = await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, daily: 125 }, SETTINGS.targets[1]!] })
+    const body = { day: DAY, settings: { ...SETTINGS, targets: [{ ...SETTINGS.targets[0]!, daily: 125 }, SETTINGS.targets[1]!] } }
 
-    expect(saved.targets[0]!.daily).toBe(125)
-    expect((await today(me)).progress[0]!.target).toBe(125)
+    expect((await server.request("call/updateMinis", { token: me.token, body })).status).toBe(500)
+
+    const minis = await me.call("getMinis", { from: DAY, to: DAY })
+
+    expect(minis.settings.targets[0]!.daily).toBe(100)
+    expect(minis.days[0]!.progress[0]!.target).toBe(100)
+  })
+
+  it("take a save's targets on every day still open, and keep both agreeing on whether each is done", async () => {
+    const me = await server.signUp()
+    const tomorrow = shiftDay(DAY, 1)
+
+    await setUp(me)
+    // A day logged ahead, done against today's targets, then a bigger target saved today.
+    await me.call("logMini", { day: tomorrow, exercise: "Push-Up", amount: 100 })
+    await me.call("logMini", { day: tomorrow, exercise: "Sit-Up", amount: 50 })
+    await setUp(me, { targets: [{ ...SETTINGS.targets[0]!, daily: 125 }, SETTINGS.targets[1]!] })
+
+    const minis = await me.call("getMinis", { from: tomorrow, to: tomorrow })
+
+    expect(minis.days[0]).toMatchObject({ met: false, progress: [{ target: 125, done: 100 }, { target: 50, done: 50 }] })
+    expect(minis.metDays).not.toContain(tomorrow)
+  })
+
+  it("keep a day that has ended closed when the time zone moves west", async () => {
+    const me = await server.signUp()
+
+    // Thursday done in Brisbane; by Friday morning there, it is still Thursday in Los Angeles.
+    await setUp(me, { timeZone: "Australia/Brisbane" })
+    await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 100 })
+    await me.call("logMini", { day: DAY, exercise: "Sit-Up", amount: 50 })
+
+    clockAt(Date.parse(`${DAY}T23:00:00Z`))
+    await me.call("updateMinis", {
+      day: shiftDay(DAY, 1),
+      settings: { ...SETTINGS, timeZone: "America/Los_Angeles", targets: [{ ...SETTINGS.targets[0]!, daily: 125 }, SETTINGS.targets[1]!] },
+    })
+
+    const minis = await me.call("getMinis", { from: DAY, to: DAY })
+
+    expect(minis.days[0]).toMatchObject({ met: true, progress: [{ target: 100 }, { target: 50 }] })
+    expect(minis.metDays).toEqual([DAY])
   })
 
   it("follow the settings until the day is over, for a day logged ahead of an account with no time zone yet", async () => {
