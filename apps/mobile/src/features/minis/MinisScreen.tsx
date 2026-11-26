@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import { Pressable, Switch, View } from "react-native"
 import { localDay } from "~/domain/health"
-import { shiftDay } from "~/domain/days"
 import {
+  attemptOf,
   dayFraction,
   describeAmount,
   formatMiniAmount,
+  isPaused,
+  makeAttemptKeys,
   MINI_LIMITS,
   MINI_UNITS,
   miniFormFor,
@@ -53,6 +55,8 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
   const { data, error } = useCall("getMinis", miniRange(today))
   const user = useUser()
   const { act, pending, error: actionError } = useAction()
+  // A set tried again after an answer that never came keeps its key, so it is logged once.
+  const [keys] = useState(() => makeAttemptKeys(clientKey))
 
   if (!data) {
     return (
@@ -73,7 +77,10 @@ export function MinisScreen({ navigation, route }: AppScreenProps<"Minis">) {
 
   const log = (exercise: string, amount: number, nudgeId?: number) =>
     act(async () => {
-      await call("logMini", { day: today, exercise, amount, nudgeId, clientKey: clientKey() })
+      const attempt = attemptOf(today, exercise, amount, nudgeId)
+
+      await call("logMini", { day: today, exercise, amount, nudgeId, clientKey: keys.keyFor(attempt) })
+      keys.settled(attempt)
     })
 
   return (
@@ -296,7 +303,7 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
   const [saved, setSaved] = useState(false)
   const [picking, setPicking] = useState(false)
   // The targets the form started from, so the server keeps any that grew since (keepGrowth in src/server/minis.ts).
-  const [base, setBase] = useState(settings.targets)
+  const [loaded, setLoaded] = useState(settings)
 
   const edit = (next: MiniForm) => {
     setForm(next)
@@ -321,10 +328,10 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
 
     void act(async () => {
       // What was saved, which may differ: a target saved unchanged keeps growth it earned meanwhile.
-      const stored = await call("updateMinis", { day: today, settings: next.settings, base })
+      const stored = await call("updateMinis", { day: today, settings: next.settings, base: loaded.targets, loaded })
 
       setForm(miniFormFor(stored))
-      setBase(stored.targets)
+      setLoaded(stored)
       setSaved(true)
     })
   }
@@ -454,25 +461,27 @@ function SettingsForm({ settings, today }: { readonly settings: MiniSettings; re
 /** A day off from nudges, or back on. */
 function PauseNudges({ settings, today }: { readonly settings: MiniSettings; readonly today: string }) {
   const { act, pending, error } = useAction()
-  const paused = settings.pausedUntil !== null && settings.pausedUntil > today
+  // Read by the day the nudges follow, in the saved time zone, which a phone that has moved may not be on.
+  const paused = isPaused(settings, Date.now(), today)
 
   if (!settings.nudges || settings.targets.length === 0) return null
 
-  const setPause = (pausedUntil: string | null) =>
+  // Only the pause changes, so a screen showing older settings cannot put them back. The server
+  // works out until when, from the account's own day.
+  const setPause = (pause: boolean) =>
     void act(async () => {
-      // Only the pause changes, so a screen showing older settings cannot put them back.
-      await call("pauseMinis", { day: today, until: pausedUntil })
+      await call("pauseMinis", { day: today, pause })
     })
 
   return (
     <View className="pt-3">
       <ErrorNote message={error} />
       {paused ? (
-        <Button testID={testIds.minis.resume} disabled={pending} onPress={() => setPause(null)}>
+        <Button testID={testIds.minis.resume} disabled={pending} onPress={() => setPause(false)}>
           Nudges paused today. Turn them back on
         </Button>
       ) : (
-        <Button testID={testIds.minis.pauseToday} disabled={pending} onPress={() => setPause(shiftDay(today, 1))}>
+        <Button testID={testIds.minis.pauseToday} disabled={pending} onPress={() => setPause(true)}>
           No more nudges today
         </Button>
       )}

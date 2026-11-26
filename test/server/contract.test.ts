@@ -193,9 +193,9 @@ const STEPS = {
       },
     }),
   pauseMinis: async () => {
-    await record("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+    await record("pauseMinis", { day: DAY, pause: true })
 
-    return record("pauseMinis", { day: DAY, until: null })
+    return record("pauseMinis", { day: DAY, pause: false })
   },
   logMini: () => record("logMini", { day: DAY, exercise: "Push-Up", amount: 25, clientKey: "contract-mini-1" }),
   skipNudge: async () => {

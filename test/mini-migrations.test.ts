@@ -20,6 +20,38 @@ const upTo = (database: DatabaseSync, last: number) => {
   }
 }
 
+describe("0016", () => {
+  it("keeps every set and nudge, and the sets' links to their nudges, and never gives an id out again", () => {
+    const database = new DatabaseSync(":memory:")
+
+    database.exec("PRAGMA foreign_keys = ON")
+    upTo(database, 15)
+    database.exec(`
+      INSERT INTO users (id, email, password_hash, display_name, created_at) VALUES ('u1', 'a@example.com', 'x', 'A', 0);
+      INSERT INTO mini_nudges (id, user_id, day, exercise, unit, amount, sent_at) VALUES (7, 'u1', '2026-11-26', 'Push-Up', 'reps', 25, 0);
+      INSERT INTO mini_sets (id, user_id, day, exercise, exercise_key, unit, amount, nudge_id, created_at) VALUES
+        (3, 'u1', '2026-11-26', 'Push-Up', 'push-up', 'reps', 25, 7, 0),
+        (4, 'u1', '2026-11-26', 'Sit-Up', 'sit-up', 'reps', 10, NULL, 0);`)
+
+    database.exec(migration("0016"))
+
+    expect(database.prepare("SELECT id, nudge_id, exercise_key FROM mini_sets ORDER BY id").all()).toEqual([
+      { id: 3, nudge_id: 7, exercise_key: "push-up" },
+      { id: 4, nudge_id: null, exercise_key: "sit-up" },
+    ])
+    expect(String(database.prepare("SELECT sql FROM sqlite_master WHERE name = 'mini_sets'").get()?.sql)).toMatch(/REFERENCES "?mini_nudges"? \(id\)/)
+
+    // The newest set taken back: the next one gets a new id, not its old one.
+    database.exec("DELETE FROM mini_sets WHERE id = 4")
+    database.exec(`INSERT INTO mini_sets (user_id, day, exercise, unit, amount, created_at) VALUES ('u1', '2026-11-26', 'Sit-Up', 'reps', 10, 0)`)
+    expect(database.prepare("SELECT MAX(id) AS id FROM mini_sets").get()).toEqual({ id: 5 })
+
+    // The links still work: taking a nudge away clears the set's link to it.
+    database.exec("DELETE FROM mini_nudges WHERE id = 7")
+    expect(database.prepare("SELECT nudge_id FROM mini_sets WHERE id = 3").get()).toEqual({ nudge_id: null })
+  })
+})
+
 describe("0011 after 0010", () => {
   it("keeps the first answer to a nudge answered twice, and then lets no nudge be answered twice", () => {
     const database = new DatabaseSync(":memory:")

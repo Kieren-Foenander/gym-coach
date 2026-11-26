@@ -103,9 +103,17 @@ export const CallInputs = {
     day: Day,
     settings: MiniSettingsInput,
     base: Schema.optional(Schema.Array(MiniTargetInput).check(Schema.isMaxLength(MINI_LIMITS.targets))),
+    /**
+     * The settings the form was loaded with. A field sent as it was loaded is one the user left
+     * alone, so it keeps what is saved now, which another device may have changed since.
+     */
+    loaded: Schema.optional(MiniSettingsInput),
   }),
-  /** Pauses nudges until a day (null ends the pause), changing nothing else that is saved. */
-  pauseMinis: Schema.Struct({ day: Day, until: Schema.NullOr(Day) }),
+  /**
+   * Pauses nudges for the rest of today where the account is (true), or ends a pause (false),
+   * changing nothing else that is saved. `day` is the phone's today, used only before the account has a time zone.
+   */
+  pauseMinis: Schema.Struct({ day: Day, pause: Schema.Boolean }),
   logMini: Schema.Struct({
     day: Day,
     exercise: ExerciseName,

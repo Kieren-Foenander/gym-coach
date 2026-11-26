@@ -212,7 +212,48 @@ export const remainingOf = (progress: MiniProgress): number => Math.max(0, progr
 export const miniSessions = (metDays: ReadonlyArray<string>): ReadonlyArray<StreakSession & { readonly volume: number }> =>
   metDays.map((day) => ({ startedAt: middayOf(day), kind: "minis", volume: 0 }))
 
+/**
+ * Client keys for logging sets. Trying the same set again (the same day, exercise, amount and
+ * nudge) keeps its key until the server has said it is in, so a retry after an answer that never
+ * came back logs it once. Once it is in, the same amount again is a new set with a new key.
+ */
+export const makeAttemptKeys = (newKey: () => string) => {
+  const keys = new Map<string, string>()
+
+  return {
+    keyFor: (attempt: string): string => {
+      const kept = keys.get(attempt)
+
+      if (kept !== undefined) return kept
+
+      const key = newKey()
+
+      keys.set(attempt, key)
+
+      return key
+    },
+    settled: (attempt: string): void => {
+      keys.delete(attempt)
+    },
+  }
+}
+
+/** What makes two tries at logging the same set: its day, exercise, amount and nudge. */
+export const attemptOf = (day: string, exercise: string, amount: number, nudgeId?: number): string =>
+  [day, exerciseKey(exercise), amount, nudgeId ?? ""].join("|")
+
 // ---------------------------------------------------------------- nudges
+
+/**
+ * Today where the account is: in its saved time zone, which nudges follow, or the device's own
+ * day before it has one. A phone that has moved zone may be on another day.
+ */
+export const settingsToday = (settings: MiniSettings, time: number, deviceDay: string): string =>
+  isTimeZone(settings.timeZone) ? localTime(settings.timeZone, time).day : deviceDay
+
+/** Whether nudges are paused now, read by the same day the nudges themselves follow. */
+export const isPaused = (settings: MiniSettings, time: number, deviceDay: string): boolean =>
+  settings.pausedUntil !== null && settings.pausedUntil > settingsToday(settings, time, deviceDay)
 
 /** Whether a nudge may go now: nudges on, a nudge day, inside the window and not paused. */
 export const nudgesOpen = (settings: MiniSettings, now: LocalTime): boolean =>

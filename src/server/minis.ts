@@ -21,6 +21,7 @@ import {
   nudgesNeeded,
   nudgesOpen,
   sameExercise,
+  settingsToday,
   weekBefore,
   type MiniEntry,
   type MiniProgress,
@@ -83,15 +84,16 @@ interface Won {
  * Runs statements as one: all of them or none, with nothing else in between. D1 cannot hold a
  * transaction open, but runs a batch atomically; the tests' SQLite runs them in a transaction.
  */
-const atomically = Effect.fn("minis.atomically")(function* (statements: ReadonlyArray<Statement.Statement<Won>>) {
-  const d1 = yield* Effect.serviceOption(D1Client.D1Client)
+const atomically = <A>(statements: ReadonlyArray<Statement.Statement<A>>) =>
+  Effect.gen(function* () {
+    const d1 = yield* Effect.serviceOption(D1Client.D1Client)
 
-  if (Option.isSome(d1)) return yield* d1.value.batch(statements)
+    if (Option.isSome(d1)) return yield* d1.value.batch(statements)
 
-  const sql = yield* SqlClient.SqlClient
+    const sql = yield* SqlClient.SqlClient
 
-  return yield* sql.withTransaction(Effect.forEach(statements, (statement) => statement))
-})
+    return yield* sql.withTransaction(Effect.forEach(statements, (statement) => statement))
+  })
 
 /** Runs three reads as one, so they all see the database as it was at one moment. */
 const readTogether = <A, B, C>(a: Statement.Statement<A>, b: Statement.Statement<B>, c: Statement.Statement<C>) =>
@@ -200,12 +202,9 @@ const writeSettings = Effect.fn("minis.writeSettings")(function* (userId: string
   const won = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND mini_write_token = ${token})`
   const openFrom = sql`(SELECT mini_open_from FROM users WHERE id = ${userId})`
 
-  // Keys kept before 0012 could make them are put right first, so the days this write judges are
-  // judged as the app judges them. Only those days: from where the open days will start, which is
-  // today at the earliest, so a day or two, however long the account's history.
-  const opensFrom = later(stored.openFrom, later(before, after))
-
-  for (const row of yield* dayRows(userId, opensFrom, "9999-12-31")) yield* repairKeys(userId, row.day)
+  // Set keys kept before 0012 could make them are put right first, so the days this write judges
+  // are judged as the app judges them. The day targets' keys are written by the batch itself.
+  yield* repairSetKeys(userId)
 
   const results = yield* atomically([
     sql<Won>`
@@ -275,6 +274,24 @@ const dayRows = Effect.fn("minis.dayRows")(function* (userId: string, from: stri
  * made by exerciseKey. Rows kept before the keys were (migration 0012 could only fold ASCII) are
  * put right the first time their day is touched; for any other day this changes nothing.
  */
+/**
+ * Puts right every set key of an account that 0012 could not make, in a fixed number of queries
+ * whatever the history: 0012 folded ASCII alone, so only a name with something beyond ASCII can
+ * have a key that differs from exerciseKey's, and only those are read.
+ */
+const repairSetKeys = Effect.fn("minis.repairSetKeys")(function* (userId: string) {
+  const sql = yield* SqlClient.SqlClient
+
+  const candidates = yield* sql<{ id: number; exercise: string; exerciseKey: string }>`
+    SELECT id, exercise, exercise_key FROM mini_sets WHERE user_id = ${userId} AND exercise GLOB '*[^ -~]*'`
+
+  const wrong = candidates.filter((set) => set.exerciseKey !== exerciseKey(set.exercise))
+
+  if (wrong.length > 0) {
+    yield* atomically(wrong.map((set) => sql`UPDATE mini_sets SET exercise_key = ${exerciseKey(set.exercise)} WHERE id = ${set.id}`))
+  }
+})
+
 const repairKeys = Effect.fn("minis.repairKeys")(function* (userId: string, day: string) {
   const sql = yield* SqlClient.SqlClient
 
@@ -542,20 +559,56 @@ export const changeMinis = Effect.fn("changeMinis")(function* (
   return yield* new Invalid({ reason: "The settings were changing at the same time. Try again." })
 })
 
+const sameValue = <A>(a: A, b: A) => JSON.stringify(a) === JSON.stringify(b)
+
 /**
- * Saves settings as a screen's form sends them, whole, except the pause: that is kept as saved,
- * since a form opened before a pause (on another device, say) still holds the old one. Pausing
- * and resuming go through pauseMinis.
+ * What a form's save means, given the settings it was loaded with: only what the user changed in
+ * it replaces what is saved now, which another device may have changed since. The targets go
+ * together, and so do the window's start and end, so the two halves of one change never mix with
+ * another's. The pause is never the form's to change. Without `loaded` (an older screen) the
+ * form is taken whole, but for the pause.
+ */
+const mergeForm = (submitted: MiniSettings, loaded: MiniSettings | undefined, saved: MiniSettings): MiniSettings => {
+  if (loaded === undefined) return { ...submitted, pausedUntil: saved.pausedUntil }
+
+  const keep = <K extends keyof MiniSettings>(key: K): MiniSettings[K] => (sameValue(submitted[key], loaded[key]) ? saved[key] : submitted[key])
+  const windowKept = submitted.startMinute === loaded.startMinute && submitted.endMinute === loaded.endMinute
+
+  return {
+    targets: keep("targets"),
+    nudges: keep("nudges"),
+    days: keep("days"),
+    startMinute: windowKept ? saved.startMinute : submitted.startMinute,
+    endMinute: windowKept ? saved.endMinute : submitted.endMinute,
+    gapMinutes: keep("gapMinutes"),
+    timeZone: keep("timeZone"),
+    pausedUntil: saved.pausedUntil,
+  }
+}
+
+/**
+ * Saves settings as a screen's form sends them: a three-way merge of what it was loaded with,
+ * what it sends and what is saved now (mergeForm). Pausing and resuming go through pauseMinis.
  */
 export const updateMinis = (
   deviceDay: string,
   submitted: MiniSettings,
   base?: ReadonlyArray<Pick<MiniTarget, "exercise" | "unit" | "daily">>,
-) => changeMinis(deviceDay, (saved) => Effect.succeed({ ...submitted, pausedUntil: saved.pausedUntil }), base)
+  loaded?: MiniSettings,
+) => changeMinis(deviceDay, (saved) => Effect.succeed(mergeForm(submitted, loaded, saved)), base ?? loaded?.targets)
 
-/** Pauses nudges until a day, or ends a pause with null, changing nothing else that is saved. */
-export const pauseMinis = (deviceDay: string, until: string | null) =>
-  changeMinis(deviceDay, (saved) => Effect.succeed({ ...saved, pausedUntil: until }))
+/**
+ * Pauses nudges for the rest of the account's today (true), or ends a pause (false), changing
+ * nothing else that is saved. The day is the one nudges follow, in the saved time zone, so it is
+ * the same day whatever the phone that asks says.
+ */
+export const pauseMinis = (deviceDay: string, pause: boolean) =>
+  changeMinis(deviceDay, (saved) =>
+    Effect.map(Clock.currentTimeMillis, (time) => ({
+      ...saved,
+      pausedUntil: pause ? shiftDay(settingsToday(saved, time, deviceDay), 1) : null,
+    })),
+  )
 
 export interface MiniSetInput {
   readonly day: string
@@ -629,22 +682,35 @@ export const logMini = Effect.fn("logMini")(function* (input: MiniSetInput) {
   const exercise = set.nudgeId !== null ? set.exercise : (target?.exercise ?? set.exercise)
   const unit = set.nudgeId !== null ? (set.unit ?? "reps") : (target?.unit ?? set.unit ?? "reps")
 
-  // A second answer to the same nudge is left out by its unique index, and answered with the first.
-  const rows = yield* sql<MiniEntry>`
-    INSERT OR IGNORE INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, nudge_id, client_key, created_at)
-    VALUES (${user.id}, ${set.day}, ${exercise}, ${exerciseKey(exercise)}, ${unit}, ${input.amount}, ${set.nudgeId},
-      ${input.clientKey ?? null}, ${time})
-    RETURNING ${sql.unsafe(ENTRY_COLUMNS)}`
+  // So the day is judged as the app judges it once the set is in.
+  yield* repairKeys(user.id, set.day)
+
+  // The set, its nudge answered and its day worked out again go in as one, so a failure part of
+  // the way leaves nothing logged: a retry, with a fresh key or none, logs it once. A second
+  // answer to the same nudge is left out by its unique index, and answered with the first.
+  const [inserted] = yield* atomically([
+    sql<MiniEntry>`
+      INSERT OR IGNORE INTO mini_sets (user_id, day, exercise, exercise_key, unit, amount, nudge_id, client_key, created_at)
+      VALUES (${user.id}, ${set.day}, ${exercise}, ${exerciseKey(exercise)}, ${unit}, ${input.amount}, ${set.nudgeId},
+        ${input.clientKey ?? null}, ${time})
+      RETURNING ${sql.unsafe(ENTRY_COLUMNS)}`,
+    sql<MiniEntry>`UPDATE mini_nudges SET status = 'done' WHERE id = ${set.nudgeId} AND user_id = ${user.id}`,
+    sql<MiniEntry>`
+      UPDATE mini_days SET
+        met = ${sql.unsafe(MET_NOW)},
+        next_nudge_at = CASE WHEN next_nudge_at = 0 AND ${sql.unsafe(MET_NOW)} = 0 THEN NULL ELSE next_nudge_at END
+      WHERE user_id = ${user.id} AND day = ${set.day}`,
+  ])
 
   const entry =
-    rows[0] ??
+    inserted?.[0] ??
     (yield* sql<MiniEntry>`
       SELECT ${sql.unsafe(ENTRY_COLUMNS)} FROM mini_sets
       WHERE user_id = ${user.id} AND (nudge_id = ${set.nudgeId} OR client_key = ${input.clientKey ?? null})`)[0]
 
   if (!entry) return yield* new Invalid({ reason: "That set could not be logged. Try again." })
 
-  return yield* finish(entry)
+  return entry
 })
 
 /**

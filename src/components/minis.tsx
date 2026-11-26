@@ -3,11 +3,11 @@ import { useEffect, useState } from "react"
 import { ChevronIcon, CloseIcon } from "~/components/icons"
 import { Button, buttonClass, Card, cardClass, ErrorNote, parseNumber, SectionTitle, Sheet, Stepper, TextInput, useAction } from "~/components/ui"
 import { ExercisePicker } from "~/components/exercise"
-import { shiftDay } from "~/domain/days"
 import {
   dayFraction,
   describeAmount,
   formatMiniAmount,
+  isPaused,
   MINI_LIMITS,
   MINI_UNITS,
   miniFormFor,
@@ -286,7 +286,7 @@ export function MiniSettingsForm({ settings, today }: SettingsFormProps) {
   const { act, pending, error } = useAction()
   const [form, setForm] = useState<MiniForm>(() => miniFormFor(settings))
   // The targets the form started from, so the server keeps any that grew since (keepGrowth in src/server/minis.ts).
-  const [base, setBase] = useState(settings.targets)
+  const [loaded, setLoaded] = useState(settings)
   const [problem, setProblem] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -314,10 +314,10 @@ export function MiniSettingsForm({ settings, today }: SettingsFormProps) {
 
     void act(async () => {
       // What was saved, which may differ: a target saved unchanged keeps growth it earned meanwhile.
-      const stored = await updateMinis({ data: { day: today, settings: next.settings, base } })
+      const stored = await updateMinis({ data: { day: today, settings: next.settings, base: loaded.targets, loaded } })
 
       setForm(miniFormFor(stored))
-      setBase(stored.targets)
+      setLoaded(stored)
       setSaved(true)
     })
   }
@@ -466,25 +466,27 @@ interface PauseProps {
 /** A day off from nudges, or back on. */
 export function PauseNudges({ settings, today }: PauseProps) {
   const { act, pending, error } = useAction()
-  const paused = settings.pausedUntil !== null && settings.pausedUntil > today
+  // Read by the day the nudges follow, in the saved time zone, which a phone that has moved may not be on.
+  const paused = isPaused(settings, Date.now(), today)
 
   if (!settings.nudges || settings.targets.length === 0) return null
 
-  const setPause = (pausedUntil: string | null) =>
+  // Only the pause changes, so a screen showing older settings cannot put them back. The server
+  // works out until when, from the account's own day.
+  const setPause = (pause: boolean) =>
     void act(async () => {
-      // Only the pause changes, so a screen showing older settings cannot put them back.
-      await pauseMinis({ data: { day: today, until: pausedUntil } })
+      await pauseMinis({ data: { day: today, pause } })
     })
 
   return (
     <div className="pt-3">
       <ErrorNote message={error} />
       {paused ? (
-        <Button className="w-full" disabled={pending} data-testid={testIds.minis.resume} onClick={() => setPause(null)}>
+        <Button className="w-full" disabled={pending} data-testid={testIds.minis.resume} onClick={() => setPause(false)}>
           Nudges paused today. Turn them back on
         </Button>
       ) : (
-        <Button className="w-full" disabled={pending} data-testid={testIds.minis.pauseToday} onClick={() => setPause(shiftDay(today, 1))}>
+        <Button className="w-full" disabled={pending} data-testid={testIds.minis.pauseToday} onClick={() => setPause(true)}>
           No more nudges today
         </Button>
       )}

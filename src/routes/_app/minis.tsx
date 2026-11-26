@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Schema } from "effect"
+import { useState } from "react"
+import { attemptOf, makeAttemptKeys } from "~/domain/minis"
 import { DayProgress, EntryList, MiniSettingsForm, NudgeCard, PauseNudges, PushCard, SetupLink } from "~/components/minis"
 import { BackButton, ErrorNote, SectionTitle, useAction, useNow } from "~/components/ui"
 import { daysAround } from "~/domain/days"
@@ -44,9 +46,15 @@ function MinisDay({ today }: { readonly today: string }) {
   const chunks = new Map(day.targets.map((target) => [target.exercise, target.chunk]))
   const minisGoal = user.streakGoals.find((goal) => goal.activity === "minis")
 
+  // A set tried again after an answer that never came keeps its key, so it is logged once.
+  const [keys] = useState(() => makeAttemptKeys(() => crypto.randomUUID()))
+
   const log = (exercise: string, amount: number, nudgeId?: number) =>
     act(async () => {
-      await logMini({ data: { day: today, exercise, amount, nudgeId, clientKey: crypto.randomUUID() } })
+      const attempt = attemptOf(today, exercise, amount, nudgeId)
+
+      await logMini({ data: { day: today, exercise, amount, nudgeId, clientKey: keys.keyFor(attempt) } })
+      keys.settled(attempt)
     })
 
   return (

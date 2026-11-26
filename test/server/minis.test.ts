@@ -339,10 +339,10 @@ describe("nudges", () => {
     expect((await tick(TEN_AM)).sent).toBe(0)
 
     await setUp(me)
-    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+    await me.call("pauseMinis", { day: DAY, pause: true })
     expect((await tick(TEN_AM)).sent).toBe(0)
 
-    await me.call("pauseMinis", { day: DAY, until: null })
+    await me.call("pauseMinis", { day: DAY, pause: false })
     await setUp(me, { nudges: false })
     expect((await tick(TEN_AM)).sent).toBe(0)
 
@@ -446,8 +446,8 @@ describe("nudges", () => {
     await setUp(me)
     await subscribe(me)
     await tick(TEN_AM)
-    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
-    await me.call("pauseMinis", { day: DAY, until: null })
+    await me.call("pauseMinis", { day: DAY, pause: true })
+    await me.call("pauseMinis", { day: DAY, pause: false })
 
     expect((await tick(TEN_AM + 5 * 60_000)).sent).toBe(0)
     expect((await tick(TEN_AM + 40 * 60_000)).sent).toBe(0)
@@ -459,13 +459,79 @@ describe("nudges", () => {
 
     await setUp(me)
     await subscribe(me)
-    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+    await me.call("pauseMinis", { day: DAY, pause: true })
 
     // Another device's form, opened before the pause, changes only the gap.
     const saved = await setUp(me, { gapMinutes: 60, pausedUntil: null })
 
     expect(saved.pausedUntil).toBe(shiftDay(DAY, 1))
     expect((await tick(TEN_AM)).sent).toBe(0)
+  })
+
+  it("never gives a removed set's id to the next one, so a stale Remove cannot take a different set", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+
+    const first = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 25 })
+
+    // One device takes it back and logs another; the other still shows the first.
+    await me.call("deleteMini", { entryId: first.id })
+
+    const replacement = await me.call("logMini", { day: DAY, exercise: "Push-Up", amount: 30 })
+
+    expect(replacement.id).not.toBe(first.id)
+    expect((await server.request("call/deleteMini", { token: me.token, body: { entryId: first.id } })).status).toBe(404)
+    expect((await today(me)).progress[0]!.done).toBe(30)
+  })
+
+  it("logs a set all at once or not at all, so trying again logs it once", async () => {
+    const me = await server.signUp()
+
+    await setUp(me)
+
+    // Working out the day fails once, after the set went in within the same step.
+    server.exec(`CREATE TRIGGER refuse_once BEFORE UPDATE OF met ON mini_days BEGIN SELECT RAISE(ABORT, 'refused'); END`)
+
+    const body = { day: DAY, exercise: "Push-Up", amount: 10, clientKey: "first-try-1" }
+
+    expect((await server.request("call/logMini", { token: me.token, body })).status).toBe(500)
+    expect((await today(me)).progress[0]!.done).toBe(0)
+
+    server.exec(`DROP TRIGGER refuse_once`)
+    await me.call("logMini", { ...body, clientKey: "second-try-2" })
+
+    expect((await today(me)).progress[0]!.done).toBe(10)
+  })
+
+  it("keeps nudges off when a form opened before they were turned off is saved", async () => {
+    const me = await server.signUp()
+    const loaded = await setUp(me)
+
+    await subscribe(me)
+    // Another device turns nudges off.
+    await setUp(me, { nudges: false })
+
+    // This one, loaded while they were on, changes only the gap.
+    const saved = await me.call("updateMinis", { day: DAY, settings: { ...loaded, gapMinutes: 60 }, loaded })
+
+    expect(saved).toMatchObject({ nudges: false, gapMinutes: 60 })
+    expect((await tick(TEN_AM)).sent).toBe(0)
+  })
+
+  it("pauses for the account's own today, whatever day the phone that asks is on", async () => {
+    const me = await server.signUp()
+
+    // Brisbane's Friday 09:00 is Thursday afternoon in Los Angeles, where the phone is.
+    const fridayInBrisbane = Date.parse(`${DAY}T23:00:00Z`)
+
+    await setUp(me, { timeZone: "Australia/Brisbane" })
+    await subscribe(me)
+    clockAt(fridayInBrisbane)
+    await me.call("pauseMinis", { day: DAY, pause: true })
+
+    expect((await me.call("getMinis", { from: DAY, to: DAY })).settings.pausedUntil).toBe(shiftDay(DAY, 2))
+    expect((await tick(fridayInBrisbane)).sent).toBe(0)
   })
 
   it("takes a set back all at once or not at all", async () => {
@@ -495,7 +561,7 @@ describe("nudges", () => {
     await setUp(me)
     // Another device turns nudges off; this one still shows them on, and pauses for the day.
     await setUp(me, { nudges: false })
-    await me.call("pauseMinis", { day: DAY, until: shiftDay(DAY, 1) })
+    await me.call("pauseMinis", { day: DAY, pause: true })
 
     const { settings } = await me.call("getMinis", { from: DAY, to: DAY })
 
