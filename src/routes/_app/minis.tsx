@@ -127,7 +127,7 @@ function MinisDay({ today }: { readonly today: string }) {
           <p className="pt-3 text-sm text-faint">
             {minisGoal
               ? `Your streak goal: ${describeGoal(minisGoal)}. Days with every target done get a blue ring on the calendar.`
-              : "Add a mini workouts streak goal in Settings to ring the days you finish every target on the calendar."}
+              : "Add a mini workouts streak goal in Settings, Streak goals, to ring the days you finish every target on the calendar."}
           </p>
         </>
       ) : (

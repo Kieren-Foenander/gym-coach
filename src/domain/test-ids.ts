@@ -1,5 +1,6 @@
 import { slugFor } from "./catalog"
 import type { MiniUnit } from "./minis"
+import type { SettingsPage } from "./settings"
 import { normaliseGoal, type DayMark, type Frequency, type Ring, type StreakActivity, type StreakGoal } from "./streaks"
 
 /**
@@ -209,6 +210,8 @@ export const testIds = {
     dayWorkout: keyed<number>("calendar.day-workout"),
   },
   settings: {
+    /** A row in the Settings menu that opens one of its pages. */
+    page: keyed<SettingsPage>("settings.page"),
     displayName: "settings.display-name",
     goal: "settings.goal",
     saveProfile: "settings.save-profile",

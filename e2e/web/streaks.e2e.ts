@@ -40,6 +40,7 @@ describe("streak goals", { requires: ["browser"] }, () => {
     await expect(screen.getByTestId(testIds.today.streak)).toHaveAttribute("data-value", "0")
 
     await screen.getByTestId(testIds.nav.tab("settings")).tap()
+    await screen.getByTestId(testIds.settings.page("streaks")).tap()
 
     const main = screen.getByTestId(testIds.settings.streakGoal("main"))
 
@@ -60,6 +61,7 @@ describe("streak goals", { requires: ["browser"] }, () => {
 
   test("keeps a second goal after a reload, shows both streaks, and removes it", { tags: ["smoke"] }, async ({ browser, screen }) => {
     await screen.getByTestId(testIds.nav.tab("settings")).tap()
+    await screen.getByTestId(testIds.settings.page("streaks")).tap()
     await screen.getByTestId(testIds.settings.addStreakGoal).tap()
 
     // Beside a training goal, the second goal starts as a daily walk.
@@ -81,6 +83,7 @@ describe("streak goals", { requires: ["browser"] }, () => {
     await expect(screen.getByTestId(testIds.calendar.longestStreak(training))).toHaveCount(0)
 
     await screen.getByTestId(testIds.nav.tab("settings")).tap()
+    await screen.getByTestId(testIds.settings.page("streaks")).tap()
     await second.getByTestId(testIds.settings.removeStreakGoal).tap()
     await screen.getByTestId(testIds.settings.saveStreakGoals).tap()
     await expect(screen.getByTestId(testIds.settings.saveStreakGoals)).toHaveAttribute("data-state", SAVE_STATES.saved)

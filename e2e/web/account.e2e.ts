@@ -13,6 +13,7 @@ describe("the account", { requires: ["browser"] }, () => {
 
   test("keeps a changed name after a reload", async ({ browser, screen }) => {
     await screen.getByTestId(testIds.nav.tab("settings")).tap()
+    await screen.getByTestId(testIds.settings.page("profile")).tap()
     await screen.getByTestId(testIds.settings.displayName).fill("Renamed Tester")
     await screen.getByTestId(testIds.settings.saveProfile).tap()
     // Reload only once the server has the new name.

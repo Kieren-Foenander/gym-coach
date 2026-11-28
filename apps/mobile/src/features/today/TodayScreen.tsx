@@ -141,7 +141,7 @@ export function TodayScreen() {
             Connect your AI coach and ask it to build one around your goals, or pick a starter plan.
           </Text>
           <View className="flex-row gap-2">
-            <Button variant="primary" className="flex-1" onPress={() => navigation.navigate("Tabs", { screen: "Settings" })}>
+            <Button variant="primary" className="flex-1" onPress={() => navigation.navigate("SettingsCoach")}>
               Connect coach
             </Button>
             <Button className="flex-1" onPress={() => navigation.navigate("Tabs", { screen: "Plan" })}>
