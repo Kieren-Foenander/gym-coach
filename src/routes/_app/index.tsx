@@ -143,7 +143,7 @@ function TodayPage() {
             Connect your AI coach and ask it to build one around your goals, or pick a starter plan.
           </p>
           <div className="flex gap-2">
-            <Link to="/settings" className={buttonClass("primary", "flex-1")}>
+            <Link to="/settings/coach" className={buttonClass("primary", "flex-1")}>
               Connect coach
             </Link>
             <Link to="/plan" className={buttonClass("secondary", "flex-1")}>

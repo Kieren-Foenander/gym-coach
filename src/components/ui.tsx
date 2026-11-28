@@ -37,7 +37,7 @@ export function Card({ children, className = "" }: { readonly children: ReactNod
 }
 
 /** The way back at the top of a page. Goes back in history, or to `fallback` when the page was opened directly. */
-export function BackButton({ fallback }: { readonly fallback: "/" | "/exercises" }) {
+export function BackButton({ fallback }: { readonly fallback: "/" | "/exercises" | "/settings" }) {
   const router = useRouter()
 
   const back = () => {

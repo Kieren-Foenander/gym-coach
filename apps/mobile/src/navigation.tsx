@@ -23,7 +23,11 @@ import { NutritionScreen } from "@/features/nutrition/NutritionScreen"
 import { HistoryScreen } from "@/features/history/HistoryScreen"
 import { AddPlanDaySheet, AddPlanExerciseSheet, EditPlanExerciseSheet, TemplatesSheet } from "@/features/plan/PlanSheets"
 import { PlanScreen } from "@/features/plan/PlanScreen"
+import { CoachScreen } from "@/features/settings/CoachScreen"
+import { HealthScreen } from "@/features/settings/HealthScreen"
+import { ProfileScreen } from "@/features/settings/ProfileScreen"
 import { SettingsScreen } from "@/features/settings/SettingsScreen"
+import { StreakGoalsScreen } from "@/features/settings/StreakGoalsScreen"
 import { TodayScreen } from "@/features/today/TodayScreen"
 import { LoadingGuideSheet } from "@/features/workout/LoadingGuideSheet"
 import { AddWorkoutExerciseSheet, ExerciseNoteSheet, SwapExerciseSheet } from "@/features/workout/WorkoutSheets"
@@ -46,6 +50,11 @@ export type AppStackParams = {
   readonly Nutrition: undefined
   /** Mini workouts, with the nudge to answer when one was opened. */
   readonly Minis: { readonly nudgeId?: number }
+  readonly SettingsProfile: undefined
+  readonly SettingsStreaks: undefined
+  readonly SettingsCoach: undefined
+  /** Apple Health, listed in Settings on an iPhone only. */
+  readonly SettingsHealth: undefined
   readonly MuscleGroup: { readonly muscle: Muscle }
   readonly LibraryExercise: { readonly slug: string }
   readonly OwnExercise: { readonly exerciseId: number }
@@ -175,6 +184,10 @@ export function Navigation() {
             <AppStack.Screen name="Calendar" component={CalendarScreen} />
             <AppStack.Screen name="Nutrition" component={NutritionScreen} />
             <AppStack.Screen name="Minis" component={MinisScreen} />
+            <AppStack.Screen name="SettingsProfile" component={ProfileScreen} />
+            <AppStack.Screen name="SettingsStreaks" component={StreakGoalsScreen} />
+            <AppStack.Screen name="SettingsCoach" component={CoachScreen} />
+            <AppStack.Screen name="SettingsHealth" component={HealthScreen} />
             <AppStack.Screen name="MuscleGroup" component={MuscleGroupScreen} />
             <AppStack.Screen name="LibraryExercise" component={LibraryExerciseScreen} />
             <AppStack.Screen name="OwnExercise" component={OwnExerciseScreen} />

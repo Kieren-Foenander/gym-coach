@@ -89,6 +89,7 @@ describe("mini workouts", { requires: ["browser"] }, () => {
     await expect(screen.getByTestId(testIds.calendar.day(today))).toHaveAttribute("data-state", DAY_STATES.other)
 
     await screen.getByTestId(testIds.nav.tab("settings")).tap()
+    await screen.getByTestId(testIds.settings.page("streaks")).tap()
     await screen.getByTestId(testIds.settings.addStreakGoal).tap()
 
     const second = screen.getByTestId(testIds.settings.streakGoal("second"))
